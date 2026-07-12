@@ -1,0 +1,12 @@
+# SuperPro Designer validation template.
+# Fill the `value` column with the numbers from your SuperPro Economic
+# Evaluation Report for the SAME process you model in this tool, then load this
+# file from the app  (Validation > Load reference CSV).
+# Leave a value blank to skip that metric. Lines starting with # are ignored.
+#
+# metric,value
+total_capex_eur,
+annual_opex_eur,
+production_cost_eur_per_kg,
+annual_production_kg,
+electricity_kwh_per_kg,

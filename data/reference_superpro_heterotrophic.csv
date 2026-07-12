@@ -1,0 +1,11 @@
+# SuperPro reference — heterotrophic "standard cultivation" (microalgae powder).
+# Source: Aury standard cultivation FIXED paper (SuperPro Designer). Values in USD (~EUR for comparison).
+# NOTE: SuperPro's "General" sheet annual throughput (28,516,142 kg/yr) is a display bug;
+# the self-consistent production rate is ~285,161 kg/yr (glucose 856,800 / 3.0 kg/kg).
+# metric,value
+total_capex_eur,9406574
+annual_opex_eur,4693744
+production_cost_eur_per_kg,16.46
+annual_production_kg,285161
+electricity_kwh_per_kg,3.83
+npv_eur,5556504

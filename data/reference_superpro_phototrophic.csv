@@ -1,0 +1,14 @@
+# SuperPro reference — phototrophic algal-oil biorefinery.
+# Source: AlgalOil_v9b9 Economic Evaluation Report (SuperPro Designer, 2015 prices). Values in USD.
+# Large-scale ponds -> harvesting -> hexane extraction -> algal oil; protein co-product; AD energy recovery.
+# The calibrated examples/phototrophic_algal_oil.py reproduces this within ~1% on unit cost and ~9% on
+# capital investment; OPEX is ~16% high because the plant's anaerobic-digestion energy recovery
+# (a ~$16M/yr credit) is not modelled here.
+# metric,value
+total_capex_eur,305988000
+annual_opex_eur,111528000
+production_cost_eur_per_kg,1.70
+annual_production_kg,65486691
+electricity_kwh_per_kg,1.746
+annual_revenue_eur,126603000
+npv_eur,6186000

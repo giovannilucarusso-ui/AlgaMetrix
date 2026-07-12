@@ -1,0 +1,278 @@
+"""Dataclasses describing a production scenario.
+
+A :class:`Scenario` is a plain, serialisable description of *what* is being
+produced and *how*. It carries no calculation logic; the physics, economics and
+environmental accounting live in :mod:`inventory`, :mod:`tea` and :mod:`lca`.
+All units are stated explicitly in the field comments and are SI-based
+(kg, m2, m3, kWh, MJ, EUR, year).
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from enum import Enum
+
+
+class TrophicMode(str, Enum):
+    """How the organism obtains carbon and energy."""
+
+    PHOTOTROPHIC = "phototrophic"    # light + CO2 (raceway, PBR)
+    HETEROTROPHIC = "heterotrophic"  # organic substrate (fermenter)
+
+
+class CarbonSource(str, Enum):
+    """Inorganic-carbon feed for a phototrophic culture.
+
+    ``CO2`` is gaseous CO2 enrichment (flue gas, pure CO2). ``BICARBONATE`` is
+    dissolved sodium bicarbonate (NaHCO3) — the standard carbon source for
+    alkaliphilic strains such as Arthrospira (Spirulina) grown at pH 9-10.
+    Ignored for heterotrophic systems (carbon comes from the substrate).
+    """
+
+    CO2 = "co2"
+    BICARBONATE = "bicarbonate"
+
+
+class Basis(str, Enum):
+    """What the cultivation `scale` and `productivity` are expressed per."""
+
+    AREA = "area"      # scale in m2, productivity in g/m2/day
+    VOLUME = "volume"  # scale in m3, productivity in g/L/day
+
+
+@dataclass
+class Organism:
+    """A strain and its composition. Elemental fractions drive the nutrient balance."""
+
+    name: str
+    group: str                 # microalga | cyanobacterium | thraustochytrid | protist
+    protein: float             # mass fraction of ash-free dry weight
+    lipid: float
+    carbohydrate: float
+    ash: float
+    carbon: float              # elemental mass fraction of dry weight
+    nitrogen: float
+    phosphorus: float
+    notes: str = ""
+    # Optional pigment fraction (mass fraction of dry weight) for pigment
+    # biorefineries, e.g. C-phycocyanin in Spirulina. NB: this is a subset of the
+    # protein pool, not additive to it — see products.py when modelling both.
+    phycocyanin: float = 0.0
+
+
+@dataclass
+class CultivationSystem:
+    """A reactor/pond type and its operating and cost characteristics."""
+
+    name: str
+    mode: TrophicMode
+    basis: Basis
+    productivity: float        # g/m2/d (area) or g/L/d (volume)
+    operating_days: float      # d/yr
+    biomass_conc: float        # g/L at harvest
+    elec_kwh_per_kg: float     # cultivation electricity per kg dry biomass
+    co2_utilization: float     # fraction of supplied inorganic carbon (CO2 or NaHCO3) fixed
+    nutrient_uptake: float     # fraction of supplied N, P assimilated
+    water_m3_per_kg: float     # net water consumption per kg dry biomass
+    substrate_yield: float     # kg biomass / kg substrate (heterotrophic)
+    capex_per_unit: float      # EUR per m2 (area) or per m3 (volume)
+    land_m2_per_unit: float    # m2 land per m2 pond or per m3 reactor
+    notes: str = ""
+    # Inorganic-carbon feed for phototrophic systems (CO2 gas vs NaHCO3 solution).
+    carbon_source: CarbonSource = CarbonSource.CO2
+    # Optional thermal conditioning of the culture (e.g. seasonal pond/greenhouse
+    # heating). Dominant hotspot for heated temperate Spirulina ponds; leave 0 for
+    # warm-climate unheated systems. Fuel routes the burden like Drying.fuel.
+    cultivation_heat_mj_per_kg: float = 0.0   # thermal MJ per kg dry biomass
+    cultivation_heat_fuel: str = "natural_gas"  # natural_gas | electricity
+    # Optional recipe travelling with the system.
+    materials: list["Material"] = field(default_factory=list)
+    utilities: list["Utility"] = field(default_factory=list)
+    product_price: float = 0.0   # typical EUR/kg selling price (seeds the UI)
+
+
+@dataclass
+class Harvesting:
+    """Dewatering / concentration step."""
+
+    name: str
+    recovery: float            # fraction of biomass recovered (0-1)
+    elec_kwh_per_kg: float     # per kg dry biomass entering the step
+    final_solids: float        # solids fraction of the concentrate (0-1)
+    notes: str = ""
+
+
+@dataclass
+class Drying:
+    """Optional thermal drying step."""
+
+    name: str
+    enabled: bool
+    final_solids: float            # solids fraction of the dried product (0-1)
+    thermal_mj_per_kg_water: float # heat to evaporate 1 kg water
+    elec_kwh_per_kg: float = 0.0   # per kg dry biomass
+    fuel: str = "natural_gas"      # natural_gas | electricity
+    notes: str = ""
+
+
+@dataclass
+class Material:
+    """An explicit raw-material / media line item (e.g. yeast extract, hexane, nitrate).
+
+    Complements the physics-derived flows (CO2, N, P, substrate): use it for the
+    specific media components and process chemicals a real recipe needs.
+    """
+
+    name: str
+    amount_per_kg: float   # kg of material per kg of dry product
+    price: float           # EUR/kg
+    gwp: float = 0.0        # kg CO2-eq / kg (cradle-to-gate)
+    ced: float = 0.0        # MJ / kg
+    notes: str = ""
+
+
+@dataclass
+class Utility:
+    """An explicit utility line item beyond electricity and drying heat.
+
+    e.g. sterilization steam, fermentation cooling water / chilled water.
+    """
+
+    name: str
+    amount_per_kg: float   # utility units per kg of dry product
+    unit: str              # "kg", "MJ", "m3", ...
+    price: float           # EUR per unit
+    gwp: float = 0.0        # kg CO2-eq / unit
+    ced: float = 0.0        # MJ / unit
+    notes: str = ""
+
+
+@dataclass
+class Extraction:
+    """Optional downstream: cell disruption + solvent extraction of the biomass.
+
+    Flows are expressed per kg of dry biomass entering the step. When enabled its
+    electricity, heat and net solvent make-up are added to the inventory and its
+    equipment to the CAPEX. The split of the biomass into products is described by
+    the :class:`Product` list on the scenario.
+    """
+
+    enabled: bool = False
+    name: str = "Solvent extraction"
+    disruption_elec_kwh_per_kg: float = 0.0  # cell disruption (homogeniser/bead mill)
+    elec_kwh_per_kg: float = 0.0             # extraction + phase separation
+    heat_mj_per_kg: float = 0.0              # solvent recovery (distillation)
+    solvent_name: str = "Hexane"
+    solvent_kg_per_kg: float = 0.0           # solvent contacted per kg biomass
+    solvent_recovery: float = 0.95           # fraction of solvent recycled
+    solvent_price: float = 0.0               # EUR/kg
+    solvent_gwp: float = 0.0                 # kg CO2-eq / kg
+    solvent_ced: float = 0.0                 # MJ / kg
+    capex_per_kgyr: float = 0.0              # EUR per (kg biomass/yr)
+    allocation: str = "economic"             # economic | mass | none (all to main product)
+    notes: str = ""                          # provenance / citation for a catalogued preset
+
+
+@dataclass
+class Product:
+    """An output fraction that can be sold. Yields link to the organism composition."""
+
+    name: str
+    fraction: str = "biomass"   # lipid | protein | carbohydrate | ash | biomass | residual | custom
+    recovery: float = 1.0       # fraction of that component recovered into this product
+    price: float = 0.0          # EUR/kg
+    is_main: bool = False       # the main product carries the reported production cost
+    yield_override: float = 0.0  # if >0, kg product / kg biomass directly (ignores `fraction`)
+
+
+@dataclass
+class Economics:
+    """Prices and financial assumptions for the techno-economic analysis."""
+
+    electricity_price: float       # EUR/kWh
+    heat_price: float              # EUR/MJ
+    co2_price: float               # EUR/kg CO2 (may be <=0 for waste/credited CO2)
+    nitrogen_price: float          # EUR/kg N
+    phosphorus_price: float        # EUR/kg P
+    water_price: float             # EUR/m3
+    substrate_price: float         # EUR/kg substrate
+    land_price: float              # EUR/m2 (one-time)
+    harvest_capex_per_kgyr: float  # EUR per (kg/yr) capacity
+    drying_capex_per_kgyr: float   # EUR per (kg/yr) capacity
+    installation_factor: float     # installed CAPEX = equipment * factor
+    indirect_factor: float         # engineering+contingency, fraction of installed
+    labor_cost_per_year: float     # EUR/yr
+    maintenance_frac: float        # fraction of total CAPEX per year
+    overhead_frac: float           # fraction of (variable+labour+maintenance)
+    discount_rate: float           # for NPV / capital recovery factor
+    plant_lifetime: float          # yr (project evaluation horizon)
+    # --- profitability & SuperPro-style capital structure (defaults provided) ---
+    bicarbonate_price: float = 0.28    # EUR/kg NaHCO3 (sodium bicarbonate carbon source)
+    depreciation_years: float = 10.0   # straight-line depreciation period
+    insurance_frac: float = 0.01       # per year, as fraction of DFC
+    working_capital_frac: float = 0.05  # working capital as fraction of DFC
+    startup_frac: float = 0.05          # start-up cost as fraction of DFC
+    tax_rate: float = 0.30              # income tax rate
+
+
+@dataclass
+class LCIAFactors:
+    """Cradle-to-gate characterization factors for the impact assessment."""
+
+    elec_gwp: float        # kg CO2-eq / kWh
+    elec_ced: float        # MJ / kWh
+    elec_water: float      # m3 / kWh
+    heat_gwp: float        # kg CO2-eq / MJ
+    heat_ced: float        # MJ / MJ
+    nitrogen_gwp: float    # kg CO2-eq / kg N
+    nitrogen_ced: float    # MJ / kg N
+    phosphorus_gwp: float  # kg CO2-eq / kg P
+    phosphorus_ced: float  # MJ / kg P
+    co2_supply_gwp: float  # kg CO2-eq / kg CO2 supplied
+    substrate_gwp: float   # kg CO2-eq / kg substrate
+    substrate_ced: float   # MJ / kg substrate
+    count_biogenic_uptake: bool = True  # credit fixed CO2 at the gate
+    # --- sodium bicarbonate carbon source (defaults provided) -------------
+    bicarbonate_gwp: float = 0.87  # kg CO2-eq / kg NaHCO3 (Solvay/trona production)
+    bicarbonate_ced: float = 11.0  # MJ / kg NaHCO3
+    # --- eutrophication & acidification (defaults provided) ---------------
+    n_to_water_frac: float = 0.3   # fraction of un-assimilated N reaching water
+    p_to_water_frac: float = 0.5   # fraction of un-assimilated P reaching water
+    elec_acid: float = 0.0018      # kg SO2-eq / kWh
+    heat_acid: float = 0.00007     # kg SO2-eq / MJ
+    nitrogen_acid: float = 0.008   # kg SO2-eq / kg N (fertilizer production)
+    phosphorus_acid: float = 0.006  # kg SO2-eq / kg P
+    substrate_acid: float = 0.002  # kg SO2-eq / kg substrate
+    solvent_acid: float = 0.004    # kg SO2-eq / kg solvent
+    nitrogen_eutroph_n: float = 0.012   # kg N-eq / kg N (upstream fertilizer)
+    phosphorus_eutroph_p: float = 0.03  # kg P-eq / kg P (upstream fertilizer)
+    elec_eutroph_p: float = 0.00005     # kg P-eq / kWh
+
+
+@dataclass
+class Scenario:
+    """A complete, self-contained production scenario."""
+
+    organism: Organism
+    system: CultivationSystem
+    harvesting: Harvesting
+    drying: Drying
+    economics: Economics
+    lcia: LCIAFactors
+    scale: float                    # m2 (area basis) or m3 (volume basis)
+    product_name: str = "dry biomass"
+    # Explicit media / chemicals and utilities on top of the derived flows.
+    materials: list[Material] = field(default_factory=list)
+    utilities: list[Utility] = field(default_factory=list)
+    # Profitability inputs (0 => not sold, production-cost analysis only).
+    product_price: float = 0.0                # EUR/kg of product (whole-biomass mode)
+    coproduct_revenue_per_year: float = 0.0   # EUR/yr from co-products / by-products
+    # Optional downstream extraction and multi-product output with allocation.
+    extraction: Extraction = field(default_factory=Extraction)
+    products: list[Product] = field(default_factory=list)
+    # Optional batch scheduling (else throughput = scale x productivity x days).
+    batch_mode: bool = False
+    batch_size_kg: float = 0.0        # gross dry biomass harvested per batch
+    batch_cycle_time_h: float = 0.0   # total batch cycle time (incl. turnaround)
+    # Operating-cost credits (energy/heat recovery, biogas, waste valorisation).
+    credits_per_year: float = 0.0     # EUR/yr that reduce the net operating cost

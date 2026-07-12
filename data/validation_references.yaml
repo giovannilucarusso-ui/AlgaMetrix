@@ -1,0 +1,128 @@
+# Validation library — published Spirulina/microalgae TEA & LCA studies this model
+# has been checked against, with the paper's reported value next to our model's
+# output. Add one entry per (paper, metric) as new validations are done.
+# `type`: TEA | LCA.  `match`: short human verdict of the agreement.
+
+# --- Padi et al. 2023 — the TEA calibration + reproduction reference ----------
+- paper: "Padi et al. 2023, Algal Research 74:103190"
+  type: TEA
+  system: "Spirulina DSFP, open raceway + NaHCO3, greenhouse (Ireland/Italy)"
+  metric: "Production cost / MEPP"
+  paper_value: "13.2–17.3 €/kg"
+  model_value: "13.47 €/kg"
+  match: "within range"
+  url: "https://doi.org/10.1016/j.algal.2023.103190"
+
+- paper: "Padi et al. 2023, Algal Research 74:103190"
+  type: TEA
+  system: "Spirulina DSFP, open raceway + NaHCO3, greenhouse (Ireland/Italy)"
+  metric: "Total capital investment"
+  paper_value: "16.8 M€"
+  model_value: "18.1 M€"
+  match: "+8%"
+  url: "https://doi.org/10.1016/j.algal.2023.103190"
+
+- paper: "Padi et al. 2023, Algal Research 74:103190"
+  type: TEA
+  system: "Spirulina DSFP, open raceway + NaHCO3, greenhouse (Ireland/Italy)"
+  metric: "NaHCO3 cost"
+  paper_value: "1.38 €/kg"
+  model_value: "1.45 €/kg"
+  match: "+5%"
+  url: "https://doi.org/10.1016/j.algal.2023.103190"
+
+# --- Frontiers 2026 — independent LCA validation (Italian organic spirulina) --
+- paper: "Frontiers Sust. Food Syst. 2026 (organic spirulina, Italy)"
+  type: LCA
+  system: "Open raceway in greenhouse, seasonal (no heating), NaHCO3 5 kg/kg"
+  metric: "GWP"
+  paper_value: "~15 kg CO2-eq/kg"
+  model_value: "14.0 kg CO2-eq/kg"
+  match: "-7%"
+  url: "https://www.frontiersin.org/journals/sustainable-food-systems/articles/10.3389/fsufs.2026.1763476/full"
+
+- paper: "Frontiers Sust. Food Syst. 2026 (organic spirulina, Italy)"
+  type: LCA
+  system: "Open raceway in greenhouse, seasonal (no heating), NaHCO3 5 kg/kg"
+  metric: "GWP — NaHCO3 contribution"
+  paper_value: "4.56 kg CO2-eq/kg"
+  model_value: "4.51 kg CO2-eq/kg"
+  match: "-1%"
+  url: "https://www.frontiersin.org/journals/sustainable-food-systems/articles/10.3389/fsufs.2026.1763476/full"
+
+- paper: "Frontiers Sust. Food Syst. 2026 (organic spirulina, Italy)"
+  type: LCA
+  system: "Open raceway in greenhouse, seasonal (no heating), NaHCO3 5 kg/kg"
+  metric: "NaHCO3 use"
+  paper_value: "5.0 kg/kg"
+  model_value: "5.18 kg/kg"
+  match: "+4%"
+  url: "https://www.frontiersin.org/journals/sustainable-food-systems/articles/10.3389/fsufs.2026.1763476/full"
+
+# --- Downstream-processing anchors (DSP) --------------------------------------
+# Literature the built-in downstream/extraction presets and the tangential-membrane
+# harvesting presets are anchored to. `type: DSP` = the preset's default parameter
+# is compared to the paper's reported value (not a full TEA/LCA reproduction).
+
+- paper: "de Melo et al. 2014; Molecules 2023 review 28(3):1410"
+  type: DSP
+  system: "Supercritical CO2 extraction of microalgae (lipids, carotenoids, astaxanthin)"
+  metric: "scCO2 operating window & recovery"
+  paper_value: "20–45 MPa, 40–70 °C, 5–10% v/v EtOH; 80–90% recovery"
+  model_value: "SC-CO2 preset (co-solvent noted; ~0.8 kg CO2/kg net make-up)"
+  match: "parameters in range"
+  url: "https://doi.org/10.3390/molecules28031410"
+
+- paper: "J. Supercrit. Fluids 2025 (staged scCO2 optimisation)"
+  type: DSP
+  system: "Supercritical CO2 plant, CO2 compression/recompression cycle"
+  metric: "Specific energy (best practice)"
+  paper_value: "~0.62 kWh/kg extract; target < 3 kWh/kg product"
+  model_value: "3.0 kWh/kg biomass (compression-dominated)"
+  match: "conservative upper bound"
+  url: "https://www.sciencedirect.com/science/article/pii/S0896844625002438"
+
+- paper: "Postma et al. 2015, Bioresour. Technol. 184:297; 2017 bead-size study"
+  type: DSP
+  system: "Bead-milling cell disruption of Chlorella / Nannochloropsis / Tetraselmis"
+  metric: "Disruption specific energy"
+  paper_value: "0.45–2 kWh/kg (optimised, 0.3–0.5 mm beads)"
+  model_value: "1.0 kWh/kg (bead-mill/UF protein presets)"
+  match: "within range"
+  url: "https://www.sciencedirect.com/science/article/abs/pii/S0960852415010378"
+
+- paper: "Yap et al. 2015, Bioresour. Technol. (HPH energy evaluation)"
+  type: DSP
+  system: "High-pressure homogenisation cell disruption (alt. to bead milling)"
+  metric: "Disruption specific energy"
+  paper_value: "0.5–5.4 kWh/kg (species/pressure dependent)"
+  model_value: "0.5 kWh/kg (solvent presets, disruption pre-treatment)"
+  match: "lower bound (mild pre-treatment)"
+  url: "https://www.sciencedirect.com/science/article/abs/pii/S0960852414016514"
+
+- paper: "Fasaei et al. 2018, Algal Research 31:347; Bilad et al. (crossflow)"
+  type: DSP
+  system: "Tangential (cross-flow) membrane harvesting / dewatering"
+  metric: "Dewatering electricity"
+  paper_value: "0.1–0.7 kWh/kg (closed); TFF 0.4–2 kWh/m³ broth"
+  model_value: "0.4 kWh/kg (Cross-flow UF harvesting preset)"
+  match: "within range"
+  url: "https://www.sciencedirect.com/science/article/pii/S2211926417306677"
+
+- paper: "Halim et al. 2012, Frontiers Energy Res. 2014 lipid-extraction review"
+  type: DSP
+  system: "Organic-solvent lipid extraction (hexane / ethanol)"
+  metric: "Solvent-to-biomass ratio & recovery"
+  paper_value: "S/F 3–20:1; >90% lipid recovery"
+  model_value: "Hexane preset S/F 5:1, 98% solvent recycle"
+  match: "within range"
+  url: "https://www.frontiersin.org/journals/energy-research/articles/10.3389/fenrg.2014.00061/full"
+
+- paper: "Aslanbay Guler et al. 2024, ChemBioEng Reviews 11 (green extraction LCA)"
+  type: LCA
+  system: "Cradle-to-gate footprint of extraction solvents"
+  metric: "Solvent GWP"
+  paper_value: "0.68–5.51 kg CO2-eq/kg (common organic solvents)"
+  model_value: "Hexane 0.9, Ethanol 1.6 kg CO2-eq/kg"
+  match: "within range"
+  url: "https://onlinelibrary.wiley.com/doi/full/10.1002/cben.202300056"

@@ -1,0 +1,9 @@
+# Normalise line endings so the repo stays consistent across Windows/macOS/Linux.
+* text=auto eol=lf
+
+# Treat binary assets as binary (no line-ending conversion, no diff noise).
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.xlsx binary

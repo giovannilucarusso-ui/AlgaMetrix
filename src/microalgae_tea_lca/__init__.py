@@ -1,0 +1,102 @@
+"""AlgaeTEA-LCA: open-source techno-economic analysis and LCA for microalgae
+and aquatic protist biomass.
+
+Typical usage::
+
+    from microalgae_tea_lca.library import load_library
+    from microalgae_tea_lca.models import Scenario
+    from microalgae_tea_lca.scenario import run_scenario
+
+    lib = load_library()
+    scenario = Scenario(
+        organism=lib.organisms["Chlorella vulgaris"],
+        system=lib.systems["Open raceway pond"],
+        harvesting=lib.harvesting["Settling + centrifugation"],
+        drying=lib.drying["Spray drying"],
+        economics=lib.economics,
+        lcia=lib.lcia,
+        scale=100_000,
+    )
+    results = run_scenario(scenario)
+"""
+
+from __future__ import annotations
+
+from .inventory import Inventory, build_inventory
+from .lca import LCAResult, run_lca
+from .library import Library, load_library
+from .models import (
+    Basis,
+    CarbonSource,
+    CultivationSystem,
+    Drying,
+    Economics,
+    Extraction,
+    Harvesting,
+    LCIAFactors,
+    Material,
+    Organism,
+    Product,
+    Scenario,
+    TrophicMode,
+    Utility,
+)
+from .benchmarks import (
+    check_benchmarks,
+    infer_category,
+    load_benchmarks,
+    load_market_prices,
+    load_validation_references,
+)
+from .comparison import scenario_kpis
+from .products import ProductResult, compute_products, product_masses
+from .scenario import Results, minimum_selling_price, run_scenario
+from .sensitivity import PARAMETERS, run_sweep
+from .tea import TEAResult, capital_recovery_factor, irr, npv, run_tea
+from .uncertainty import MonteCarloResult, run_montecarlo
+
+__version__ = "0.1.0"
+
+__all__ = [
+    "Basis",
+    "CarbonSource",
+    "CultivationSystem",
+    "Drying",
+    "Economics",
+    "Harvesting",
+    "Inventory",
+    "Extraction",
+    "LCAResult",
+    "LCIAFactors",
+    "Library",
+    "Material",
+    "MonteCarloResult",
+    "Organism",
+    "PARAMETERS",
+    "Product",
+    "ProductResult",
+    "Results",
+    "Scenario",
+    "TEAResult",
+    "TrophicMode",
+    "Utility",
+    "build_inventory",
+    "capital_recovery_factor",
+    "check_benchmarks",
+    "compute_products",
+    "infer_category",
+    "irr",
+    "load_benchmarks",
+    "load_market_prices",
+    "load_library",
+    "load_validation_references",
+    "minimum_selling_price",
+    "npv",
+    "product_masses",
+    "run_lca",
+    "run_montecarlo",
+    "run_scenario",
+    "run_sweep",
+    "run_tea",
+    "scenario_kpis",
+]

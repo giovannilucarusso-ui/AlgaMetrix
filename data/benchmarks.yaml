@@ -1,0 +1,104 @@
+# Open-literature benchmark ranges for microalgae dry biomass, for transparency.
+#
+# These let the tool show whether a scenario's output falls within values published
+# in open-access / peer-reviewed studies (not proprietary software). Ranges are wide
+# on purpose: GWP and energy in particular vary hugely with the functional unit,
+# allocation choices, biogenic-CO2 accounting, energy mix, scale and processing depth.
+# Values in USD (~EUR for comparison). Always read the source before drawing conclusions.
+#
+# metric: production_cost | gwp | ced | electricity   (all per kg dry biomass)
+# category: open_pond | pbr | heterotrophic | any
+
+- metric: production_cost
+  category: open_pond
+  low: 0.5
+  high: 9.6
+  typical_low: 2.0
+  typical_high: 5.0
+  unit: $/kg
+  note: "NREL open-pond MBSP $494/t AFDW (aggressive biofuel target); review range 500-9560 $/t."
+  source: "Davis et al. 2016, NREL/TP-5100-64772"
+  url: "https://docs.nrel.gov/docs/fy16osti/64772.pdf"
+
+- metric: production_cost
+  category: pbr
+  low: 1.7
+  high: 15.0
+  typical_low: 5.0
+  typical_high: 15.0
+  unit: $/kg
+  note: "NREL closed-PBR MBSP $1,737-1,793/t AFDW; higher for food/high-value scenarios."
+  source: "NREL/TP-5100-72716 (closed photobioreactors)"
+  url: "https://docs.nrel.gov/docs/fy19osti/72716.pdf"
+
+- metric: gwp
+  category: open_pond
+  low: 0.2
+  high: 30.0
+  unit: kg CO2-eq/kg
+  note: "Low with biogenic-CO2 credit / good energy mix; ~29 kg/kg reported for raceway w/ processing."
+  source: "Onorato & Rösch 2020; Gueguen et al. 2024 (SusProdCons)"
+  url: "https://www.sciencedirect.com/science/article/pii/S2352554124001736"
+
+- metric: gwp
+  category: pbr
+  low: 1.0
+  high: 153.0
+  unit: kg CO2-eq/kg
+  note: "Industrial-scale PBR ~153 kg/kg; light-guiding ~91; simpler PBR ~28 kg/kg."
+  source: "Gueguen et al. 2024 (Sustainable Production and Consumption)"
+  url: "https://www.sciencedirect.com/science/article/pii/S2352554124001736"
+
+- metric: ced
+  category: open_pond
+  low: 5.8
+  high: 100.0
+  unit: MJ/kg
+  note: "5.8-10 MJ/kg for cultivation; higher with harvesting + drying."
+  source: "Life-cycle reviews of raceway cultivation"
+  url: "https://www.mdpi.com/2071-1050/13/16/8873"
+
+- metric: ced
+  category: pbr
+  low: 50.0
+  high: 1000.0
+  unit: MJ/kg
+  note: "Airlift PBR ~3.7x a raceway; industrial PBR ~267 kWh/kg (~960 MJ/kg)."
+  source: "Life-cycle reviews of PBR cultivation"
+  url: "https://www.sciencedirect.com/science/article/pii/S2352554124001736"
+
+- metric: electricity
+  category: open_pond
+  low: 0.5
+  high: 10.0
+  unit: kWh/kg
+  note: "Paddlewheel mixing + pumping; harvesting/drying add more."
+  source: "Open-pond LCA/TEA studies"
+  url: "https://docs.nrel.gov/docs/fy16osti/64772.pdf"
+
+- metric: electricity
+  category: pbr
+  low: 3.0
+  high: 267.0
+  unit: kWh/kg
+  note: "Circulation/aeration dominate; up to 267 kWh/kg for an industrial Chlorella PBR."
+  source: "Gueguen et al. 2024 (Sustainable Production and Consumption)"
+  url: "https://www.sciencedirect.com/science/article/pii/S2352554124001736"
+
+- metric: water
+  category: open_pond
+  low: 0.4
+  high: 10.0
+  unit: m3/kg
+  note: "Direct + evaporation; open ponds lose more water than closed systems."
+  source: "Raceway-pond LCA (culture-media study)"
+  url: "https://www.sciencedirect.com/science/article/abs/pii/S2211926417310263"
+
+- metric: water
+  category: pbr
+  low: 2.4
+  high: 6.8
+  unit: m3/kg
+  note: "Total water footprint of PBR cultivation; operation stage >60%."
+  source: "Water footprint of microalgae cultivation in photobioreactor (2018)"
+  url: "https://www.researchgate.net/publication/328896620_Water_footprint_of_microalgae_cultivation_in_photobioreactor"

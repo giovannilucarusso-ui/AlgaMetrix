@@ -1,0 +1,119 @@
+# Organism / strain library.
+#
+# All fractions are mass fractions of ASH-FREE DRY WEIGHT unless noted.
+# `carbon`, `nitrogen`, `phosphorus` are elemental mass fractions of DRY WEIGHT
+# and drive the CO2 / nutrient demand in the mass balance.
+#
+# Values are literature-typical placeholders. EDIT with your own measured data
+# and cite the source in `notes`. `group` is informational only.
+
+- name: Chlorella vulgaris
+  group: microalga
+  protein: 0.50
+  lipid: 0.20
+  carbohydrate: 0.20
+  ash: 0.10
+  carbon: 0.50
+  nitrogen: 0.08
+  phosphorus: 0.011
+  notes: "Robust freshwater green microalga; common protein/feed reference strain."
+
+- name: Arthrospira platensis (Spirulina)
+  group: cyanobacterium
+  protein: 0.62
+  lipid: 0.08
+  carbohydrate: 0.18
+  ash: 0.12
+  carbon: 0.46
+  nitrogen: 0.10
+  phosphorus: 0.012
+  phycocyanin: 0.11   # C-phycocyanin, fraction of DW (theoretical ~11%; up to 15-20%). Subset of protein.
+  notes: "Filamentous cyanobacterium; high protein; grown at high pH/alkalinity (easy harvest). C-phycocyanin is the high-value blue pigment (a subset of the protein pool)."
+
+- name: Nannochloropsis sp.
+  group: microalga
+  protein: 0.35
+  lipid: 0.35
+  carbohydrate: 0.20
+  ash: 0.10
+  carbon: 0.52
+  nitrogen: 0.06
+  phosphorus: 0.010
+  notes: "Marine microalga; EPA-rich lipids; typically grown in closed PBRs."
+
+- name: Haematococcus pluvialis
+  group: microalga
+  protein: 0.25
+  lipid: 0.35
+  carbohydrate: 0.30
+  ash: 0.10
+  carbon: 0.53
+  nitrogen: 0.05
+  phosphorus: 0.008
+  notes: "Astaxanthin producer; two-stage (green growth then red stress) cultivation."
+
+- name: Schizochytrium sp.
+  group: thraustochytrid
+  protein: 0.15
+  lipid: 0.55
+  carbohydrate: 0.25
+  ash: 0.05
+  carbon: 0.58
+  nitrogen: 0.03
+  phosphorus: 0.007
+  notes: "Heterotrophic protist; DHA-rich single-cell oil; grown in fed-batch fermenters on glucose."
+
+- name: Aurantiochytrium sp.
+  group: thraustochytrid
+  protein: 0.13
+  lipid: 0.55
+  carbohydrate: 0.25
+  ash: 0.07
+  carbon: 0.60
+  nitrogen: 0.025
+  phosphorus: 0.006
+  notes: "Heterotrophic protist; very high DHA; grown on glucose/glycerol in fermenters."
+
+- name: Tetraselmis suecica
+  group: microalga
+  protein: 0.35
+  lipid: 0.20
+  carbohydrate: 0.35
+  ash: 0.10
+  carbon: 0.50
+  nitrogen: 0.06
+  phosphorus: 0.010
+  notes: "Marine green microalga; aquaculture feed; robust in open systems."
+
+- name: Dunaliella salina
+  group: microalga
+  protein: 0.30
+  lipid: 0.15
+  carbohydrate: 0.40
+  ash: 0.15
+  carbon: 0.50
+  nitrogen: 0.05
+  phosphorus: 0.008
+  notes: "Hypersaline green microalga; beta-carotene producer; wall-less."
+
+- name: Phaeodactylum tricornutum
+  group: microalga
+  protein: 0.35
+  lipid: 0.20
+  carbohydrate: 0.25
+  ash: 0.20
+  carbon: 0.48
+  nitrogen: 0.06
+  phosphorus: 0.012
+  notes: "Marine diatom; EPA and fucoxanthin; requires silica."
+
+- name: Porphyridium cruentum
+  group: microalga
+  protein: 0.35
+  lipid: 0.10
+  carbohydrate: 0.45
+  ash: 0.10
+  carbon: 0.46
+  nitrogen: 0.06
+  phosphorus: 0.010
+  notes: "Red microalga; phycoerythrin and sulfated exopolysaccharides."

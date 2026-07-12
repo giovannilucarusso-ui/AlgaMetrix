@@ -1,0 +1,59 @@
+# Indicative market / production-cost ranges for microalgal products, for sanity-checking
+# the selling prices used in a scenario. Values in USD (~EUR). Ranges are broad and
+# time-varying — treat as orders of magnitude and read the source. Not investment advice.
+
+- product: Biomass — biofuel target (nth-plant)
+  low: 0.5
+  high: 0.9
+  unit: $/kg
+  note: "NREL open-pond minimum biomass selling price target."
+  source: "Davis et al. 2016, NREL/TP-5100-64772"
+  url: "https://docs.nrel.gov/docs/fy16osti/64772.pdf"
+
+- product: Spirulina biomass — production cost
+  low: 1.08
+  high: 1.36
+  unit: $/kg
+  note: "Modelled production cost of Spirulina dry biomass (co-production TEA)."
+  source: "Rahman et al. 2023, Scientific Reports 13:10387"
+  url: "https://www.nature.com/articles/s41598-023-37156-3"
+
+- product: Whole biomass — food/nutraceutical grade (retail)
+  low: 5.0
+  high: 40.0
+  unit: $/kg
+  note: "Spirulina/Chlorella whole-cell powder retail range; wide by grade and brand."
+  source: "Microalgae-based products market reviews (2023)"
+  url: "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC10287645/"
+
+- product: C-phycocyanin (food/cosmetic grade)
+  low: 150.0
+  high: 300.0
+  unit: $/kg
+  note: "Market price €170-280/kg; modelled production cost €283-544/kg (often unprofitable)."
+  source: "van der Walt et al. 2025, J. Applied Phycology"
+  url: "https://link.springer.com/article/10.1007/s10811-025-03443-x"
+
+- product: Astaxanthin — dried Haematococcus powder
+  low: 500.0
+  high: 1500.0
+  unit: $/kg
+  note: "By carotenoid/astaxanthin content; purified astaxanthin can exceed $70,000/kg."
+  source: "Microalgae downstream-processing review (2024)"
+  url: "https://doi.org/10.3390/microorganisms14071393"
+
+- product: Omega-3 (DHA/EPA) oil
+  low: 25.0
+  high: 140.0
+  unit: $/kg
+  note: "Single-cell omega-3 oil; SuperPro omega-3 example assumed $30/kg."
+  source: "INTELLIGEN omega-3 SuperPro example; market reports"
+  url: "https://www.intelligen.com"
+
+- product: Protein / algae meal (feed grade)
+  low: 0.15
+  high: 3.0
+  unit: $/kg
+  note: "Protein-rich algae meal ~$150/MT (feed); higher for food-grade isolates."
+  source: "INTELLIGEN omega-3 SuperPro example (co-product)"
+  url: "https://www.intelligen.com"

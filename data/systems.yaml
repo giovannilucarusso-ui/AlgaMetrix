@@ -1,0 +1,151 @@
+# Cultivation system library.
+#
+# `mode`  : phototrophic | heterotrophic
+# `basis` : area   -> scale is pond/panel area in m2, `productivity` is g dry biomass / m2 / day
+#           volume -> scale is reactor working volume in m3, `productivity` is g dry biomass / L / day
+#
+# `elec_kwh_per_kg`   electricity for cultivation (mixing/pumping/aeration/light) per kg dry biomass
+# `carbon_source`     co2 (gaseous CO2 enrichment, default) | bicarbonate (dissolved NaHCO3, e.g. Spirulina)
+# `co2_utilization`   fraction of supplied inorganic carbon (CO2 OR NaHCO3) that is actually fixed (phototrophic)
+# `nutrient_uptake`   fraction of supplied N and P that is actually assimilated
+# `water_m3_per_kg`   net water consumption (evaporation + blowdown - recycle) per kg dry biomass
+# `substrate_yield`   kg dry biomass per kg organic substrate (heterotrophic only)
+# `capex_per_unit`    installed-equipment CAPEX in EUR per m2 (area) or per m3 (volume)
+# `land_m2_per_unit`  land footprint in m2 per m2 of pond (>=1) or per m3 of reactor
+#
+# Values are literature-typical placeholders. EDIT and cite your sources.
+
+- name: Open raceway pond
+  mode: phototrophic
+  basis: area
+  productivity: 20.0        # g/m2/d
+  operating_days: 330.0     # d/yr
+  biomass_conc: 0.5         # g/L at harvest
+  elec_kwh_per_kg: 0.9      # paddlewheel mixing + CO2/water pumping
+  co2_utilization: 0.75
+  nutrient_uptake: 0.90
+  water_m3_per_kg: 0.5      # dominated by evaporation
+  substrate_yield: 0.0
+  capex_per_unit: 25.0      # EUR/m2
+  land_m2_per_unit: 1.5
+  product_price: 8.0        # EUR/kg dry biomass (seed value)
+  notes: "Lowest CAPEX/energy; high land and water use; contamination risk."
+
+- name: Tubular photobioreactor
+  mode: phototrophic
+  basis: area
+  productivity: 30.0        # g/m2/d (illuminated footprint)
+  operating_days: 340.0
+  biomass_conc: 2.0
+  elec_kwh_per_kg: 5.0      # circulation pumping dominates
+  co2_utilization: 0.90
+  nutrient_uptake: 0.95
+  water_m3_per_kg: 0.15
+  substrate_yield: 0.0
+  capex_per_unit: 120.0     # EUR/m2
+  land_m2_per_unit: 1.2
+  notes: "Closed system; higher productivity and CO2 use; high electricity and CAPEX."
+
+- name: Flat-panel photobioreactor
+  mode: phototrophic
+  basis: area
+  productivity: 35.0
+  operating_days: 340.0
+  biomass_conc: 3.0
+  elec_kwh_per_kg: 4.0
+  co2_utilization: 0.90
+  nutrient_uptake: 0.95
+  water_m3_per_kg: 0.12
+  substrate_yield: 0.0
+  capex_per_unit: 150.0
+  land_m2_per_unit: 1.2
+  notes: "Closed system; good light path; aeration/mixing electricity."
+
+- name: Bubble-column / airlift PBR
+  mode: phototrophic
+  basis: volume
+  productivity: 0.6         # g/L/d
+  operating_days: 340.0
+  biomass_conc: 4.0
+  elec_kwh_per_kg: 6.0      # aeration/sparging dominates
+  co2_utilization: 0.85
+  nutrient_uptake: 0.95
+  water_m3_per_kg: 0.10
+  substrate_yield: 0.0
+  capex_per_unit: 350.0     # EUR/m3 working volume
+  land_m2_per_unit: 0.8
+  notes: "Closed vertical column; gas-lift mixing; good for shear-sensitive strains."
+
+- name: Thin-layer cascade
+  mode: phototrophic
+  basis: area
+  productivity: 40.0        # g/m2/d (high areal productivity)
+  operating_days: 320.0
+  biomass_conc: 10.0        # thin, highly concentrated film
+  elec_kwh_per_kg: 2.5
+  co2_utilization: 0.85
+  nutrient_uptake: 0.92
+  water_m3_per_kg: 0.20
+  substrate_yield: 0.0
+  capex_per_unit: 80.0      # EUR/m2
+  land_m2_per_unit: 1.3
+  notes: "Open sloped cascade with thin turbulent film; high productivity, moderate CAPEX."
+
+# Spirulina open raceway ponds fed with sodium bicarbonate (NaHCO3), the standard
+# carbon source for alkaliphilic Arthrospira grown at pH 9-10. Calibrated to Padi
+# et al. (2023), Algal Research 74:103190 (greenhouse-housed ORP, Southern Italy):
+# achieved productivity 8.6 g/m2/d, 330 d/a, NaHCO3 ~5 kg/kg spirulina at 0.28 EUR/kg.
+# N and P are supplied via KNO3 and K4O7P2 in the real recipe but are accounted for
+# here through the organism's elemental N/P demand (see nitrogen_price/phosphorus_price),
+# so only the non-N/P micronutrient salts are listed as explicit materials.
+- name: Open raceway pond (Spirulina, NaHCO3)
+  mode: phototrophic
+  basis: area
+  productivity: 8.6         # g/m2/d (achieved, Padi et al. 2023; reports up to 14)
+  operating_days: 330.0     # d/yr
+  biomass_conc: 0.5         # g/L at harvest
+  elec_kwh_per_kg: 3.5      # paddlewheel mixing + broth pumping/recycling (high per-kg at low productivity)
+  carbon_source: bicarbonate
+  co2_utilization: 0.69     # make-up efficiency: frac. of supplied NaHCO3 carbon fixed (-> ~5 kg/kg). At pH 9-10 single-pass fixation is lower (~30-60%); 0.69 reflects pond recycle. Adjustable 0.5-0.8.
+  nutrient_uptake: 0.90
+  water_m3_per_kg: 1.0      # net groundwater make-up (Padi et al. 2023: ~1.12 m3/kg); greenhouse cover lowers evaporation
+  substrate_yield: 0.0
+  capex_per_unit: 60.0      # EUR/m2 (greenhouse-housed ORP: dome + pH/heating controls)
+  land_m2_per_unit: 1.5
+  # Seasonal greenhouse heating (Southern Italy, 14->25 C for ~6 months): dominant
+  # energy hotspot. ~15 kWh/kg electric = 54 MJ/kg. Set 0 for a warm-climate pond.
+  cultivation_heat_mj_per_kg: 54.0
+  cultivation_heat_fuel: electricity
+  product_price: 15.0       # EUR/kg dried spirulina food product (DSFP 13.2-17.3, paper)
+  materials:
+    - {name: Potassium sulphate (K2SO4), amount_per_kg: 0.0416, price: 0.66, gwp: 0.5, ced: 5.0}
+    - {name: Magnesium sulphate (MgSO4), amount_per_kg: 0.0178, price: 0.48, gwp: 0.7, ced: 8.0}
+    - {name: Chelated iron (Fe-EDDHA), amount_per_kg: 0.0178, price: 3.13, gwp: 3.0, ced: 40.0}
+    - {name: Sodium hypochlorite (cleaning), amount_per_kg: 0.47, price: 0.13, gwp: 0.9, ced: 4.0}
+  notes: "Alkaline (pH 9-10) Spirulina ORP; carbon from NaHCO3, not CO2 gas. Greenhouse-heated (Southern Italy); set cultivation_heat_mj_per_kg=0 for warm climates. Easy harvest."
+
+# Calibrated to the SuperPro "standard cultivation" heterotrophic case
+# (glucose ~3 kg/kg powder, yeast extract 0.61 kg/kg, electricity ~3.8 kWh/kg,
+# steam/chilled/cooling water for sterilization & fermentation cooling).
+- name: Stirred-tank fermenter (heterotrophic)
+  mode: heterotrophic
+  basis: volume
+  productivity: 7.0         # g/L/d EFFECTIVE annual (instantaneous ~15-30; lower for batch cycles/turnaround)
+  operating_days: 300.0
+  biomass_conc: 100.0       # g/L at harvest
+  elec_kwh_per_kg: 2.5      # aeration + agitation; harvest+drying add ~1.3 more
+  co2_utilization: 0.0
+  nutrient_uptake: 0.95
+  water_m3_per_kg: 0.065    # process water ~65 kg/kg powder (SuperPro)
+  substrate_yield: 0.37     # kg biomass / kg glucose (-> ~3 kg glucose/kg powder)
+  capex_per_unit: 800.0     # EUR/m3 working volume (sterile fermenter train)
+  land_m2_per_unit: 0.5
+  product_price: 20.0       # EUR/kg microalgae powder (seed value)
+  materials:
+    - {name: Yeast extract, amount_per_kg: 0.61, price: 7.5, gwp: 1.5, ced: 20.0}
+    - {name: Sea salts (NaCl), amount_per_kg: 1.21, price: 0.24, gwp: 0.2, ced: 3.0}
+  utilities:
+    - {name: Sterilization steam, amount_per_kg: 6.27, unit: kg, price: 0.011, gwp: 0.20, ced: 3.2}
+    - {name: Chilled water, amount_per_kg: 316.7, unit: kg, price: 0.0004, gwp: 0.0004, ced: 0.05}
+    - {name: Cooling water, amount_per_kg: 180.8, unit: kg, price: 0.00005, gwp: 0.0, ced: 0.01}
+  notes: "For thraustochytrids/heterotrophs (e.g. Schizochytrium) & standard heterotrophic microalgae. Glucose-fed, sterile."
