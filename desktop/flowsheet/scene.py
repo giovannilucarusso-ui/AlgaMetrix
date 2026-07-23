@@ -50,6 +50,7 @@ READ_Y0 = 97.0
 READ_H = 18.0
 STUB = 12.0
 PORT = 4.5           # half-side of the square nozzle handle
+BOXLESS_SYM = 86.0   # symbol size in the boxless PFD view (fills the freed space)
 
 # --- professional palette --------------------------------------------------- #
 COL_BG = "#ffffff"
@@ -100,6 +101,13 @@ class PortItem(QGraphicsItem):
     def paint(self, painter, option, widget=None):
         painter.setRenderHint(painter.RenderHint.Antialiasing, True)
         color = QColor(self.node_item.accent)
+        # In the PFD (boxless) view the handle is a discreet dot; it grows into the
+        # square grab-target on hover so wiring by hand stays easy.
+        if getattr(NodeItem, "BOXLESS", False) and not self._hover:
+            painter.setBrush(QBrush(color))
+            painter.setPen(Qt.NoPen)
+            painter.drawEllipse(QPointF(0, 0), 2.3, 2.3)
+            return
         s = PORT + (1.5 if self._hover else 0.0)
         rect = QRectF(-s, -s, 2 * s, 2 * s)
         if self.is_input:
@@ -115,6 +123,11 @@ class PortItem(QGraphicsItem):
 # --------------------------------------------------------------------------- #
 class NodeItem(QGraphicsObject):
     """A draggable equipment block bound to a :class:`model.UnitNode`."""
+
+    # Rendering mode (class-wide toggle, flipped from the editor toolbar):
+    # True  -> PFD look: the symbol floats on the sheet (no card / box).
+    # False -> card look: a boxed block with port labels (better for wiring).
+    BOXLESS = True
 
     def __init__(self, node: M.UnitNode):
         super().__init__()
@@ -165,6 +178,9 @@ class NodeItem(QGraphicsObject):
 
     def paint(self, painter, option, widget=None):
         painter.setRenderHint(painter.RenderHint.Antialiasing, True)
+        if getattr(NodeItem, "BOXLESS", False):
+            self._paint_boxless(painter)
+            return
         accent = QColor(self.accent)
         selected = self.isSelected()
 
@@ -231,6 +247,59 @@ class NodeItem(QGraphicsObject):
             painter.setFont(QFont("Segoe UI", 8, QFont.DemiBold))
             painter.setPen(QPen(QColor(COL_READOUT)))
             painter.drawText(QRectF(9, READ_Y0, NODE_W - 18, READ_H),
+                             Qt.AlignVCenter | Qt.AlignHCenter, self._readout)
+
+    def _paint_boxless(self, painter):
+        """PFD look: the symbol floats on the sheet (no card / box). Tag + name sit
+        above, the mass-balance read-out below, and thin accent leaders run from the
+        symbol edge out to the connection points. The symbol is enlarged to fill the
+        space the card used to occupy."""
+        accent = QColor(self.accent)
+        # selection cue: a soft rounded highlight instead of a permanent box
+        if self.isSelected():
+            hl = QColor(accent)
+            hl.setAlpha(24)
+            painter.setBrush(QBrush(hl))
+            painter.setPen(QPen(QColor(COL_STREAM_SEL), 1.2, Qt.DashLine))
+            painter.drawRoundedRect(QRectF(2, 2, NODE_W - 4, NODE_H - 4), 8, 8)
+
+        # tag + name, centred at the top
+        painter.setFont(QFont("Consolas", 8, QFont.Bold))
+        tag = self.node.tag or ""
+        tag_w = painter.fontMetrics().horizontalAdvance(tag)
+        painter.setFont(QFont("Segoe UI", 8))
+        fm = painter.fontMetrics()
+        name = fm.elidedText(self.node.name, Qt.ElideRight, int(NODE_W - tag_w - 26))
+        name_w = fm.horizontalAdvance(name) if name else 0
+        gap = 6 if name else 0
+        x0 = (NODE_W - (tag_w + gap + name_w)) / 2.0
+        painter.setFont(QFont("Consolas", 8, QFont.Bold))
+        painter.setPen(QPen(QColor(COL_TAG)))
+        painter.drawText(QRectF(x0, 1, tag_w + 2, LABEL_H), Qt.AlignVCenter | Qt.AlignLeft, tag)
+        if name:
+            painter.setFont(QFont("Segoe UI", 8))
+            painter.setPen(QPen(QColor(COL_NAME)))
+            painter.drawText(QRectF(x0 + tag_w + gap, 1, name_w + 2, LABEL_H),
+                             Qt.AlignVCenter | Qt.AlignLeft, name)
+
+        # enlarged symbol + thin accent leaders out to the connection points
+        sym_l = (NODE_W - BOXLESS_SYM) / 2.0
+        sym_r = sym_l + BOXLESS_SYM
+        sym = QRectF(sym_l, 17.0, BOXLESS_SYM, BOXLESS_SYM)
+        painter.setPen(QPen(accent, 1.6))
+        for (is_input, _name), port in self.ports.items():
+            y = port.pos().y()
+            if is_input:
+                painter.drawLine(QPointF(sym_l, y), QPointF(-STUB, y))
+            else:
+                painter.drawLine(QPointF(sym_r, y), QPointF(NODE_W + STUB, y))
+        icons.paint_icon(painter, self.sp.icon, sym, accent)
+
+        # mass-balance read-out, centred below the symbol
+        if self._readout:
+            painter.setFont(QFont("Segoe UI", 8, QFont.DemiBold))
+            painter.setPen(QPen(QColor(COL_READOUT)))
+            painter.drawText(QRectF(0, NODE_H - READ_H, NODE_W, READ_H),
                              Qt.AlignVCenter | Qt.AlignHCenter, self._readout)
 
     # -- movement: snap to grid, keep model + edges in sync -------------- #

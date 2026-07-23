@@ -11,8 +11,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from PySide6.QtCore import QPointF, QSize, Qt
-from PySide6.QtGui import QColor, QFont, QIcon
+from PySide6.QtCore import QPointF, QRectF, QSize, Qt
+from PySide6.QtGui import QColor, QFont, QIcon, QImage, QPainter, QPdfWriter, QPen
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -36,7 +36,8 @@ from PySide6.QtWidgets import (
 )
 
 from . import icons, model as M
-from .scene import FlowsheetScene
+from .builder import flowsheet_from_scenario
+from .scene import CANVAS_BG, FlowsheetScene, NodeItem
 from .view import FlowsheetView
 
 # Palette order (category -> heading label).
@@ -69,6 +70,10 @@ class FlowsheetEditor(QWidget):
         self._prop_spins: dict[str, QDoubleSpinBox | QComboBox] = {}
         self._current_node: str | None = None
         self._stream_no: dict[str, int] = {}
+        # Set by the host window: returns (Scenario, Results | None) for the live
+        # case study so the canvas can be (re)generated from the wizard inputs.
+        self._scenario_source = None
+        self._autogen_done = False
 
         self._build_ui()
 
@@ -87,6 +92,12 @@ class FlowsheetEditor(QWidget):
         root.setSpacing(6)
 
         root.addLayout(self._build_toolbar())
+
+        self.pfd_subtitle = QLabel("")
+        self.pfd_subtitle.setObjectName("subtle")
+        self.pfd_subtitle.setStyleSheet("color:#5b6b78; padding:0 2px 3px 2px; font-size:12px;")
+        self.pfd_subtitle.setWordWrap(True)
+        root.addWidget(self.pfd_subtitle)
 
         middle = QHBoxLayout()
         middle.setSpacing(6)
@@ -122,12 +133,36 @@ class FlowsheetEditor(QWidget):
         bar.addWidget(title)
         bar.addSpacing(14)
 
+        self.btn_generate = btn(
+            "⟳ Generate from scenario", self.generate_from_scenario,
+            "QPushButton{background:#1565c0; color:white; border:none; border-radius:5px; "
+            "padding:6px 12px; font-weight:700;} QPushButton:hover{background:#0f4c99;} "
+            "QPushButton:disabled{background:#c3ccd6; color:#eef2f6;}")
+        self.btn_generate.setToolTip(
+            "Build the flow diagram automatically from the current TEA/LCA case "
+            "study (organism, system, harvesting, drying and extraction).")
+        bar.addSpacing(10)
+
         btn("↻ Update balance", self.solve_and_annotate,
             "QPushButton{background:#15803d; color:white; border:none; border-radius:5px; "
             "padding:6px 12px; font-weight:700;} QPushButton:hover{background:#116330;}")
         btn("⤢ Fit", self.view.fit_content)
         btn("1:1", self.view.reset_zoom)
+
+        self.btn_boxes = QPushButton("▢ Boxes")
+        self.btn_boxes.setCheckable(True)
+        self.btn_boxes.setChecked(not getattr(NodeItem, "BOXLESS", True))
+        self.btn_boxes.setToolTip(
+            "Toggle between the clean PFD look (symbols float on the sheet) and "
+            "boxed blocks with port labels (handier for wiring by hand).")
+        self.btn_boxes.setStyleSheet(
+            self._SECONDARY_BTN
+            + " QPushButton:checked{background:#e8eef5; border-color:#94a3b8; color:#0f172a;}")
+        self.btn_boxes.toggled.connect(self._toggle_boxes)
+        bar.addWidget(self.btn_boxes)
+
         bar.addSpacing(10)
+        btn("⤓ Export image…", self.export_image)
         btn("Save…", self.save_flowsheet)
         btn("Load…", self.load_flowsheet)
         btn("Example", self.load_example)
@@ -214,6 +249,13 @@ class FlowsheetEditor(QWidget):
         lay.addWidget(msg)
         lay.addStretch(1)
         self.prop_scroll.setWidget(w)
+
+    def _toggle_boxes(self, checked: bool):
+        """Flip between the boxed-card and the boxless PFD rendering."""
+        NodeItem.BOXLESS = not checked
+        for item in self.scene.node_items.values():
+            item.update()
+        self.view.viewport().update()
 
     # ------------------------------------------------------------------ #
     # Palette / adding nodes
@@ -522,6 +564,173 @@ class FlowsheetEditor(QWidget):
         self._show_placeholder()
         self.solve_and_annotate()
         self.view.fit_content()
+
+    def export_image(self):
+        """Export the whole diagram as a high-resolution PNG or a vector PDF."""
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Export flow diagram", "flowsheet.png",
+            "PNG image (*.png);;PDF document (*.pdf)")
+        if not path:
+            return
+        rect = self.scene.itemsBoundingRect().adjusted(-40, -40, 40, 40)
+        if rect.isEmpty():
+            QMessageBox.information(self, "Export", "The canvas is empty.")
+            return
+        self.scene.clearSelection()
+        try:
+            if path.lower().endswith(".pdf"):
+                self._render_pdf(path, rect)
+            else:
+                self._render_png(path, rect)
+        except Exception as exc:
+            QMessageBox.warning(self, "Export failed", f"Could not export the diagram:\n{exc}")
+
+    def render_diagram_png(self, path: str, scale: float = 2.5) -> bool:
+        """Render the current diagram to ``path`` (used by the PDF report). Returns
+        False if the canvas is empty."""
+        self.scene.clearSelection()
+        rect = self.scene.itemsBoundingRect().adjusted(-40, -40, 40, 40)
+        if rect.isEmpty():
+            return False
+        self._render_png(path, rect, scale)
+        return True
+
+    # Scene-unit height of the branded title-block strip drawn above the diagram.
+    _BAND = 54.0
+
+    def _logo_pixmap(self):
+        """Cached Algametrix logo pixmap (empty if the asset is missing)."""
+        if not hasattr(self, "_logo_pm"):
+            from PySide6.QtGui import QPixmap
+
+            from .. import resources
+            p = resources.logo_path()
+            self._logo_pm = QPixmap(p) if p else QPixmap()
+        return self._logo_pm
+
+    def _draw_title_block(self, painter, dev_w: float, band_h: float):
+        """Draw the logo (top-right) and a hairline rule across the header band."""
+        painter.setPen(QPen(QColor("#e0e7ec"), max(1.0, band_h * 0.02)))
+        painter.drawLine(QPointF(band_h * 0.3, band_h),
+                         QPointF(dev_w - band_h * 0.3, band_h))
+        pm = self._logo_pixmap()
+        if pm.isNull():
+            return
+        pad = band_h * 0.24
+        target_h = band_h - 2 * pad
+        target_w = target_h * pm.width() / max(pm.height(), 1)
+        x = dev_w - pad - target_w
+        painter.drawPixmap(QRectF(x, pad, target_w, target_h), pm, QRectF(pm.rect()))
+
+    def _render_png(self, path: str, rect: QRectF, scale: float = 2.0):
+        w = int(rect.width() * scale)
+        h = int(rect.height() * scale)
+        bh = int(self._BAND * scale)
+        img = QImage(w, h + bh, QImage.Format_ARGB32)
+        img.fill(QColor(CANVAS_BG))
+        painter = QPainter(img)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        painter.setRenderHint(QPainter.TextAntialiasing, True)
+        painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
+        self._draw_title_block(painter, w, bh)
+        self.scene.render(painter, QRectF(0, bh, w, h), rect, Qt.KeepAspectRatio)
+        painter.end()
+        img.save(path)
+
+    def _render_pdf(self, path: str, rect: QRectF):
+        from PySide6.QtCore import QMarginsF, QSizeF
+        from PySide6.QtGui import QPageSize
+
+        total_h = rect.height() + self._BAND
+        writer = QPdfWriter(path)
+        writer.setResolution(300)
+        writer.setPageSize(QPageSize(QSizeF(rect.width() / 96.0, total_h / 96.0),
+                                     QPageSize.Unit.Inch))
+        writer.setPageMargins(QMarginsF(0, 0, 0, 0))
+        painter = QPainter(writer)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        painter.setRenderHint(QPainter.TextAntialiasing, True)
+        painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
+        dev_w, dev_h = writer.width(), writer.height()
+        bh = dev_h * self._BAND / total_h
+        self._draw_title_block(painter, dev_w, bh)
+        self.scene.render(painter, QRectF(0, bh, dev_w, dev_h - bh), rect, Qt.KeepAspectRatio)
+        painter.end()
+
+    # ------------------------------------------------------------------ #
+    # Scenario-driven generation
+    # ------------------------------------------------------------------ #
+    def set_scenario_source(self, provider) -> None:
+        """Register a callable returning ``(Scenario, Results | None)``.
+
+        The host window wires this to its live case study so the canvas can be
+        regenerated from the same inputs that drive the TEA and LCA."""
+        self._scenario_source = provider
+        if hasattr(self, "btn_generate"):
+            self.btn_generate.setEnabled(provider is not None)
+
+    def _current_scenario(self):
+        if self._scenario_source is None:
+            return None, None
+        try:
+            scn, results = self._scenario_source()
+            return scn, results
+        except Exception:  # never let a scenario error break the canvas
+            return None, None
+
+    def generate_from_scenario(self, *, confirm: bool = True) -> bool:
+        """Replace the canvas with a flowsheet built from the live scenario."""
+        scn, results = self._current_scenario()
+        if scn is None:
+            QMessageBox.information(
+                self, "Generate from scenario",
+                "No case study is available yet. Set up a scenario on the "
+                "Scenario tab (or via the wizard) first.")
+            return False
+        if confirm and self.scene.flowsheet.nodes and not self._is_pristine():
+            if QMessageBox.question(
+                self, "Generate from scenario",
+                "Replace the current diagram with one generated from the "
+                "TEA/LCA scenario? Unsaved manual edits will be lost.") \
+                    != QMessageBox.StandardButton.Yes:
+                return False
+        fs = flowsheet_from_scenario(scn, results)
+        self.scene.set_flowsheet(fs)
+        self._show_placeholder()
+        self.solve_and_annotate()
+        self.view.fit_content()
+        self._set_case_subtitle(scn, results)
+        self._autogen_done = True
+        return True
+
+    def _set_case_subtitle(self, scn, results) -> None:
+        """One-line identity of the case the diagram was generated from."""
+        from microalgae_tea_lca.models import Basis
+
+        unit = "m²" if scn.system.basis == Basis.AREA else "m³"
+        op = "batch" if scn.batch_mode else "continuous"
+        parts = [scn.organism.name, scn.system.name, f"{scn.scale:,.0f} {unit}", op]
+        if results is not None:
+            mp = getattr(results, "main_product", None)
+            if mp is not None:
+                parts.append(f"{mp.name}: {mp.annual_kg / 1000:,.1f} t/yr")
+            else:
+                parts.append(f"{results.inventory.annual_biomass_kg / 1000:,.1f} t/yr dry biomass")
+        self.pfd_subtitle.setText("Generated from case:   " + "   ·   ".join(parts))
+
+    def maybe_autogenerate(self) -> None:
+        """Generate once, silently, the first time the tab is shown untouched."""
+        if self._autogen_done or self._scenario_source is None:
+            return
+        if self._is_pristine():
+            self.generate_from_scenario(confirm=False)
+
+    def _is_pristine(self) -> bool:
+        """True when the canvas still holds the built-in starter, unedited."""
+        starter = M.starter_flowsheet()
+        cur = self.scene.flowsheet
+        return (sorted(n.kind for n in cur.nodes.values())
+                == sorted(n.kind for n in starter.nodes.values()))
 
     def clear_flowsheet(self):
         if QMessageBox.question(self, "Clear canvas", "Remove all blocks and streams?") \

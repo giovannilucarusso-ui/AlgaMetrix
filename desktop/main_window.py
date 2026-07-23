@@ -177,6 +177,7 @@ class MainWindow(QMainWindow):
         file_menu.addAction(tr("Save scenario…"), self.save_scenario)
         file_menu.addSeparator()
         file_menu.addAction(tr("Export results (JSON)…"), self.export_results)
+        file_menu.addAction(tr("Export process report (PDF)…"), self.export_process_report)
         file_menu.addSeparator()
         file_menu.addAction(tr("Exit"), self.close)
 
@@ -247,7 +248,9 @@ class MainWindow(QMainWindow):
         # Top-level mode switch: parametric scenario vs. the visual flowsheet.
         self.top_tabs = QTabWidget()
         self.top_tabs.addTab(scenario_tab, tr("⚗  Scenario"))
-        self.top_tabs.addTab(self._build_flowsheet_tab(), tr("🧩  Process Designer"))
+        self._flowsheet_tab_index = self.top_tabs.addTab(
+            self._build_flowsheet_tab(), tr("🧩  Process Designer"))
+        self.top_tabs.currentChanged.connect(self._on_top_tab_changed)
         root.addWidget(self.top_tabs)
 
     def _build_flowsheet_tab(self) -> QWidget:
@@ -256,7 +259,15 @@ class MainWindow(QMainWindow):
         from .flowsheet import FlowsheetEditor
 
         self.flowsheet_editor = FlowsheetEditor()
+        # Let the designer (re)generate its diagram from the live case study.
+        self.flowsheet_editor.set_scenario_source(
+            lambda: (self.build_scenario(), getattr(self, "results", None)))
         return self.flowsheet_editor
+
+    def _on_top_tab_changed(self, index: int):
+        """First time the Process Designer is opened, auto-build from the case."""
+        if index == getattr(self, "_flowsheet_tab_index", -1):
+            self.flowsheet_editor.maybe_autogenerate()
 
     def _build_input_panel(self) -> QWidget:
         container = QWidget()
@@ -698,6 +709,9 @@ class MainWindow(QMainWindow):
         )
         vals = mc.series[out_name]
         s = mc.stats(out_name)
+        self._last_uncertainty = {
+            "output": out_name, "n": mc.n, "vals": list(vals), "stats": dict(s),
+        }
         ax = self.cv_unc.reset()
         ax.hist(vals, bins=30, color=ACCENT, alpha=0.85)
         for q, col in ((s["p10"], "#888888"), (s["p50"], "#c0392b"), (s["p90"], "#888888")):
@@ -742,6 +756,10 @@ class MainWindow(QMainWindow):
         getter = OUTPUTS[self.cmb_sens_output.currentText()]
         xs = [pt.value for pt in points]
         ys = [getter(pt.results) for pt in points]
+        self._last_sensitivity = {
+            "param": param.name, "unit": param.unit,
+            "output": self.cmb_sens_output.currentText(), "xs": xs, "ys": ys,
+        }
         ax = self.cv_sens.reset()
         ax.plot(xs, ys, marker="o", color=ACCENT)
         ax.axhline(0, color="#bbbbbb", linewidth=0.8)
@@ -795,6 +813,7 @@ class MainWindow(QMainWindow):
     def apply_scenario(self, scn: Scenario):
         """Load a Scenario object (e.g. from the setup wizard) into the UI state."""
         self._loading = True
+        self._last_sensitivity = self._last_uncertainty = None  # stale on a new case
         self.organism = copy.deepcopy(scn.organism)
         self.system = copy.deepcopy(scn.system)
         self.harvesting = copy.deepcopy(scn.harvesting)
@@ -1253,6 +1272,7 @@ class MainWindow(QMainWindow):
 
     def reset_defaults(self):
         self._loading = True
+        self._last_sensitivity = self._last_uncertainty = None
         self.cmb_org.setCurrentIndex(0)
         self.cmb_sys.setCurrentIndex(0)
         self.cmb_harv.setCurrentIndex(0)
@@ -1342,6 +1362,54 @@ class MainWindow(QMainWindow):
             idx = combo.findText(text)
         combo.setCurrentIndex(idx)
         combo.blockSignals(False)
+
+    def export_process_report(self):
+        """Export a shareable PDF: KPI summary + the Process Flow Diagram + streams."""
+        import os
+        import tempfile
+
+        path, _ = QFileDialog.getSaveFileName(
+            self, tr("Export process report"), "process_report.pdf", "PDF (*.pdf)")
+        if not path:
+            return
+        ed = self.flowsheet_editor
+        # Make the diagram reflect the current case: (re)generate if it is still the
+        # untouched starter, otherwise keep the user's diagram and just re-balance it.
+        if ed._is_pristine():
+            ed.generate_from_scenario(confirm=False)
+        else:
+            ed.solve_and_annotate()
+
+        fd, png = tempfile.mkstemp(suffix=".png")
+        os.close(fd)
+        try:
+            from .report import build_process_report
+            has_diagram = ed.render_diagram_png(png)
+            mp = self.results.main_product
+            title = (mp.name if mp else self.organism.name)
+            # Gather every analysis the user has run so it lands in the report.
+            extras: dict = {}
+            if getattr(self, "_last_sensitivity", None):
+                extras["sensitivity"] = self._last_sensitivity
+            if getattr(self, "_last_uncertainty", None):
+                extras["uncertainty"] = self._last_uncertainty
+            if getattr(self, "_snapshots", None):
+                extras["compare"] = {"order": KPI_ORDER, "snapshots": self._snapshots}
+            build_process_report(
+                path, self.results, self.build_scenario(),
+                flowsheet=ed.scene.flowsheet,
+                pfd_png=png if has_diagram else None,
+                title=f"{title} — process report", extras=extras,
+            )
+            self.statusBar().showMessage(f"Report saved to {path}", 6000)
+        except Exception as exc:
+            QMessageBox.warning(self, tr("Export failed"),
+                                f"Could not build the report:\n{exc}")
+        finally:
+            try:
+                os.remove(png)
+            except OSError:
+                pass
 
     def export_results(self):
         path, _ = QFileDialog.getSaveFileName(self, tr("Export results"), "results.json", "JSON (*.json)")

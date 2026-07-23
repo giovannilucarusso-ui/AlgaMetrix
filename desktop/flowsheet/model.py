@@ -132,7 +132,7 @@ def _first_in(inputs: Mapping[str, Flow]) -> Flow:
 # --------------------------------------------------------------------------- #
 # Transfer functions (first-pass balances)
 # --------------------------------------------------------------------------- #
-_FEED_COMPONENT = {0: "biomass", 1: "water", 2: "substrate", 3: "co2", 4: "solvent"}
+_FEED_COMPONENT = {0: "biomass", 1: "water", 2: "substrate", 3: "co2", 4: "solvent", 5: "other"}
 
 
 def _t_feed(p, _inputs):
@@ -212,6 +212,11 @@ def _t_mixer(p, inputs):
     return {"out": _first_in(inputs)}
 
 
+def _t_media_prep(p, inputs):
+    """Media preparation tank: blend water, nutrients and chemicals into media."""
+    return {"media": _first_in(inputs)}
+
+
 def _t_splitter(p, inputs):
     f = _first_in(inputs)
     frac = min(max(p.get("split_fraction", 0.5), 0.0), 1.0)
@@ -271,11 +276,11 @@ UNIT_TYPES: dict[str, UnitSpec] = {
         "feed", "Feed / Media", "🚰", "io",
         inputs=(), outputs=("out",),
         params=(
-            ParamSpec("component", "Component (0=biomass 1=water 2=substrate 3=CO2 4=solvent)", 1, "", 0, 4, 0),
+            ParamSpec("component", "Component (0=biomass 1=water 2=substrate 3=CO2 4=solvent 5=other)", 1, "", 0, 5, 0),
             ParamSpec("flow_kg_h", "Flow", 1000.0, "kg/h", 0, 1e12, 1),
         ),
         transfer=_t_feed, icon="tank", tag_prefix="FD",
-        hint="A raw-material source: water/media, substrate, CO2 or solvent.",
+        hint="A raw-material source: water/media, nutrients, substrate, CO2 or solvent.",
     ),
     "co2_supply": UnitSpec(
         "co2_supply", "CO₂ supply", "🫧", "io",
@@ -300,31 +305,31 @@ UNIT_TYPES: dict[str, UnitSpec] = {
     # --- cultivation / bioreactors ------------------------------------ #
     "raceway": UnitSpec(
         "raceway", "Raceway pond", "🦠", "cultivation",
-        inputs=("media", "co2"), outputs=("broth",),
+        inputs=("inoculum", "media", "co2"), outputs=("broth",),
         params=_p_cult(0.5), transfer=_t_cultivation, icon="raceway", tag_prefix="PD",
         hint="Open raceway pond (phototrophic, low cell density).",
     ),
     "tubular_pbr": UnitSpec(
         "tubular_pbr", "Tubular PBR", "🦠", "cultivation",
-        inputs=("media", "co2"), outputs=("broth",),
+        inputs=("inoculum", "media", "co2"), outputs=("broth",),
         params=_p_cult(2.0), transfer=_t_cultivation, icon="tubular", tag_prefix="TPB",
         hint="Closed tubular photobioreactor.",
     ),
     "flat_panel_pbr": UnitSpec(
         "flat_panel_pbr", "Flat-panel PBR", "🦠", "cultivation",
-        inputs=("media", "co2"), outputs=("broth",),
+        inputs=("inoculum", "media", "co2"), outputs=("broth",),
         params=_p_cult(3.0), transfer=_t_cultivation, icon="flat_panel", tag_prefix="FPB",
         hint="Flat-panel photobioreactor (high areal productivity).",
     ),
     "bubble_column_pbr": UnitSpec(
         "bubble_column_pbr", "Bubble-column PBR", "🦠", "cultivation",
-        inputs=("media", "co2"), outputs=("broth",),
+        inputs=("inoculum", "media", "co2"), outputs=("broth",),
         params=_p_cult(1.5), transfer=_t_cultivation, icon="bubble_column", tag_prefix="BCR",
         hint="Bubble-column / airlift photobioreactor.",
     ),
     "fermenter": UnitSpec(
         "fermenter", "Stirred-tank fermenter", "🧫", "cultivation",
-        inputs=("media", "substrate"), outputs=("broth",),
+        inputs=("inoculum", "media", "substrate"), outputs=("broth",),
         params=_p_cult(100.0), transfer=_t_cultivation, icon="stirred_tank", tag_prefix="FR",
         hint="Heterotrophic stirred-tank fermenter (high cell density).",
     ),
@@ -429,6 +434,13 @@ UNIT_TYPES: dict[str, UnitSpec] = {
     ),
 
     # --- logic / auxiliary -------------------------------------------- #
+    "media_prep": UnitSpec(
+        "media_prep", "Media prep", "🧪", "logic",
+        inputs=("water", "nutrients", "chemicals"), outputs=("media",),
+        params=(), transfer=_t_media_prep, icon="stirred_tank", tag_prefix="MP",
+        hint="Media preparation tank: blends water, nutrient salts and chemicals "
+             "into the culture medium fed to the reactor.",
+    ),
     "mixer": UnitSpec(
         "mixer", "Mixer", "➕", "logic",
         inputs=("in_a", "in_b"), outputs=("out",),
