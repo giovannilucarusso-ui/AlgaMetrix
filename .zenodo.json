@@ -1,0 +1,24 @@
+{
+  "upload_type": "software",
+  "access_right": "open",
+  "license": "MIT",
+  "title": "AlgaMetrix: open-source techno-economic analysis and life-cycle assessment for microalgae and aquatic protist biomass",
+  "description": "<p><strong>AlgaMetrix</strong> is a free and open-source tool for the techno-economic analysis (TEA) and life-cycle assessment (LCA) of microalgal, cyanobacterial and thraustochytrid (aquatic protist) biomass.</p><p>Both analyses are derived from a <em>single shared mass and energy balance</em>, so the economic and the environmental results always describe the same process rather than two independently parameterised models. From a user-defined production scenario it computes the process inventory, a SuperPro-style capital structure, the minimum biomass production cost, a discounted cash-flow profitability model (NPV, IRR, break-even selling price), cradle-to-gate impacts (GWP, cumulative energy demand, water, land, eutrophication, acidification), downstream extraction with cost and impact allocation across co-products, one-dimensional sensitivity sweeps and Monte-Carlo uncertainty propagation.</p><p>It ships as a PySide6 desktop application built on a UI-agnostic Python engine that can equally be driven from a script or a notebook. Every organism, cultivation system, price and characterization factor lives in editable, citable YAML files under <code>data/</code>: there are no hidden numbers. Cultivation systems include open raceway ponds, tubular, flat-panel and bubble-column photobioreactors, thin-layer cascades, a bicarbonate-fed Spirulina raceway, and a stirred-tank heterotrophic fermenter.</p><p><strong>Note on defaults:</strong> the bundled parameter values are literature-typical placeholders that make the tool run out of the box. They are not validated for any specific plant and should be replaced with the user's own data.</p>",
+  "creators": [
+    {
+      "name": "Russo, Giovanni Luca",
+      "orcid": "0000-0002-4072-0331"
+    }
+  ],
+  "keywords": [
+    "microalgae",
+    "cyanobacteria",
+    "thraustochytrid",
+    "techno-economic analysis",
+    "life-cycle assessment",
+    "bioeconomy",
+    "biomass",
+    "sustainability",
+    "bioprocess engineering"
+  ]
+}
