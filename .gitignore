@@ -33,3 +33,38 @@ Thumbs.db
 
 # Claude Code (share the run/launch config, keep local settings private)
 .claude/settings.local.json
+
+# ---------------------------------------------------------------------------
+# Manuscript work — deliberately NOT part of this repository.
+#
+# This repository publishes the Algametrix tool: the engine, the desktop app
+# and their tests. The cross-study evidence layer, the reproduction pipeline
+# and everything written for the manuscript stay local until the paper is
+# submitted. Keep these entries until that decision is revisited: a plain
+# `git add -A` would otherwise publish the manuscript.
+# ---------------------------------------------------------------------------
+
+# Manuscript drafts, revision reports and handoff bundles
+/paper_handoff/
+/revision_handoff/
+/revision_handoff_r2/
+/handoff_zip/
+/REVISION_REPORT.md
+/00_START_HERE.md
+*.zip
+
+# Cross-study evidence layer and reproduction pipeline
+/src/microalgae_tea_lca/paper/
+/data/studies/
+/reproduce.py
+/scripts/
+/tests/test_paper_*.py
+
+# Generated manuscript outputs (all written by reproduce.py)
+/results/
+/figures/
+
+# Methodology notes that document the manuscript, not the tool
+/docs/STUDY_SELECTION.md
+/docs/PRICE_BASIS.md
+/docs/CARBON_ACCOUNTING.md
