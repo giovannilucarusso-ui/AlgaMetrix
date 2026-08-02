@@ -19,6 +19,12 @@ url: "https://github.com/giovannilucarusso-ui/AlgaMetrix"
 license: MIT
 version: 1.0.0
 date-released: "2026-08-02"
+# Concept DOI: resolves to the most recent archived release.
+doi: 10.5281/zenodo.21764183
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.21764184
+    description: "Archived snapshot of version 1.0.0"
 keywords:
   - microalgae
   - cyanobacteria

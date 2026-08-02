@@ -3,6 +3,7 @@
 [![tests](https://github.com/giovannilucarusso-ui/AlgaMetrix/actions/workflows/tests.yml/badge.svg)](https://github.com/giovannilucarusso-ui/AlgaMetrix/actions/workflows/tests.yml)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue.svg)](pyproject.toml)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21764183.svg)](https://doi.org/10.5281/zenodo.21764183)
 
 **Open-source techno-economic analysis (TEA) and life-cycle assessment (LCA) for microalgae and aquatic protist biomass.**
 
@@ -251,8 +252,14 @@ Open an issue or a pull request. Please cite the source for any numbers you add.
 If AlgaMetrix contributes to work you publish, please cite it. GitHub's *Cite this repository*
 button reads [CITATION.cff](CITATION.cff) and will give you BibTeX or APA directly:
 
-> Russo, G. L. (2026). *AlgaMetrix* (Version 1.0.0) [Computer software].
-> https://github.com/giovannilucarusso-ui/AlgaMetrix
+> Russo, G. L. (2026). *AlgaMetrix: open-source techno-economic analysis and life-cycle assessment
+> for microalgae and aquatic protist biomass* (Version 1.0.0) [Computer software]. Zenodo.
+> https://doi.org/10.5281/zenodo.21764183
+
+Each release is archived on Zenodo. **`10.5281/zenodo.21764183` is the concept DOI**: cite it when
+you mean "AlgaMetrix" and it will always resolve to the most recent version. To pin the exact
+version you ran, cite its own DOI instead — v1.0.0 is
+[`10.5281/zenodo.21764184`](https://doi.org/10.5281/zenodo.21764184).
 
 ## License
 
