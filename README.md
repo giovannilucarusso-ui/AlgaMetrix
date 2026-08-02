@@ -1,5 +1,9 @@
 # AlgaMetrix
 
+[![tests](https://github.com/giovannilucarusso-ui/AlgaMetrix/actions/workflows/tests.yml/badge.svg)](https://github.com/giovannilucarusso-ui/AlgaMetrix/actions/workflows/tests.yml)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue.svg)](pyproject.toml)
+
 **Open-source techno-economic analysis (TEA) and life-cycle assessment (LCA) for microalgae and aquatic protist biomass.**
 
 Existing TEA/LCA tools (SuperPro Designer, SimaPro, GaBi, Aspen Plus) are proprietary, expensive, and
