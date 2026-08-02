@@ -246,6 +246,14 @@ tests/                    unit tests for the engine and validation
 Contributions are very welcome — especially validated inventory data for specific strains and plants.
 Open an issue or a pull request. Please cite the source for any numbers you add.
 
+## Citation
+
+If AlgaMetrix contributes to work you publish, please cite it. GitHub's *Cite this repository*
+button reads [CITATION.cff](CITATION.cff) and will give you BibTeX or APA directly:
+
+> Russo, G. L. (2026). *AlgaMetrix* (Version 0.1.0) [Computer software].
+> https://github.com/giovannilucarusso-ui/AlgaMetrix
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

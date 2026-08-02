@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+message: "If you use AlgaMetrix in your work, please cite it as below."
+title: AlgaMetrix
+abstract: >-
+  Open-source techno-economic analysis (TEA) and life-cycle assessment (LCA)
+  for microalgae, cyanobacteria and aquatic protist biomass. Both analyses are
+  derived from a single shared mass and energy balance, so the economic and the
+  environmental results always describe the same process. Every organism,
+  cultivation system, price and characterization factor lives in editable,
+  citable YAML files.
+type: software
+authors:
+  - family-names: Russo
+    given-names: Giovanni Luca
+    orcid: "https://orcid.org/0000-0002-4072-0331"
+repository-code: "https://github.com/giovannilucarusso-ui/AlgaMetrix"
+url: "https://github.com/giovannilucarusso-ui/AlgaMetrix"
+license: MIT
+version: 0.1.0
+date-released: "2026-08-02"
+keywords:
+  - microalgae
+  - cyanobacteria
+  - thraustochytrid
+  - techno-economic analysis
+  - life-cycle assessment
+  - bioeconomy
+  - sustainability
