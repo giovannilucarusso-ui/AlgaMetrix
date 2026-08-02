@@ -20,12 +20,18 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from .inventory import Inventory
-from .models import CarbonSource, Scenario
+from .models import CarbonAccounting, CarbonSource, Scenario
 
 
 @dataclass
 class LCAResult:
-    """Environmental results per kg of dry biomass."""
+    """Environmental results per kg of dry biomass.
+
+    ``gwp_kg_co2eq_per_kg`` is the **net** result under the scenario's declared
+    biogenic-carbon convention. It is never reported on its own: the gross value
+    before any biogenic adjustment, the adjustment itself and the convention that
+    produced it are all carried here so a reader can undo the choice.
+    """
 
     gwp_kg_co2eq_per_kg: float
     ced_mj_per_kg: float
@@ -33,6 +39,16 @@ class LCAResult:
     land_m2a_per_kg: float
     gwp_breakdown: dict = field(default_factory=dict)  # kg CO2-eq / kg, by contributor
     impacts: dict = field(default_factory=dict)         # all impact categories per kg
+    # --- biogenic-carbon accounting --------------------------------------
+    gwp_gross_kg_co2eq_per_kg: float = 0.0     # before any biogenic adjustment
+    biogenic_adjustment_kg_co2eq_per_kg: float = 0.0   # <= 0; net = gross + adjustment
+    carbon_accounting_mode: str = CarbonAccounting.NO_BIOGENIC_CREDIT.value
+    carbon_supply_gwp_kg_co2eq_per_kg: float = 0.0     # upstream burden of the C feed
+
+    @property
+    def gwp_net_kg_co2eq_per_kg(self) -> float:
+        """Explicit alias: the net GWP under the declared convention."""
+        return self.gwp_kg_co2eq_per_kg
 
 
 def run_lca(scenario: Scenario, inv: Inventory) -> LCAResult:
@@ -63,15 +79,21 @@ def run_lca(scenario: Scenario, inv: Inventory) -> LCAResult:
             gwp_contrib.get(ext.solvent_name, 0.0) + inv.solvent_net_per_kg * ext.solvent_gwp
         )
 
-    # Biogenic uptake is only a real atmospheric drawdown when the carbon comes
-    # from CO2. With a NaHCO3 feed the fixed carbon originates from a mined /
-    # manufactured chemical (whose own production burden is counted above), so
-    # crediting it here would double-count; hence the credit is CO2-only.
-    carbon_from_co2 = scenario.system.carbon_source == CarbonSource.CO2
-    if f.count_biogenic_uptake and inv.co2_fixed_per_kg > 0 and carbon_from_co2:
-        gwp_contrib["Biogenic CO2 uptake"] = -inv.co2_fixed_per_kg
+    # --- gross GWP: everything before any biogenic-carbon adjustment ------
+    gwp_gross = sum(gwp_contrib.values())
+    carbon_supply_gwp = (
+        gwp_contrib.get("CO2 supply", 0.0)
+        + gwp_contrib.get("Bicarbonate (NaHCO3)", 0.0)
+        + gwp_contrib.get("Substrate", 0.0)
+    )
 
-    gwp = sum(gwp_contrib.values())
+    # --- biogenic adjustment under the declared convention ----------------
+    mode = _effective_carbon_mode(f)
+    adjustment = _biogenic_adjustment(scenario, inv, f, mode)
+    if adjustment:
+        gwp_contrib["Biogenic CO2 uptake"] = adjustment
+
+    gwp = gwp_gross + adjustment
 
     # --- Cumulative Energy Demand ----------------------------------------
     ced = (
@@ -128,4 +150,55 @@ def run_lca(scenario: Scenario, inv: Inventory) -> LCAResult:
         land_m2a_per_kg=land,
         gwp_breakdown={k: v for k, v in gwp_contrib.items() if abs(v) > 0},
         impacts=impacts,
+        gwp_gross_kg_co2eq_per_kg=gwp_gross,
+        biogenic_adjustment_kg_co2eq_per_kg=adjustment,
+        carbon_accounting_mode=mode.value,
+        carbon_supply_gwp_kg_co2eq_per_kg=carbon_supply_gwp,
     )
+
+
+def _effective_carbon_mode(factors) -> CarbonAccounting:
+    """The convention actually in force.
+
+    ``count_biogenic_uptake=False`` is the historical master switch and always
+    wins, so scenarios written before the modes existed keep their behaviour.
+    """
+    if not factors.count_biogenic_uptake:
+        return CarbonAccounting.NO_BIOGENIC_CREDIT
+    mode = factors.carbon_accounting
+    return mode if isinstance(mode, CarbonAccounting) else CarbonAccounting(mode)
+
+
+def _biogenic_adjustment(
+    scenario: Scenario, inv: Inventory, factors, mode: CarbonAccounting
+) -> float:
+    """kg CO2-eq per kg product, <= 0. Added to the gross GWP to give the net.
+
+    The quantity credited differs between modes on purpose:
+
+    * ``SOURCE_SPECIFIC_CREDIT`` credits ``co2_fixed_per_kg`` - the CO2 fixed by
+      the gross biomass cultivated - and only when the carbon was fed as CO2.
+      This is the historical behaviour and is retained so published results
+      remain reproducible.
+    * ``TEMPORARY_STORAGE_CREDIT_AT_GATE`` credits ``biogenic_co2_in_product_per_kg``
+      - the carbon that actually leaves the gate inside the product, whatever fed
+      it. For a system with harvesting losses this is the smaller, and physically
+      the correct, at-gate quantity.
+
+    The two differ by the harvesting recovery; both quantities stay available on
+    the inventory (``co2_fixed_per_kg`` and ``biogenic_co2_in_product_per_kg``),
+    so the difference is explicit rather than hidden.
+    """
+    if mode is CarbonAccounting.NO_BIOGENIC_CREDIT:
+        return 0.0
+    if mode is CarbonAccounting.SOURCE_SPECIFIC_CREDIT:
+        from_co2 = scenario.system.carbon_source == CarbonSource.CO2
+        if from_co2 and inv.co2_fixed_per_kg > 0:
+            return -inv.co2_fixed_per_kg
+        return 0.0
+    if mode is CarbonAccounting.TEMPORARY_STORAGE_CREDIT_AT_GATE:
+        return -inv.biogenic_co2_in_product_per_kg
+    if mode is CarbonAccounting.CUSTOM:
+        frac = max(0.0, min(float(factors.custom_biogenic_credit_fraction), 1.0))
+        return -inv.biogenic_co2_in_product_per_kg * frac
+    return 0.0

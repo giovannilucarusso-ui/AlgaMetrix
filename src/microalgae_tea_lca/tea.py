@@ -156,8 +156,10 @@ def run_tea(scenario: Scenario, inv: Inventory) -> TEAResult:
     depreciation = dfc / eco.depreciation_years if eco.depreciation_years > 0 else 0.0
     facility_dependent = depreciation + dfc * (eco.maintenance_frac + eco.insurance_frac)
     overhead = (raw_materials_cost + utilities_cost + labour) * eco.overhead_frac
+    other_opex = scenario.other_opex_per_year
 
-    annual_opex = raw_materials_cost + utilities_cost + labour + facility_dependent + overhead
+    annual_opex = (raw_materials_cost + utilities_cost + labour
+                   + facility_dependent + overhead + other_opex)
 
     # Itemised breakdown (sums to AOC) and grouped categories.
     opex_breakdown = {
@@ -166,6 +168,7 @@ def run_tea(scenario: Scenario, inv: Inventory) -> TEAResult:
         "Labour": labour,
         "Facility-dependent": facility_dependent,
         "Overhead": overhead,
+        "Other operating": other_opex,
     }
     opex_categories = {
         "Raw materials": raw_materials_cost,
@@ -173,6 +176,7 @@ def run_tea(scenario: Scenario, inv: Inventory) -> TEAResult:
         "Labour": labour,
         "Facility-dependent": facility_dependent,
         "Overhead": overhead,
+        "Other operating": other_opex,
     }
 
     production_cost = annual_opex / annual_kg if annual_kg > 0 else float("inf")

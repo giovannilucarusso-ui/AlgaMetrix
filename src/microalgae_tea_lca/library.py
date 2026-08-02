@@ -15,6 +15,7 @@ import yaml
 
 from .models import (
     Basis,
+    CarbonAccounting,
     CarbonSource,
     CultivationSystem,
     Drying,
@@ -167,7 +168,12 @@ def _economics(d: dict) -> Economics:
 def _lcia(d: dict) -> LCIAFactors:
     d = dict(d)
     count = bool(d.pop("count_biogenic_uptake", True))
-    return LCIAFactors(count_biogenic_uptake=count, **{k: float(v) for k, v in d.items()})
+    mode = CarbonAccounting(d.pop("carbon_accounting", CarbonAccounting.SOURCE_SPECIFIC_CREDIT.value))
+    return LCIAFactors(
+        count_biogenic_uptake=count,
+        carbon_accounting=mode,
+        **{k: float(v) for k, v in d.items()},
+    )
 
 
 def load_library(data_dir: Path | str | None = None) -> Library:

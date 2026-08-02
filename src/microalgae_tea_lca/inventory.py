@@ -22,6 +22,10 @@ NAHCO3_PER_C = 84.007 / 12.011
 # run at 0 % efficiency (that implies an infinite carbon feed), so the balance is
 # floored here to keep the supplied-carbon flow finite and physically sensible.
 MIN_CARBON_UTILIZATION = 0.05
+# Carbon mass fraction of the default organic substrate (glucose, C6H12O6:
+# 6 x 12.011 / 180.156). Used only for the carbon bookkeeping that the
+# biogenic-carbon accounting reports; it does not enter the cost or impact sums.
+SUBSTRATE_CARBON_FRACTION = 6 * 12.011 / 180.156
 
 
 @dataclass
@@ -37,7 +41,7 @@ class Inventory:
     elec_kwh_per_kg: float            # total electricity
     heat_mj_per_kg: float             # thermal energy (drying)
     co2_supply_per_kg: float          # CO2 gas supplied to the culture
-    co2_fixed_per_kg: float           # CO2 biologically fixed into biomass
+    co2_fixed_per_kg: float           # CO2 biologically fixed by the GROSS biomass cultivated
     bicarbonate_supply_per_kg: float  # kg NaHCO3 supplied (bicarbonate carbon source)
     nitrogen_per_kg: float            # kg N supplied
     phosphorus_per_kg: float          # kg P supplied
@@ -47,6 +51,15 @@ class Inventory:
     solvent_net_per_kg: float = 0.0   # kg extraction solvent make-up (net of recycle)
     nitrogen_emitted_per_kg: float = 0.0    # kg N not assimilated (potential water emission)
     phosphorus_emitted_per_kg: float = 0.0  # kg P not assimilated
+    # --- carbon bookkeeping (biogenic-carbon accounting, see lca.CarbonAccounting) ---
+    # Carbon that actually LEAVES THE GATE inside 1 kg of product, expressed as CO2.
+    # Differs from ``co2_fixed_per_kg`` by the harvesting recovery: carbon fixed by
+    # biomass that is lost during harvesting never reaches the product.
+    biogenic_co2_in_product_per_kg: float = 0.0
+    # Carbon fed as organic substrate, expressed as CO2 (heterotrophic systems).
+    substrate_co2_supplied_per_kg: float = 0.0
+    # Inorganic carbon supplied to the culture, expressed as CO2 (CO2 gas or NaHCO3).
+    inorganic_co2_supplied_per_kg: float = 0.0
     batches_per_year: float = 0.0     # 0 in continuous mode
     batch_product_kg: float = 0.0     # final product per batch (batch mode)
     elec_breakdown: dict = field(default_factory=dict)  # kWh/kg by stage
@@ -171,6 +184,13 @@ def build_inventory(scenario: Scenario) -> Inventory:
 
     elec_total = elec_cultivation + elec_harvest + elec_drying + elec_extraction
 
+    # --- carbon bookkeeping ------------------------------------------------
+    # What leaves the gate: the carbon in 1 kg of product, with no recovery
+    # factor - biomass lost at harvest never becomes product.
+    biogenic_co2_in_product = org.carbon * CO2_PER_C
+    substrate_co2_supplied = substrate * SUBSTRATE_CARBON_FRACTION * CO2_PER_C
+    inorganic_co2_supplied = co2_supply + bicarbonate_supply * (12.011 / 84.007) * CO2_PER_C
+
     # --- land occupation --------------------------------------------------
     land_m2a = total_land_m2 / annual_kg if annual_kg > 0 else 0.0
 
@@ -189,6 +209,9 @@ def build_inventory(scenario: Scenario) -> Inventory:
         solvent_net_per_kg=solvent_net,
         nitrogen_emitted_per_kg=nitrogen_emitted,
         phosphorus_emitted_per_kg=phosphorus_emitted,
+        biogenic_co2_in_product_per_kg=biogenic_co2_in_product,
+        substrate_co2_supplied_per_kg=substrate_co2_supplied,
+        inorganic_co2_supplied_per_kg=inorganic_co2_supplied,
         batches_per_year=batches_per_year,
         batch_product_kg=batch_product_kg,
         elec_breakdown={

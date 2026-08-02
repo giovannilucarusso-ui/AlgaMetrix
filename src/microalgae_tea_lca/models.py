@@ -40,6 +40,36 @@ class Basis(str, Enum):
     VOLUME = "volume"  # scale in m3, productivity in g/L/day
 
 
+class CarbonAccounting(str, Enum):
+    """How carbon fixed into the biomass is treated at the cradle-to-gate boundary.
+
+    A cradle-to-gate GWP that credits the carbon locked into the biomass is only
+    meaningful together with the convention that produced it: the biomass leaves
+    the gate carrying that carbon, and whether it counts as a removal depends on
+    what happens downstream and on the study's temporary-storage rules. The mode
+    is therefore explicit, and the gross (pre-adjustment) result is always
+    reported alongside the net one.
+
+    ``NO_BIOGENIC_CREDIT``
+        No adjustment. Gross == net. The conservative default for comparisons.
+    ``TEMPORARY_STORAGE_CREDIT_AT_GATE``
+        Credit the carbon physically incorporated into the biomass, whatever fed
+        it. Represents "the product carries this much carbon out of the gate".
+    ``SOURCE_SPECIFIC_CREDIT``
+        Credit only carbon taken up as atmospheric/flue-gas CO2. Carbon arriving
+        as a manufactured or mined reagent (NaHCO3) or as an organic substrate is
+        not credited, because its production burden is already counted upstream.
+        This reproduces the behaviour of earlier versions of this engine.
+    ``CUSTOM``
+        Credit ``custom_biogenic_credit_fraction`` of the incorporated carbon.
+    """
+
+    NO_BIOGENIC_CREDIT = "no_biogenic_credit"
+    TEMPORARY_STORAGE_CREDIT_AT_GATE = "temporary_storage_credit_at_gate"
+    SOURCE_SPECIFIC_CREDIT = "source_specific_credit"
+    CUSTOM = "custom"
+
+
 @dataclass
 class Organism:
     """A strain and its composition. Elemental fractions drive the nutrient balance."""
@@ -231,7 +261,12 @@ class LCIAFactors:
     co2_supply_gwp: float  # kg CO2-eq / kg CO2 supplied
     substrate_gwp: float   # kg CO2-eq / kg substrate
     substrate_ced: float   # MJ / kg substrate
-    count_biogenic_uptake: bool = True  # credit fixed CO2 at the gate
+    count_biogenic_uptake: bool = True  # master switch; False forces NO_BIOGENIC_CREDIT
+    # Which biogenic-carbon convention applies when the master switch is on.
+    # The default reproduces the historical behaviour (credit CO2-fed carbon only).
+    carbon_accounting: CarbonAccounting = CarbonAccounting.SOURCE_SPECIFIC_CREDIT
+    # Fraction of incorporated carbon credited under CarbonAccounting.CUSTOM.
+    custom_biogenic_credit_fraction: float = 1.0
     # --- sodium bicarbonate carbon source (defaults provided) -------------
     bicarbonate_gwp: float = 0.87  # kg CO2-eq / kg NaHCO3 (Solvay/trona production)
     bicarbonate_ced: float = 11.0  # MJ / kg NaHCO3
@@ -276,3 +311,8 @@ class Scenario:
     batch_cycle_time_h: float = 0.0   # total batch cycle time (incl. turnaround)
     # Operating-cost credits (energy/heat recovery, biogas, waste valorisation).
     credits_per_year: float = 0.0     # EUR/yr that reduce the net operating cost
+    # Lump-sum annual operating costs that are neither per-kg materials/utilities
+    # nor labour — e.g. consumables (probes, filters), miscellaneous utilities,
+    # wastewater treatment, contingencies. Many published TEA studies report such
+    # items as an annual figure; this adds them to the AOC as its own category.
+    other_opex_per_year: float = 0.0  # EUR/yr
