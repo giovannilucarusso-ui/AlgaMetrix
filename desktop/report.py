@@ -20,12 +20,12 @@ import matplotlib.image as mpimg  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.backends.backend_pdf import PdfPages  # noqa: E402
 
+from algametrix import __version__ as VERSION  # noqa: E402
 from algametrix.models import Basis  # noqa: E402
 
 from . import resources  # noqa: E402
 from .flowsheet import model as M  # noqa: E402
 
-VERSION = "0.2.0"
 PORTRAIT = (8.27, 11.69)  # A4 portrait, inches
 
 # palette

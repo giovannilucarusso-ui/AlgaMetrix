@@ -251,7 +251,7 @@ Open an issue or a pull request. Please cite the source for any numbers you add.
 If AlgaMetrix contributes to work you publish, please cite it. GitHub's *Cite this repository*
 button reads [CITATION.cff](CITATION.cff) and will give you BibTeX or APA directly:
 
-> Russo, G. L. (2026). *AlgaMetrix* (Version 0.1.0) [Computer software].
+> Russo, G. L. (2026). *AlgaMetrix* (Version 1.0.0) [Computer software].
 > https://github.com/giovannilucarusso-ui/AlgaMetrix
 
 ## License

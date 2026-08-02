@@ -55,7 +55,7 @@ from .sensitivity import PARAMETERS, run_sweep
 from .tea import TEAResult, capital_recovery_factor, irr, npv, run_tea
 from .uncertainty import MonteCarloResult, run_montecarlo
 
-__version__ = "0.1.0"
+__version__ = "1.0.0"
 
 __all__ = [
     "Basis",
