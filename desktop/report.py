@@ -1,6 +1,6 @@
 """Process report (PDF) — a shareable, branded summary of a case study.
 
-Rebuilds the multi-page A4 Algametrix report (cover with KPIs, techno-economic
+Rebuilds the multi-page A4 AlgaMetrix report (cover with KPIs, techno-economic
 charts, cost-breakdown table, life-cycle charts, energy/mass inventory) and adds
 the auto-generated **Process Flow Diagram** and its stream table. The module is
 **Qt-free** — matplotlib plus the pure :mod:`desktop.flowsheet.model` solver — so
@@ -20,7 +20,7 @@ import matplotlib.image as mpimg  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.backends.backend_pdf import PdfPages  # noqa: E402
 
-from microalgae_tea_lca.models import Basis  # noqa: E402
+from algametrix.models import Basis  # noqa: E402
 
 from . import resources  # noqa: E402
 from .flowsheet import model as M  # noqa: E402
@@ -93,7 +93,7 @@ def _product_metrics(results):
 # common page furniture
 # --------------------------------------------------------------------------- #
 def _footer(fig, page: int, total: int) -> None:
-    fig.text(0.07, 0.028, f"Algametrix v{VERSION}   ·   {date.today():%Y-%m-%d}",
+    fig.text(0.07, 0.028, f"AlgaMetrix v{VERSION}   ·   {date.today():%Y-%m-%d}",
              fontsize=8, color=SUBTLE)
     fig.text(0.93, 0.028, f"{page} / {total}", fontsize=8, color=SUBTLE, ha="right")
 
@@ -155,7 +155,7 @@ def _cover(results, scenario, page, total):
         la = fig.add_axes([0.07, 0.885, 0.34, 0.085]); la.axis("off")
         la.imshow(img)
     else:
-        ax.text(0.07, 0.915, "Algametrix", fontsize=26, fontweight="bold", color=GREEN,
+        ax.text(0.07, 0.915, "AlgaMetrix", fontsize=26, fontweight="bold", color=GREEN,
                 transform=ax.transAxes)
 
     ax.text(0.07, 0.855, "Techno-economic & Life-cycle Assessment report",

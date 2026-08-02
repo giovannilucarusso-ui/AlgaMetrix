@@ -12,17 +12,17 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from microalgae_tea_lca.inventory import (
+from algametrix.inventory import (
     CO2_PER_C,
     MIN_CARBON_UTILIZATION,
     NAHCO3_PER_C,
     build_inventory,
 )
-from microalgae_tea_lca.lca import run_lca
-from microalgae_tea_lca.library import load_library
-from microalgae_tea_lca.models import CarbonSource, Scenario, TrophicMode
-from microalgae_tea_lca.scenario import run_scenario
-from microalgae_tea_lca.tea import capital_recovery_factor, run_tea
+from algametrix.lca import run_lca
+from algametrix.library import load_library
+from algametrix.models import CarbonSource, Scenario, TrophicMode
+from algametrix.scenario import run_scenario
+from algametrix.tea import capital_recovery_factor, run_tea
 
 
 @pytest.fixture(scope="module")
@@ -184,7 +184,7 @@ def test_zero_utilization_does_not_blow_up(lib):
 
 def test_validation_references_load(lib):
     """The validation library loads and carries the seeded papers."""
-    from microalgae_tea_lca.benchmarks import load_validation_references
+    from algametrix.benchmarks import load_validation_references
 
     refs = load_validation_references()
     assert len(refs) >= 2
@@ -199,7 +199,7 @@ def test_validation_references_load(lib):
 
 def test_downstream_presets_load_and_run(lib):
     """The catalogued downstream presets load and drive the inventory correctly."""
-    from microalgae_tea_lca.models import Product
+    from algametrix.models import Product
 
     # Catalogue is populated and carries the key technologies the UI offers.
     names = set(lib.extraction)
@@ -266,7 +266,7 @@ def test_cultivation_heat_zero_is_noop(lib):
 
 def test_minimum_selling_price_breaks_even(lib):
     """MEPP is the price at which NPV crosses zero."""
-    from microalgae_tea_lca.scenario import minimum_selling_price
+    from algametrix.scenario import minimum_selling_price
 
     scn = make_scenario(lib, "Open raceway pond", "Chlorella vulgaris", 100_000)
     scn.product_price = 10.0
@@ -284,8 +284,8 @@ def test_minimum_selling_price_breaks_even(lib):
 
 def test_phycocyanin_is_a_composition_fraction(lib):
     """A product with fraction='phycocyanin' reads the organism's pigment fraction."""
-    from microalgae_tea_lca.products import product_yield
-    from microalgae_tea_lca.models import Product
+    from algametrix.products import product_yield
+    from algametrix.models import Product
 
     spir = lib.organisms["Arthrospira platensis (Spirulina)"]
     assert spir.phycocyanin > 0

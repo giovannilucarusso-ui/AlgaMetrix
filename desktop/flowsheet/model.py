@@ -1,7 +1,7 @@
 """Flowsheet data model, unit-operation registry and mass-balance solver.
 
 The model is deliberately UI-agnostic and JSON-serialisable so it can be saved,
-reloaded and (later) mapped onto the calculation engine in ``microalgae_tea_lca``.
+reloaded and (later) mapped onto the calculation engine in ``algametrix``.
 
 A :class:`Flowsheet` is a bag of :class:`UnitNode` blocks connected by
 :class:`StreamLink` streams. Every unit type is described by a :class:`UnitSpec`
@@ -12,7 +12,7 @@ propagates material flows so every stream carries a plausible number.
 Flows are plain dicts ``{component: kg_per_h}`` over :data:`COMPONENTS`. The
 balance is first-pass (no recycle convergence, no energy closure); it exists to
 make the canvas feel alive and to sanity-check the topology, not to replace the
-rigorous per-kg inventory in :mod:`microalgae_tea_lca.inventory`.
+rigorous per-kg inventory in :mod:`algametrix.inventory`.
 """
 
 from __future__ import annotations

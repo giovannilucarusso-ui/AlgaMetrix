@@ -13,9 +13,9 @@ sys.path.insert(0, str(ROOT))
 
 from desktop import report  # noqa: E402
 from desktop.flowsheet import builder  # noqa: E402
-from microalgae_tea_lca.library import load_library  # noqa: E402
-from microalgae_tea_lca.scenario import run_scenario  # noqa: E402
-from microalgae_tea_lca.templates import TEMPLATES  # noqa: E402
+from algametrix.library import load_library  # noqa: E402
+from algametrix.scenario import run_scenario  # noqa: E402
+from algametrix.templates import TEMPLATES  # noqa: E402
 
 
 @pytest.fixture(scope="module")
@@ -38,9 +38,9 @@ def test_build_process_report_writes_a_pdf(lib, tmp_path):
 
 def test_report_includes_available_analyses(lib, tmp_path):
     """Products + sensitivity/uncertainty/compare extras add pages to the report."""
-    from microalgae_tea_lca.comparison import KPI_ORDER, scenario_kpis
-    from microalgae_tea_lca.sensitivity import OUTPUTS, PARAMETERS, run_sweep
-    from microalgae_tea_lca.uncertainty import run_montecarlo
+    from algametrix.comparison import KPI_ORDER, scenario_kpis
+    from algametrix.sensitivity import OUTPUTS, PARAMETERS, run_sweep
+    from algametrix.uncertainty import run_montecarlo
 
     scn = next(t for t in TEMPLATES if "oil" in t.name.lower()).build(lib)  # multi-product
     results = run_scenario(scn)

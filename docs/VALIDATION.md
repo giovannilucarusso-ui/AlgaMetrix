@@ -1,6 +1,6 @@
 # Validation & transparency
 
-`AlgaeTEA-LCA` is validated on three independent levels: against a proprietary process
+`AlgaMetrix` is validated on three independent levels: against a proprietary process
 simulator (SuperPro Designer), against published techno-economic studies, and against
 open-access literature benchmark ranges. Every reference below is citable. All model
 figures are reproduced by the scripts in [`examples/`](../examples); prices are USD (≈EUR).

@@ -17,10 +17,10 @@ sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT))
 
 from desktop.flowsheet import builder, model as M  # noqa: E402
-from microalgae_tea_lca.library import load_library  # noqa: E402
-from microalgae_tea_lca.models import Basis, CarbonSource, Scenario, TrophicMode  # noqa: E402
-from microalgae_tea_lca.scenario import run_scenario  # noqa: E402
-from microalgae_tea_lca.templates import TEMPLATES, apply_goal  # noqa: E402
+from algametrix.library import load_library  # noqa: E402
+from algametrix.models import Basis, CarbonSource, Scenario, TrophicMode  # noqa: E402
+from algametrix.scenario import run_scenario  # noqa: E402
+from algametrix.templates import TEMPLATES, apply_goal  # noqa: E402
 
 
 @pytest.fixture(scope="module")

@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "microalgae-tea-lca"
+name = "algametrix"
 version = "0.1.0"
 description = "Open-source techno-economic analysis and LCA for microalgae and aquatic protist biomass"
 readme = "README.md"
@@ -30,13 +30,13 @@ web = ["streamlit>=1.36", "plotly>=5.22"]
 dev = ["pytest>=8.0", "pyinstaller>=6.0"]
 
 [project.scripts]
-algae-tea-lca = "desktop.app:main"
+algametrix = "desktop.app:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-"microalgae_tea_lca" = ["../../data/*.yaml"]
+"algametrix" = ["../../data/*.yaml"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

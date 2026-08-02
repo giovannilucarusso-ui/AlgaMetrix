@@ -1,5 +1,5 @@
-"""PySide6 desktop front-end for AlgaeTEA-LCA.
+"""PySide6 desktop front-end for AlgaMetrix.
 
-The engine (``microalgae_tea_lca``) is UI-agnostic; this package only builds the
+The engine (``algametrix``) is UI-agnostic; this package only builds the
 window and wires widgets to it.
 """

@@ -8,7 +8,7 @@ dist/
 
 # PyInstaller (keep the project's build spec, drop the generated build log)
 *.spec
-!AlgaeTEA-LCA.spec
+!AlgaMetrix.spec
 build_log.txt
 
 # Virtual environments
@@ -37,7 +37,7 @@ Thumbs.db
 # ---------------------------------------------------------------------------
 # Manuscript work — deliberately NOT part of this repository.
 #
-# This repository publishes the Algametrix tool: the engine, the desktop app
+# This repository publishes the AlgaMetrix tool: the engine, the desktop app
 # and their tests. The cross-study evidence layer, the reproduction pipeline
 # and everything written for the manuscript stay local until the paper is
 # submitted. Keep these entries until that decision is revisited: a plain
@@ -54,7 +54,7 @@ Thumbs.db
 *.zip
 
 # Cross-study evidence layer and reproduction pipeline
-/src/microalgae_tea_lca/paper/
+/src/algametrix/paper/
 /data/studies/
 /reproduce.py
 /scripts/

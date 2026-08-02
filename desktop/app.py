@@ -16,8 +16,8 @@ from desktop.main_window import MainWindow
 
 def main() -> int:
     app = QApplication(sys.argv)
-    app.setApplicationName("AlgaeTEA-LCA")
-    app.setOrganizationName("AlgaeTEA-LCA")
+    app.setApplicationName("AlgaMetrix")
+    app.setOrganizationName("AlgaMetrix")
 
     # Language: use the saved choice, or ask once on first run (before building the UI).
     from desktop.i18n import LANGUAGES, load_saved_language, save_language, set_language

@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from microalgae_tea_lca.library import load_library
-from microalgae_tea_lca.models import (
+from algametrix.library import load_library
+from algametrix.models import (
     CarbonSource, Drying, Extraction, Harvesting, Product, Scenario, TrophicMode,
 )
-from microalgae_tea_lca.verification import format_report, verify
+from algametrix.verification import format_report, verify
 
 
 def _organism_for(lib, system):

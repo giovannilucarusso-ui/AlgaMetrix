@@ -15,10 +15,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from microalgae_tea_lca.library import load_library
-from microalgae_tea_lca.models import Extraction, Product, Scenario
-from microalgae_tea_lca.scenario import run_scenario
-from microalgae_tea_lca.validation import compare, parse_reference_csv
+from algametrix.library import load_library
+from algametrix.models import Extraction, Product, Scenario
+from algametrix.scenario import run_scenario
+from algametrix.validation import compare, parse_reference_csv
 
 
 def main() -> None:

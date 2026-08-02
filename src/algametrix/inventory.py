@@ -1,6 +1,6 @@
 """Mass and energy balance.
 
-Turns a :class:`~microalgae_tea_lca.models.Scenario` into an :class:`Inventory`:
+Turns a :class:`~algametrix.models.Scenario` into an :class:`Inventory`:
 the physical flows required to make the product, expressed **per kilogram of dry
 biomass** (the functional unit) plus the total **annual production**.
 

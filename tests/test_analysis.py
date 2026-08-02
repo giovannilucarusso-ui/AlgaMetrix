@@ -9,14 +9,14 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from microalgae_tea_lca.benchmarks import check_benchmarks, infer_category, load_market_prices
-from microalgae_tea_lca.comparison import KPI_ORDER, scenario_kpis
-from microalgae_tea_lca.inventory import build_inventory
-from microalgae_tea_lca.library import load_library
-from microalgae_tea_lca.models import Scenario
-from microalgae_tea_lca.scenario import run_scenario
-from microalgae_tea_lca.sensitivity import PARAMETERS
-from microalgae_tea_lca.uncertainty import run_montecarlo
+from algametrix.benchmarks import check_benchmarks, infer_category, load_market_prices
+from algametrix.comparison import KPI_ORDER, scenario_kpis
+from algametrix.inventory import build_inventory
+from algametrix.library import load_library
+from algametrix.models import Scenario
+from algametrix.scenario import run_scenario
+from algametrix.sensitivity import PARAMETERS
+from algametrix.uncertainty import run_montecarlo
 
 
 @pytest.fixture(scope="module")

@@ -1,8 +1,8 @@
 """Techno-economic analysis (SuperPro-Designer-aligned).
 
-Combines an :class:`~microalgae_tea_lca.inventory.Inventory` with the
-:class:`~microalgae_tea_lca.models.Economics` assumptions plus any explicit
-:class:`~microalgae_tea_lca.models.Material` / :class:`Utility` line items to produce:
+Combines an :class:`~algametrix.inventory.Inventory` with the
+:class:`~algametrix.models.Economics` assumptions plus any explicit
+:class:`~algametrix.models.Material` / :class:`Utility` line items to produce:
 
 * a capital structure  — equipment -> installed -> DFC -> total investment
   (direct fixed capital + working capital + start-up), and
@@ -12,7 +12,7 @@ Combines an :class:`~microalgae_tea_lca.inventory.Inventory` with the
 * a profitability analysis — revenues, gross/net profit, ROI, payback, NPV, IRR.
 
 The category structure mirrors a SuperPro Economic Evaluation Report so results
-can be validated against it (see :mod:`microalgae_tea_lca.validation`).
+can be validated against it (see :mod:`algametrix.validation`).
 """
 
 from __future__ import annotations

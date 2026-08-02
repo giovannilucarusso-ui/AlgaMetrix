@@ -20,10 +20,10 @@ from PySide6.QtWidgets import (
     QWizardPage,
 )
 
-from microalgae_tea_lca.library import Library
-from microalgae_tea_lca.models import Basis, Scenario
-from microalgae_tea_lca.products import main_product
-from microalgae_tea_lca.templates import (
+from algametrix.library import Library
+from algametrix.models import Basis, Scenario
+from algametrix.products import main_product
+from algametrix.templates import (
     TEMPLATES,
     apply_goal,
     get_template,
@@ -362,7 +362,7 @@ class ReviewPage(QWizardPage):
         v.addWidget(self.lbl)
 
     def initializePage(self):
-        from microalgae_tea_lca.scenario import run_scenario
+        from algametrix.scenario import run_scenario
         scn = self.wiz.scenario
         r = run_scenario(scn)
         mp = r.main_product
@@ -391,7 +391,7 @@ class SetupWizard(QWizard):
         self.scenario = _default_scenario(lib)
         self.from_example: str | None = None
         self.goal = "biomass"
-        self.setWindowTitle("AlgaeTEA-LCA")
+        self.setWindowTitle("AlgaMetrix")
         self.setWizardStyle(QWizard.ModernStyle)
         self.setOption(QWizard.NoBackButtonOnStartPage, True)
         self.setButtonText(QWizard.CancelButton, tr("Skip to full tool"))

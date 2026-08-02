@@ -32,5 +32,5 @@ def asset_path(name: str) -> str | None:
 
 
 def logo_path() -> str | None:
-    """Absolute path to the Algametrix logo (transparent lockup), or ``None``."""
+    """Absolute path to the AlgaMetrix logo (transparent lockup), or ``None``."""
     return asset_path("algametrix_logo.png")

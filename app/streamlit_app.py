@@ -1,4 +1,4 @@
-"""Interactive web UI for AlgaeTEA-LCA.
+"""Interactive web UI for AlgaMetrix.
 
 Run from the repository root::
 
@@ -20,11 +20,11 @@ import streamlit as st
 # Make `src/` importable without installing the package.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from microalgae_tea_lca.library import load_library
-from microalgae_tea_lca.models import Basis, Scenario
-from microalgae_tea_lca.scenario import run_scenario
+from algametrix.library import load_library
+from algametrix.models import Basis, Scenario
+from algametrix.scenario import run_scenario
 
-st.set_page_config(page_title="AlgaeTEA-LCA", page_icon="🌱", layout="wide")
+st.set_page_config(page_title="AlgaMetrix", page_icon="🌱", layout="wide")
 
 
 @st.cache_data
@@ -38,7 +38,7 @@ lib = get_library()
 # --------------------------------------------------------------------------- #
 # Sidebar: build the scenario from editable defaults
 # --------------------------------------------------------------------------- #
-st.sidebar.title("🌱 AlgaeTEA-LCA")
+st.sidebar.title("🌱 AlgaMetrix")
 st.sidebar.caption("Techno-economic & life-cycle analysis of microalgae / protist biomass")
 
 # --- Organism --------------------------------------------------------------

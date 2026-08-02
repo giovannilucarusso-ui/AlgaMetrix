@@ -10,12 +10,12 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from microalgae_tea_lca.inventory import build_inventory
-from microalgae_tea_lca.library import load_library
-from microalgae_tea_lca.models import Extraction, Product, Scenario
-from microalgae_tea_lca.products import product_masses, product_yield
-from microalgae_tea_lca.scenario import run_scenario
-from microalgae_tea_lca.validation import model_metrics
+from algametrix.inventory import build_inventory
+from algametrix.library import load_library
+from algametrix.models import Extraction, Product, Scenario
+from algametrix.products import product_masses, product_yield
+from algametrix.scenario import run_scenario
+from algametrix.validation import model_metrics
 
 
 @pytest.fixture(scope="module")

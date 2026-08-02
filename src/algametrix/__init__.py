@@ -1,11 +1,11 @@
-"""AlgaeTEA-LCA: open-source techno-economic analysis and LCA for microalgae
+"""AlgaMetrix: open-source techno-economic analysis and LCA for microalgae
 and aquatic protist biomass.
 
 Typical usage::
 
-    from microalgae_tea_lca.library import load_library
-    from microalgae_tea_lca.models import Scenario
-    from microalgae_tea_lca.scenario import run_scenario
+    from algametrix.library import load_library
+    from algametrix.models import Scenario
+    from algametrix.scenario import run_scenario
 
     lib = load_library()
     scenario = Scenario(

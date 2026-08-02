@@ -33,16 +33,16 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from microalgae_tea_lca import library as _lib
-from microalgae_tea_lca.benchmarks import (
+from algametrix import library as _lib
+from algametrix.benchmarks import (
     check_benchmarks,
     infer_category,
     load_market_prices,
     load_validation_references,
 )
-from microalgae_tea_lca.comparison import KPI_ORDER, scenario_kpis
-from microalgae_tea_lca.library import DEFAULT_DATA_DIR, load_library
-from microalgae_tea_lca.models import (
+from algametrix.comparison import KPI_ORDER, scenario_kpis
+from algametrix.library import DEFAULT_DATA_DIR, load_library
+from algametrix.models import (
     Basis,
     CarbonSource,
     Extraction,
@@ -50,10 +50,10 @@ from microalgae_tea_lca.models import (
     Product,
     Scenario,
 )
-from microalgae_tea_lca.scenario import minimum_selling_price, run_scenario
-from microalgae_tea_lca.sensitivity import OUTPUTS, PARAMETERS, run_sweep
-from microalgae_tea_lca.uncertainty import run_montecarlo
-from microalgae_tea_lca.validation import (
+from algametrix.scenario import minimum_selling_price, run_scenario
+from algametrix.sensitivity import OUTPUTS, PARAMETERS, run_sweep
+from algametrix.uncertainty import run_montecarlo
+from algametrix.validation import (
     METRICS,
     compare,
     parse_reference_csv,
@@ -130,7 +130,7 @@ class TableEditorDialog(QDialog):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle(tr("AlgaeTEA-LCA  ·  Techno-economic & LCA for microalgae"))
+        self.setWindowTitle(tr("AlgaMetrix  ·  Techno-economic & LCA for microalgae"))
         self.resize(1280, 820)
         self.setStyleSheet(STYLESHEET)
 
@@ -1622,8 +1622,8 @@ class MainWindow(QMainWindow):
 
     def show_about(self):
         QMessageBox.about(
-            self, "About AlgaeTEA-LCA",
-            "<b>AlgaeTEA-LCA</b><br>Open-source techno-economic &amp; life-cycle "
+            self, "About AlgaMetrix",
+            "<b>AlgaMetrix</b><br>Open-source techno-economic &amp; life-cycle "
             "analysis for microalgae, cyanobacteria and thraustochytrid biomass.<br><br>"
             "One mass/energy balance feeds both the TEA and the LCA.<br>"
             "MIT licensed. Default values are literature-typical placeholders.",

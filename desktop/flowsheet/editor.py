@@ -599,7 +599,7 @@ class FlowsheetEditor(QWidget):
     _BAND = 54.0
 
     def _logo_pixmap(self):
-        """Cached Algametrix logo pixmap (empty if the asset is missing)."""
+        """Cached AlgaMetrix logo pixmap (empty if the asset is missing)."""
         if not hasattr(self, "_logo_pm"):
             from PySide6.QtGui import QPixmap
 
@@ -705,7 +705,7 @@ class FlowsheetEditor(QWidget):
 
     def _set_case_subtitle(self, scn, results) -> None:
         """One-line identity of the case the diagram was generated from."""
-        from microalgae_tea_lca.models import Basis
+        from algametrix.models import Basis
 
         unit = "m²" if scn.system.basis == Basis.AREA else "m³"
         op = "batch" if scn.batch_mode else "continuous"

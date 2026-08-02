@@ -2,7 +2,7 @@
 from PyInstaller.utils.hooks import collect_submodules
 
 hiddenimports = ['openpyxl']
-hiddenimports += collect_submodules('microalgae_tea_lca')
+hiddenimports += collect_submodules('algametrix')
 hiddenimports += collect_submodules('desktop')
 
 
@@ -26,7 +26,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='Algametrix',
+    name='AlgaMetrix',
     icon='desktop/assets/algametrix.ico',
     debug=False,
     bootloader_ignore_signals=False,
@@ -46,5 +46,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='Algametrix',
+    name='AlgaMetrix',
 )

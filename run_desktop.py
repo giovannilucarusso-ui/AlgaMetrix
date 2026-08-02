@@ -1,4 +1,4 @@
-"""Launch the AlgaeTEA-LCA desktop app.
+"""Launch the AlgaMetrix desktop app.
 
     python run_desktop.py
 """

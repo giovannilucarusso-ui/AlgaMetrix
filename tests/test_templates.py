@@ -9,11 +9,11 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from microalgae_tea_lca.library import load_library
-from microalgae_tea_lca.models import Scenario
-from microalgae_tea_lca.products import main_product
-from microalgae_tea_lca.scenario import run_scenario
-from microalgae_tea_lca.templates import (
+from algametrix.library import load_library
+from algametrix.models import Scenario
+from algametrix.products import main_product
+from algametrix.scenario import run_scenario
+from algametrix.templates import (
     TEMPLATES,
     apply_goal,
     build_template,

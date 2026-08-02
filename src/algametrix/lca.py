@@ -1,7 +1,7 @@
 """Life-cycle assessment (cradle-to-gate).
 
-Combines an :class:`~microalgae_tea_lca.inventory.Inventory` with
-:class:`~microalgae_tea_lca.models.LCIAFactors` to produce impact indicators
+Combines an :class:`~algametrix.inventory.Inventory` with
+:class:`~algametrix.models.LCIAFactors` to produce impact indicators
 per kilogram of dry biomass:
 
 * GWP  - Global Warming Potential (kg CO2-eq)

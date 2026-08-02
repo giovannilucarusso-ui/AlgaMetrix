@@ -2,7 +2,7 @@
 
 This is the bridge between the parametric case study (built by the setup wizard
 and edited on the *Scenario* tab) and the visual *Process Designer*. Given the
-same :class:`~microalgae_tea_lca.models.Scenario` that feeds the TEA and LCA, it
+same :class:`~algametrix.models.Scenario` that feeds the TEA and LCA, it
 lays out an engineering-style process train — feeds, cultivation, dewatering,
 drying and (optional) extraction — wired left-to-right with product and effluent
 sinks, so the researcher always starts from *their* case instead of a generic
@@ -15,9 +15,9 @@ The mapping is deliberately transparent:
 * drying block        <- ``scenario.drying``     (skipped when "wet paste")
 * disruption + extractor <- ``scenario.extraction``
 
-When a solved :class:`~microalgae_tea_lca.scenario.Results` is passed, the block
+When a solved :class:`~algametrix.scenario.Results` is passed, the block
 parameters and feed flows are seeded with the case's real numbers (from the
-per-kg :class:`~microalgae_tea_lca.inventory.Inventory`), so the first-pass
+per-kg :class:`~algametrix.inventory.Inventory`), so the first-pass
 balance on the canvas lands in the same ballpark as the rigorous engine.
 
 The function is pure (no Qt): it returns a :class:`~desktop.flowsheet.model.Flowsheet`
@@ -26,7 +26,7 @@ and can be unit-tested against the engine alone.
 
 from __future__ import annotations
 
-from microalgae_tea_lca.models import CarbonSource, Scenario, TrophicMode
+from algametrix.models import CarbonSource, Scenario, TrophicMode
 
 from . import model as M
 
@@ -195,7 +195,7 @@ def _set(node: M.UnitNode, **params: float) -> None:
 def flowsheet_from_scenario(scn: Scenario, results=None) -> M.Flowsheet:
     """Construct a process :class:`Flowsheet` mirroring ``scn``.
 
-    ``results`` (an optional solved :class:`~microalgae_tea_lca.scenario.Results`)
+    ``results`` (an optional solved :class:`~algametrix.scenario.Results`)
     seeds realistic flows; without it, nominal defaults keep the canvas sensible.
     """
     fs = M.Flowsheet()

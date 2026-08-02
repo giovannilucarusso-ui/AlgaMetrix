@@ -1,6 +1,6 @@
 """Multi-product output and burden allocation.
 
-When a scenario defines :class:`~microalgae_tea_lca.models.Product` fractions,
+When a scenario defines :class:`~algametrix.models.Product` fractions,
 the biomass is split into a main product (e.g. algal oil from the lipid fraction)
 and co-products (e.g. protein meal). The functional unit then becomes 1 kg of the
 main product.

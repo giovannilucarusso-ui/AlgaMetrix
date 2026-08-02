@@ -29,7 +29,7 @@ from .models import (
     Utility,
 )
 
-# Repository layout:  <root>/data/*.yaml  and  <root>/src/microalgae_tea_lca/library.py
+# Repository layout:  <root>/data/*.yaml  and  <root>/src/algametrix/library.py
 # In a PyInstaller bundle the data folder is shipped alongside the executable.
 if getattr(sys, "frozen", False):
     DEFAULT_DATA_DIR = Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent)) / "data"

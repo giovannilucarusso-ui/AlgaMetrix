@@ -5,7 +5,7 @@ be wired to others with material streams. The heavy lifting lives in:
 
 * :mod:`model`   - the serialisable data model, the unit-operation registry and a
   first-pass topological mass-balance solver.
-* :mod:`builder` - turns a TEA/LCA :class:`~microalgae_tea_lca.models.Scenario`
+* :mod:`builder` - turns a TEA/LCA :class:`~algametrix.models.Scenario`
   into a ready-made flowsheet (pure, no Qt).
 * :mod:`scene`   - the interactive ``QGraphicsScene`` (nodes, ports, edges).
 * :mod:`editor`  - the composite widget (palette + canvas + properties panel).

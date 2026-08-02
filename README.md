@@ -1,9 +1,9 @@
-# AlgaeTEA-LCA
+# AlgaMetrix
 
 **Open-source techno-economic analysis (TEA) and life-cycle assessment (LCA) for microalgae and aquatic protist biomass.**
 
 Existing TEA/LCA tools (SuperPro Designer, SimaPro, GaBi, Aspen Plus) are proprietary, expensive, and
-generic. `AlgaeTEA-LCA` is a free, transparent, and reproducible alternative focused specifically on
+generic. `AlgaMetrix` is a free, transparent, and reproducible alternative focused specifically on
 photo- and heterotrophic cultivation of microalgae, cyanobacteria, and thraustochytrids/protists.
 
 It is a **desktop application** (PySide6/Qt) built on a small, UI-agnostic calculation engine.
@@ -156,9 +156,9 @@ deviation (green ≤10 %, amber ≤25 %, red >25 %).
 ## Use it as a library
 
 ```python
-from microalgae_tea_lca.library import load_library
-from microalgae_tea_lca.models import Scenario
-from microalgae_tea_lca.scenario import run_scenario
+from algametrix.library import load_library
+from algametrix.models import Scenario
+from algametrix.scenario import run_scenario
 
 lib = load_library()
 scenario = Scenario(
@@ -181,15 +181,15 @@ To distribute the app to users without a Python installation:
 
 ```bash
 pip install pyinstaller
-python -m PyInstaller --noconfirm --windowed --name AlgaeTEA-LCA ^
+python -m PyInstaller --noconfirm --windowed --name AlgaMetrix ^
     --paths src --paths . --add-data "data;data" ^
-    --collect-submodules microalgae_tea_lca --collect-submodules desktop ^
+    --collect-submodules algametrix --collect-submodules desktop ^
     --hidden-import openpyxl ^
     --exclude-module streamlit --exclude-module plotly ^
     run_desktop.py
 ```
 
-The app appears in `dist/AlgaeTEA-LCA/` — run `AlgaeTEA-LCA.exe`. The editable `data/` YAML files are
+The app appears in `dist/AlgaMetrix/` — run `AlgaMetrix.exe`. The editable `data/` YAML files are
 bundled alongside it. (On macOS/Linux replace `;` with `:` in `--add-data`.)
 
 ## Languages
@@ -202,7 +202,7 @@ technical labels (flow names, cost/impact breakdown categories) stay in English 
 
 ```
 data/                     editable YAML: organisms, systems, prices, LCIA factors, SuperPro template
-src/microalgae_tea_lca/   the engine
+src/algametrix/   the engine
   models.py               dataclasses describing a scenario
   library.py              loads the YAML data into objects
   inventory.py            mass & energy balance  ->  Inventory

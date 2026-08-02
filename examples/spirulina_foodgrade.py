@@ -20,10 +20,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from dataclasses import replace
 
-from microalgae_tea_lca.benchmarks import check_benchmarks, load_market_prices
-from microalgae_tea_lca.library import load_library
-from microalgae_tea_lca.models import Scenario
-from microalgae_tea_lca.scenario import minimum_selling_price, run_scenario
+from algametrix.benchmarks import check_benchmarks, load_market_prices
+from algametrix.library import load_library
+from algametrix.models import Scenario
+from algametrix.scenario import minimum_selling_price, run_scenario
 
 
 def main() -> None:

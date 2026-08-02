@@ -11,11 +11,11 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from microalgae_tea_lca.library import load_library
-from microalgae_tea_lca.models import Material, Scenario
-from microalgae_tea_lca.scenario import run_scenario
-from microalgae_tea_lca.sensitivity import PARAMETERS, run_sweep
-from microalgae_tea_lca.tea import irr, npv
+from algametrix.library import load_library
+from algametrix.models import Material, Scenario
+from algametrix.scenario import run_scenario
+from algametrix.sensitivity import PARAMETERS, run_sweep
+from algametrix.tea import irr, npv
 
 
 @pytest.fixture(scope="module")
