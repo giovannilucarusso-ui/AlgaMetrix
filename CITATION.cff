@@ -17,8 +17,8 @@ authors:
 repository-code: "https://github.com/giovannilucarusso-ui/AlgaMetrix"
 url: "https://github.com/giovannilucarusso-ui/AlgaMetrix"
 license: MIT
-version: 1.0.0
-date-released: "2026-08-02"
+version: 1.0.1
+date-released: "2026-08-04"
 # Concept DOI: resolves to the most recent archived release.
 doi: 10.5281/zenodo.21764183
 identifiers:

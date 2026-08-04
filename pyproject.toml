@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "algametrix"
-version = "1.0.0"
+version = "1.0.1"
 description = "Open-source techno-economic analysis and LCA for microalgae and aquatic protist biomass"
 readme = "README.md"
 requires-python = ">=3.10"
