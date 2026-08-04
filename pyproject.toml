@@ -32,11 +32,23 @@ dev = ["pytest>=8.0", "pyinstaller>=6.0"]
 [project.scripts]
 algametrix = "desktop.app:main"
 
-[tool.setuptools.packages.find]
-where = ["src"]
+# The engine lives in src/, the Qt client in desktop/, and the editable YAML
+# library in data/ at the repository root. `package-dir` maps each of those onto
+# the installed layout so that a wheel is self-contained: the data folder ships
+# as `algametrix/data`, which is where `library.DEFAULT_DATA_DIR` looks when the
+# repository-root copy is absent (i.e. when installed rather than checked out).
+[tool.setuptools]
+packages = ["algametrix", "algametrix.data", "desktop", "desktop.flowsheet"]
+
+[tool.setuptools.package-dir]
+"algametrix" = "src/algametrix"
+"algametrix.data" = "data"
+"desktop" = "desktop"
+"desktop.flowsheet" = "desktop/flowsheet"
 
 [tool.setuptools.package-data]
-"algametrix" = ["../../data/*.yaml"]
+"algametrix.data" = ["*.yaml", "*.csv"]
+"desktop" = ["assets/*"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
