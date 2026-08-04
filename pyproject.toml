@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "algametrix"
-version = "1.0.1"
+dynamic = ["version"]
 description = "Open-source techno-economic analysis and LCA for microalgae and aquatic protist biomass"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -39,6 +39,9 @@ algametrix = "desktop.app:main"
 # repository-root copy is absent (i.e. when installed rather than checked out).
 [tool.setuptools]
 packages = ["algametrix", "algametrix.data", "desktop", "desktop.flowsheet"]
+
+[tool.setuptools.dynamic]
+version = { attr = "algametrix.__version__" }
 
 [tool.setuptools.package-dir]
 "algametrix" = "src/algametrix"

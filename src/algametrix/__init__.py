@@ -55,7 +55,10 @@ from .sensitivity import PARAMETERS, run_sweep
 from .tea import TEAResult, capital_recovery_factor, irr, npv, run_tea
 from .uncertainty import MonteCarloResult, run_montecarlo
 
-__version__ = "1.0.0"
+# Single source of truth for the version: pyproject.toml reads it from here
+# (`[tool.setuptools.dynamic]`), so bumping this line is enough for the package
+# metadata, the desktop PDF report cover and the console `--version` alike.
+__version__ = "1.0.2"
 
 __all__ = [
     "Basis",
