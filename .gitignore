@@ -35,13 +35,18 @@ Thumbs.db
 .claude/settings.local.json
 
 # ---------------------------------------------------------------------------
-# Manuscript work — deliberately NOT part of this repository.
+# Manuscript prose — NOT part of this repository.
 #
-# This repository publishes the AlgaMetrix tool: the engine, the desktop app
-# and their tests. The cross-study evidence layer, the reproduction pipeline
-# and everything written for the manuscript stay local until the paper is
-# submitted. Keep these entries until that decision is revisited: a plain
-# `git add -A` would otherwise publish the manuscript.
+# The line drawn here is between the *manuscript* and the *evidence*. The
+# manuscript — drafts, revision reports, handoff bundles — is written elsewhere
+# and stays there. The evidence layer that backs its numbers is published:
+# without the study dataset, the reproduction pipeline, the regenerated audit
+# outputs and the methodology notes, no reader can check a single validation
+# figure, which is the whole point of releasing the tool openly.
+#
+# So: `src/algametrix/paper/`, `data/studies/`, `reproduce.py`,
+# `tests/test_paper_*.py`, `results/`, `figures/`, `scripts/fetch_indices.py`
+# and the three methodology notes in `docs/` are all tracked deliberately.
 # ---------------------------------------------------------------------------
 
 # Manuscript drafts, revision reports and handoff bundles
@@ -53,18 +58,6 @@ Thumbs.db
 /00_START_HERE.md
 *.zip
 
-# Cross-study evidence layer and reproduction pipeline
-/src/algametrix/paper/
-/data/studies/
-/reproduce.py
-/scripts/
-/tests/test_paper_*.py
-
-# Generated manuscript outputs (all written by reproduce.py)
-/results/
-/figures/
-
-# Methodology notes that document the manuscript, not the tool
-/docs/STUDY_SELECTION.md
-/docs/PRICE_BASIS.md
-/docs/CARBON_ACCOUNTING.md
+# Tooling that assembles the private manuscript bundle; the rest of scripts/
+# is part of the published pipeline.
+/scripts/make_handoff.py

@@ -42,3 +42,60 @@ jobs:
             echo "--- $f"
             python "$f" > /dev/null
           done
+
+      - name: Smoke-test the reproduction pipeline
+        # The validation numbers in docs/VALIDATION.md come out of this script.
+        # --quick shrinks the stochastic stages; the deterministic ones, which
+        # include every reproduction and every balance check, run in full.
+        run: python reproduce.py --quick
+
+  install:
+    # The engine is meant to be usable after a plain `pip install`, so prove it
+    # on a clean runner: the YAML data library must ship inside the wheel and
+    # the documented entry point must resolve.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install from the built distribution only
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build
+          python -m pip install dist/*.whl
+
+      - name: Load the shipped library from outside the source tree
+        working-directory: /tmp
+        run: |
+          python -c "
+          from algametrix.library import load_library
+          from algametrix.models import Scenario
+          from algametrix.scenario import run_scenario
+          lib = load_library()
+          scn = Scenario(
+              organism=lib.organisms['Chlorella vulgaris'],
+              system=lib.systems['Open raceway pond'],
+              harvesting=lib.harvesting['Settling + centrifugation'],
+              drying=lib.drying['Spray drying'],
+              economics=lib.economics, lcia=lib.lcia, scale=100_000,
+          )
+          r = run_scenario(scn)
+          print('cost', r.tea.production_cost_eur_per_kg)
+          print('gwp ', r.lca.gwp_kg_co2eq_per_kg)
+          "
+
+      - name: The console entry point must resolve
+        working-directory: /tmp
+        # `desktop.app` imports PySide6, which this job deliberately does not
+        # install, so check that the module the entry point names is present
+        # rather than importing it.
+        run: |
+          python -c "
+          import importlib.util as u
+          import desktop, desktop.flowsheet
+          assert u.find_spec('desktop.app') is not None, 'desktop.app was not installed'
+          print('entry point target desktop.app:main is installed')
+          "

@@ -1,0 +1,96 @@
+{
+  "retrieval_date": "2026-08-02",
+  "indices": [
+    {
+      "index_name": "labour_cost_index",
+      "normalization_class": "labour",
+      "description": "Eurostat labour cost index, wages and salaries, EU27, NACE Rev. 2 B-S (industry and services), index 2020 = 100.",
+      "source": "Eurostat dataset lc_lci_r2_a (https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/lc_lci_r2_a?format=JSON&lang=EN&geo=EU27_2020&nace_r2=B-S&lcstruct=D11&unit=I20)",
+      "provider_last_updated": "2026-06-16T11:00:00+0200",
+      "values_by_year": {
+        "2010": 79.9,
+        "2011": 81.7,
+        "2012": 83.6,
+        "2013": 84.7,
+        "2014": 86.0,
+        "2015": 87.6,
+        "2016": 89.1,
+        "2017": 91.4,
+        "2018": 94.0,
+        "2019": 96.7,
+        "2020": 100.0,
+        "2021": 101.5,
+        "2022": 105.9,
+        "2023": 111.5
+      }
+    },
+    {
+      "index_name": "general_opex_index",
+      "normalization_class": "general_opex",
+      "description": "Eurostat HICP, all items, EU27, annual average index 2015 = 100. Used for non-energy, non-labour operating expenditure.",
+      "source": "Eurostat dataset prc_hicp_aind (https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/prc_hicp_aind?format=JSON&lang=EN&geo=EU27_2020&coicop=CP00&unit=INX_A_AVG)",
+      "provider_last_updated": "2026-02-06T23:00:00+0100",
+      "values_by_year": {
+        "2010": 93.03,
+        "2011": 95.69,
+        "2012": 98.19,
+        "2013": 99.49,
+        "2014": 99.89,
+        "2015": 100.0,
+        "2016": 100.18,
+        "2017": 101.74,
+        "2018": 103.57,
+        "2019": 105.04,
+        "2020": 105.76,
+        "2021": 108.82,
+        "2022": 118.82,
+        "2023": 126.38
+      }
+    },
+    {
+      "index_name": "energy_price_series",
+      "normalization_class": "energy",
+      "description": "Eurostat electricity price for industrial consumers, EU27, band IC (500-1 999 MWh/yr), excluding taxes and levies, EUR/kWh. Bi-annual observations averaged to an annual figure.",
+      "source": "Eurostat dataset nrg_pc_205 (https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_pc_205?format=JSON&lang=EN&geo=EU27_2020&currency=EUR&siec=E7000&nrg_cons=MWH500-1999&tax=X_TAX&unit=KWH)",
+      "provider_last_updated": "2026-07-29T11:00:00+0200",
+      "values_by_year": {
+        "2010": 0.08875,
+        "2011": 0.09225,
+        "2012": 0.09295,
+        "2013": 0.091,
+        "2014": 0.08705,
+        "2015": 0.08325,
+        "2016": 0.0788,
+        "2017": 0.0763,
+        "2018": 0.0783,
+        "2019": 0.08135,
+        "2020": 0.0822,
+        "2021": 0.09495,
+        "2022": 0.179,
+        "2023": 0.18525
+      }
+    }
+  ],
+  "currency": {
+    "from_currency": "USD",
+    "to_currency": "EUR",
+    "year_specific": true,
+    "rates_by_year": {
+      "2010": 0.75431,
+      "2011": 0.71841,
+      "2012": 0.77834,
+      "2013": 0.75295,
+      "2014": 0.75273,
+      "2015": 0.9013,
+      "2016": 0.90342,
+      "2017": 0.88521,
+      "2018": 0.84677,
+      "2019": 0.89328,
+      "2020": 0.87551,
+      "2021": 0.84549,
+      "2022": 0.94962,
+      "2023": 0.92484
+    },
+    "source": "European Central Bank, annual average euro reference exchange rate (https://data-api.ecb.europa.eu/service/data/EXR/A.USD.EUR.SP00.A?format=csvdata)"
+  }
+}

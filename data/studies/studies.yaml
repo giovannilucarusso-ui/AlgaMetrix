@@ -1,0 +1,1528 @@
+# =====================================================================
+# AlgaMetrix study-evidence dataset
+# =====================================================================
+# One record per published estimate used anywhere in the methods paper.
+# Schema and controlled vocabularies: src/algametrix/paper/schema.py
+# Selection process and honest limitations: docs/STUDY_SELECTION.md
+#
+# CONVENTIONS
+#   * A field that is absent or `null` means UNKNOWN. It is never silently
+#     replaced by a default. Reports print it as "unknown".
+#   * `assumptions_required` lists what had to be assumed to use the record.
+#   * `todos` lists source information that must be extracted from the paper
+#     before the record can enter analyses that need it.
+#   * `reconstruction_builder` names a callable in
+#     src/algametrix/paper/reconstructions.py. Without one, a study
+#     cannot be executed by the engine no matter what tier it claims.
+#
+# PROVENANCE OF THIS FILE
+#   Transcribed from paper_handoff/DATASET.md (the citation-ready table that
+#   accompanied the manuscript draft) plus the price years and currencies
+#   recovered from the committed legacy output results/harmonization.txt.
+#   Fields that neither source records are `null`, not guessed.
+#
+#   IMPORTANT: the module that originally held this dataset
+#   (`reference_studies.STUDIES`, referenced by DATASET.md) lives only on the
+#   feature branch `m2-harmonization` (PR #1), which was never merged into main,
+#   although its OUTPUTS were copied onto main as files. This file re-establishes
+#   the dataset as versioned data on main, and the scenario builders it points at
+#   are ported from that branch.
+# =====================================================================
+
+meta:
+  dataset_version: "2.0"
+  description: >
+    Curated evidence set of microalgal / cyanobacterial / thraustochytrid
+    production-cost and cradle-to-gate GWP estimates. NOT a systematic review:
+    see docs/STUDY_SELECTION.md for what is and is not known about how these
+    studies were found.
+  is_systematic_search: false
+  search_sources: unknown
+  search_period: unknown
+  search_strings: unknown
+  date_compiled: unknown
+
+studies:
+
+# =====================================================================
+# Tier B (declared) - studies the engine is meant to rebuild
+# =====================================================================
+
+- study_id: tredici2016
+  author_overlap_with_algametrix: false
+  full_citation: "Tredici et al. 2016, Algal Research 19:253-263"
+  doi: 10.1016/j.algal.2016.09.005
+  publication_year: 2016
+  data_location_in_source: null
+  eligibility_status: included
+  eligibility_reason: "Bottom-up TEA of a dedicated microalgal biomass plant, cost per kg dry biomass."
+  study_type: tea
+  organism: null
+  cultivation_system: flat-panel PBR
+  trophic_mode: phototrophic
+  technology_scale: null
+  plant_maturity: null
+  geographical_context: null
+  functional_unit: 1 kg dry biomass
+  system_boundary: null
+  economic_endpoint_type: production_cost
+  reported_value: 12.40
+  reported_unit: EUR/kg dry biomass
+  reported_currency: EUR
+  reported_price_year: 2016
+  currency_basis: null
+  nominal_or_real: null
+  includes_depreciation: null
+  includes_return_on_capital: null
+  discount_rate_embedded: null
+  includes_working_capital: null
+  includes_startup_cost: null
+  includes_coproduct_credit: null
+  coproduct_treatment: unknown
+  allocation_method: unknown
+  environmental_endpoint_type: none
+  published_gwp_available: false
+  reconstructability_tier: B
+  validation_mode: blind
+  reconstruction_builder: tredici2016
+  reconstruction_status: reproduced
+  published_inventory_available: true
+  published_capex_available: true
+  published_opex_available: true
+  assumptions_required:
+    - "Endpoint classified as production_cost from the dataset label 'cost'; the paper's own
+       definition (depreciation, return on capital, working capital) is not recorded here."
+    - "Scenario definition recovered from the unmerged feature branch
+       `m2-harmonization` (PR #1), where it was committed but never merged into main.
+       Ported verbatim into paper/reconstructions.py; reproduces the published value."
+    - "The source folds interest into its reported unit cost (5%, 10-yr loan, 40% equity),
+       whereas the AlgaMetrix production cost excludes return on capital. This is a declared
+       endpoint difference, not a modelling error."
+  todos:
+    - "Extract the paper's cost breakdown (CAPEX/labour/energy/nutrients) to enable
+       component-wise price-year normalization."
+    - "Record economic endpoint definition and system boundary from the source."
+
+- study_id: vazquez2022
+  author_overlap_with_algametrix: false
+  full_citation: "Vazquez-Romero et al. 2022, Algal Research 64:102679"
+  doi: 10.1016/j.algal.2022.102679
+  publication_year: 2022
+  data_location_in_source: null
+  eligibility_status: included
+  eligibility_reason: "TEA of microalgal biomass for aquaculture, cost per kg dry biomass."
+  study_type: tea
+  organism: null
+  cultivation_system: tubular PBR + LED
+  trophic_mode: phototrophic
+  technology_scale: null
+  plant_maturity: null
+  geographical_context: null
+  functional_unit: 1 kg dry biomass
+  system_boundary: null
+  economic_endpoint_type: production_cost
+  reported_value: 108.26
+  reported_unit: EUR/kg dry biomass
+  reported_currency: EUR
+  reported_price_year: 2021
+  currency_basis: null
+  nominal_or_real: null
+  coproduct_treatment: unknown
+  allocation_method: unknown
+  environmental_endpoint_type: none
+  published_gwp_available: false
+  reconstructability_tier: B
+  validation_mode: blind
+  reconstruction_builder: vazquez2022
+  reconstruction_status: reproduced
+  published_inventory_available: true
+  published_capex_available: true
+  published_opex_available: true
+  assumptions_required:
+    - "Endpoint classified as production_cost from the dataset label 'cost'."
+    - "Scenario definition recovered from the unmerged feature branch
+       `m2-harmonization` (PR #1), where it was committed but never merged into main.
+       Ported verbatim into paper/reconstructions.py; reproduces the published value."
+    - "Native electricity factor 0.019 kg CO2-eq/kWh (Norwegian hydro): the clean-grid case."
+  todos:
+    - "Extract cost breakdown for component-wise normalization."
+
+# --- Vazquez-Romero et al. 2022 (Sci. Total Environ.) ------------------------
+# Added in the second revision to widen the matched reconstructable cohort,
+# which rested on two external primary studies, one self-citation and one
+# benchmark with no primary source. This paper is CC-BY and its supplementary
+# material publishes the complete financial convention (Lang factors,
+# depreciation, interest, maintenance, overheads) and every input price, so both
+# cases are reconstructed BLIND: the engine is given the physical data and the
+# accounting rules, never the reported biomass cost.
+#
+# Independence: a different publication, facility, country, strain and reactor
+# system from `vazquez2022`, but the same first author. Disclosed rather than
+# counted as a fully independent group.
+- study_id: vazquez2022b_nas
+  author_overlap_with_algametrix: false
+  full_citation: "Vazquez-Romero et al. 2022, Science of the Total Environment 837:155742"
+  doi: 10.1016/j.scitotenv.2022.155742
+  publication_year: 2022
+  search_source: "targeted search for open-access microalgae TEAs with a published cost breakdown"
+  date_identified: "2026-08-02"
+  data_location_in_source: "Supplementary Table 9, case 1b; parameters in Supplementary Tables 1, 3, 4, 5, 7"
+  eligibility_status: included
+  eligibility_reason: "Industrial-scale TEA reporting a production cost per kg dry biomass, with the full cost model published under CC-BY."
+  study_type: tea
+  organism: Nannochloropsis oceanica
+  cultivation_system: stacked tubular PBR
+  trophic_mode: phototrophic
+  technology_scale: "1 ha, 27.61 t/yr"
+  plant_maturity: commercial
+  geographical_context: "Olhao, Portugal"
+  functional_unit: 1 kg dry biomass
+  system_boundary: "cultivation + harvesting (centrifugation) + drying (freeze-drying), cradle to gate"
+  economic_endpoint_type: production_cost
+  includes_depreciation: true
+  includes_return_on_capital: false
+  discount_rate_embedded: null
+  includes_working_capital: false
+  includes_startup_cost: false
+  includes_coproduct_credit: false
+  coproduct_treatment: none
+  allocation_method: none
+  reported_value: 53.32
+  reported_unit: EUR/kg dry biomass
+  reported_currency: EUR
+  reported_price_year: 2021
+  nominal_or_real: nominal
+  environmental_endpoint_type: none
+  published_gwp_available: false
+  gwp_analysis_class: model_derived_gwp_from_tea_scenario
+  reconstructability_tier: B
+  validation_mode: blind
+  reconstruction_builder: vazquez2022b_nas
+  reconstruction_status: reproduced
+  published_inventory_available: true
+  published_capex_available: true
+  published_opex_available: true
+  cost_breakdown:
+    capital_annualised: 0.4074
+    maintenance: 0.0690
+    labour: 0.1250
+    electricity: 0.0745
+    overhead: 0.1067
+    other_opex: 0.2174
+  assumptions_required:
+    - "Interest on capital (8% of depreciation), property tax and insurance are
+       summed into the engine's single non-depreciation capital charge; the
+       composition is recorded in paper/reconstructions.py."
+    - "The paper applies overheads to (labour + maintenance); the engine applies
+       overhead_frac to (raw materials + utilities + labour). The published rate
+       of 0.55 is used unchanged, so the two differ by their base."
+    - "Nutrients are priced with the paper's own urea and triple-superphosphate
+       prices (its case 4a). Cases 1a/1b actually buy a commercial nutrient
+       solution, whose consumption is not published; the paper's own case 3a-vs-4a
+       comparison puts that premium at about 4.4 EUR/kg, which is the main known
+       cause of the reconstruction's negative bias."
+    - "Consumables, wastewater treatment, cooling water, operating supplies and
+       contingencies are OPEX lines the engine cannot derive from a mass balance
+       and are therefore absent from the reconstruction."
+    - "Depreciation is included and no return on capital is embedded: the paper
+       reports a cost, not a selling price (Supplementary Table 7)."
+  todos:
+    - "Split the published MEC across cultivation, harvesting and drying so the
+       capital is not carried entirely on the cultivation line."
+
+- study_id: vazquez2022b_tiso_pht
+  author_overlap_with_algametrix: false
+  full_citation: "Vazquez-Romero et al. 2022, Science of the Total Environment 837:155742"
+  doi: 10.1016/j.scitotenv.2022.155742
+  publication_year: 2022
+  search_source: "targeted search for open-access microalgae TEAs with a published cost breakdown"
+  date_identified: "2026-08-02"
+  data_location_in_source: "Supplementary Table 9, case 1a; parameters in Supplementary Tables 1, 3, 4, 5, 7"
+  eligibility_status: included
+  eligibility_reason: "Species-alternation strategy from the same publication; a distinct production system, not a re-report of case 1b."
+  study_type: tea
+  organism: "Phaeodactylum tricornutum / Tisochrysis lutea (alternating)"
+  cultivation_system: stacked tubular PBR
+  trophic_mode: phototrophic
+  technology_scale: "1 ha, 12.94 t/yr"
+  plant_maturity: commercial
+  geographical_context: "Olhao, Portugal"
+  functional_unit: 1 kg dry biomass
+  system_boundary: "cultivation + harvesting (centrifugation) + drying (freeze-drying), cradle to gate"
+  economic_endpoint_type: production_cost
+  includes_depreciation: true
+  includes_return_on_capital: false
+  includes_working_capital: false
+  includes_startup_cost: false
+  includes_coproduct_credit: false
+  coproduct_treatment: none
+  allocation_method: none
+  reported_value: 105.19
+  reported_unit: EUR/kg dry biomass
+  reported_currency: EUR
+  reported_price_year: 2021
+  nominal_or_real: nominal
+  environmental_endpoint_type: none
+  published_gwp_available: false
+  gwp_analysis_class: model_derived_gwp_from_tea_scenario
+  reconstructability_tier: B
+  validation_mode: blind
+  reconstruction_builder: vazquez2022b_tiso_pht
+  reconstruction_status: reproduced
+  published_inventory_available: true
+  published_capex_available: true
+  published_opex_available: true
+  cost_breakdown:
+    capital_annualised: 0.4137
+    maintenance: 0.0700
+    labour: 0.1352
+    electricity: 0.0975
+    overhead: 0.1129
+    other_opex: 0.1707
+  assumptions_required:
+    - "Two strains alternate for six months each; the engine models one organism,
+       so the composition is the unweighted mean of the two published ones."
+    - "Same accounting mapping and same missing OPEX lines as vazquez2022b_nas."
+    - "Three scenarios from one publication enter the cohort as three records; they
+       share a facility, a cost model and an author group."
+  todos:
+    - "Split the published MEC across cultivation, harvesting and drying."
+
+- study_id: vazquez2022b_nas_10ha
+  author_overlap_with_algametrix: false
+  full_citation: "Vazquez-Romero et al. 2022, Science of the Total Environment 837:155742"
+  doi: 10.1016/j.scitotenv.2022.155742
+  publication_year: 2022
+  search_source: "targeted search for open-access microalgae TEAs with a published cost breakdown"
+  date_identified: "2026-08-02"
+  data_location_in_source: "Supplementary Table 9, case 4a; parameters in Supplementary Tables 1, 3, 4, 5, 7"
+  eligibility_status: included
+  eligibility_reason: "10-ha scale with a fertiliser-based medium; the one case whose every input price is published, so the reconstruction carries no medium assumption."
+  study_type: tea
+  organism: Nannochloropsis oceanica
+  cultivation_system: stacked tubular PBR
+  trophic_mode: phototrophic
+  technology_scale: "10 ha, 300.1 t/yr"
+  plant_maturity: commercial
+  geographical_context: "Olhao, Portugal"
+  functional_unit: 1 kg dry biomass
+  system_boundary: "cultivation + harvesting (ultrafiltration) + drying (spray drying), cradle to gate"
+  economic_endpoint_type: production_cost
+  includes_depreciation: true
+  includes_return_on_capital: false
+  includes_working_capital: false
+  includes_startup_cost: false
+  includes_coproduct_credit: false
+  coproduct_treatment: none
+  allocation_method: none
+  reported_value: 36.21
+  reported_unit: EUR/kg dry biomass
+  reported_currency: EUR
+  reported_price_year: 2021
+  nominal_or_real: nominal
+  environmental_endpoint_type: none
+  published_gwp_available: false
+  gwp_analysis_class: model_derived_gwp_from_tea_scenario
+  reconstructability_tier: B
+  validation_mode: blind
+  reconstruction_builder: vazquez2022b_nas_10ha
+  reconstruction_status: reproduced
+  published_inventory_available: true
+  published_capex_available: true
+  published_opex_available: true
+  cost_breakdown:
+    capital_annualised: 0.5476
+    maintenance: 0.0928
+    labour: 0.0315
+    electricity: 0.0566
+    heat_fuel: 0.0227
+    overhead: 0.0683
+    other_opex: 0.1805
+  assumptions_required:
+    - "The 62.71 kWh/kg total energy is split into 36.45 kWh/kg of natural gas for
+       spray drying (the paper's own figure) and 26.26 kWh/kg of electricity."
+    - "Same accounting mapping as vazquez2022b_nas."
+    - "Consumables, wastewater treatment, cooling water, operating supplies and
+       contingencies remain outside the reconstruction."
+  todos:
+    - "Split the published MEC across cultivation, harvesting and drying."
+
+- study_id: russo2022_aury
+  author_overlap_with_algametrix: true
+  full_citation: "Russo et al. 2022, Bioresource Technology Reports 18:100997"
+  doi: 10.1016/j.biteb.2022.100997
+  publication_year: 2022
+  data_location_in_source: null
+  eligibility_status: included
+  eligibility_reason: "SuperPro-based TEA of heterotrophic biomass; authors' own study, reproduced blind."
+  study_type: tea
+  organism: null
+  cultivation_system: heterotrophic fermenter
+  trophic_mode: heterotrophic
+  technology_scale: "~285 t/yr"
+  plant_maturity: null
+  geographical_context: null
+  functional_unit: 1 kg dry biomass
+  system_boundary: null
+  economic_endpoint_type: production_cost
+  reported_value: 16.46
+  reported_unit: USD/kg dry biomass
+  reported_currency: USD
+  reported_price_year: 2022
+  currency_basis: null
+  nominal_or_real: null
+  coproduct_treatment: unknown
+  allocation_method: unknown
+  environmental_endpoint_type: none
+  published_gwp_available: false
+  reconstructability_tier: B
+  validation_mode: blind
+  reconstruction_builder: heterotrophic_powder
+  reconstruction_status: reproduced
+  published_inventory_available: true
+  published_capex_available: true
+  published_opex_available: true
+  assumptions_required:
+    - "Endpoint classified as production_cost from the dataset label 'cost'."
+    - "Self-reproduction: the authors of AlgaMetrix are authors of the source study.
+       Disclosed; frozen source numbers, independent re-implementation."
+  todos:
+    - "Record the source's cost breakdown so this study can reach component_resolved
+       normalization quality."
+
+- study_id: scp_protein
+  full_citation: "Single-cell-protein cost envelope, no primary source (engine benchmark)"
+  doi: null
+  publication_year: null
+  data_location_in_source: null
+  eligibility_status: excluded
+  eligibility_reason: null
+  exclusion_reason: "no primary source: an aggregate open-literature envelope with no
+    citation, so it cannot carry provenance. It was a member of the matched
+    reconstructable cohort and set that cohort's minimum, which meant the headline
+    divergence rested in part on an uncited number. Retained as a benchmark envelope
+    for the shipped raceway template, removed from every study population."
+  study_type: unknown
+  organism: Chlorella
+  cultivation_system: open raceway pond
+  trophic_mode: phototrophic
+  technology_scale: null
+  plant_maturity: projected
+  geographical_context: null
+  functional_unit: 1 kg dry biomass
+  system_boundary: null
+  economic_endpoint_type: production_cost
+  reported_value: 5.80
+  reported_low: 5.50
+  reported_high: 6.10
+  reported_unit: EUR/kg dry biomass
+  reported_currency: EUR
+  reported_price_year: 2022
+  currency_basis: null
+  nominal_or_real: null
+  coproduct_treatment: none
+  allocation_method: none
+  environmental_endpoint_type: none
+  published_gwp_available: false
+  reconstructability_tier: A
+  validation_mode: none
+  reconstruction_builder: null
+  reconstruction_status: not_applicable
+  published_inventory_available: false
+  published_capex_available: false
+  published_opex_available: false
+  assumptions_required:
+    - "Aggregate open-literature envelope, not a single citable study; the price year 2022
+       is recovered from the legacy harmonization output, not from a named source."
+    - "The scenario builder `scp_protein` still exists and is still used as the open-raceway
+       ARCHETYPE for the sensitivity and uncertainty analyses. It is a shipped template on
+       library-default prices, not a reproduction of this or any other published plant, and
+       archetypes.py now declares it as such."
+  todos:
+    - "If a citable primary source for a 5.5-6.1 EUR/kg single-cell-protein envelope is
+       found, restore the record with that citation and re-run the cohorts."
+
+- study_id: superpro_algaloil
+  author_overlap_with_algametrix: false
+  full_citation: "Production of Algal Oil (SuperPro Designer Economic Evaluation Report), Intelligen Inc."
+  doi: null
+  publication_year: 2015
+  data_location_in_source: "data/reference_superpro_phototrophic.csv"
+  eligibility_status: included
+  eligibility_reason: "Vendor reference case used to calibrate the engine against a commercial simulator."
+  study_type: tea
+  organism: null
+  cultivation_system: open raceway pond
+  trophic_mode: phototrophic
+  technology_scale: "~65 kt/yr algal oil"
+  plant_maturity: projected
+  geographical_context: null
+  functional_unit: 1 kg algal oil
+  system_boundary: null
+  economic_endpoint_type: production_cost
+  reported_value: 1.70
+  reported_unit: USD/kg algal oil
+  reported_currency: USD
+  reported_price_year: 2015
+  currency_basis: null
+  nominal_or_real: null
+  coproduct_treatment: revenue_credit
+  allocation_method: economic
+  environmental_endpoint_type: none
+  published_gwp_available: false
+  reconstructability_tier: B
+  validation_mode: calibrated
+  reconstruction_builder: algal_oil
+  reconstruction_status: reproduced
+  published_inventory_available: true
+  published_capex_available: true
+  published_opex_available: true
+  assumptions_required:
+    - "Calibrated, not blind: scenario parameters were set to reproduce the reference tool."
+  todos: []
+
+- study_id: superpro_omega3
+  author_overlap_with_algametrix: false
+  full_citation: "Omega-3 via Microalgal Fermentation (SuperPro Designer), Intelligen Inc."
+  doi: null
+  publication_year: 2021
+  data_location_in_source: "data/reference_superpro_omega3.csv"
+  eligibility_status: included
+  eligibility_reason: "Vendor reference case used to calibrate the engine against a commercial simulator."
+  study_type: tea
+  organism: null
+  cultivation_system: heterotrophic fermenter
+  trophic_mode: heterotrophic
+  technology_scale: null
+  plant_maturity: projected
+  geographical_context: null
+  functional_unit: 1 kg omega-3 oil
+  system_boundary: null
+  economic_endpoint_type: production_cost
+  reported_value: 16.57
+  reported_unit: USD/kg omega-3 oil
+  reported_currency: USD
+  reported_price_year: 2021
+  currency_basis: null
+  nominal_or_real: null
+  coproduct_treatment: revenue_credit
+  allocation_method: economic
+  environmental_endpoint_type: none
+  published_gwp_available: false
+  reconstructability_tier: B
+  validation_mode: calibrated
+  reconstruction_builder: omega3
+  reconstruction_status: reproduced
+  published_inventory_available: true
+  published_capex_available: true
+  published_opex_available: true
+  assumptions_required:
+    - "Calibrated, not blind."
+  todos: []
+
+- study_id: phycocyanin
+  author_overlap_with_algametrix: false
+  full_citation: "van der Walt et al. 2025, Journal of Applied Phycology"
+  doi: 10.1007/s10811-025-03443-x
+  publication_year: 2025
+  data_location_in_source: null
+  eligibility_status: included
+  eligibility_reason: "Published cost envelope for food-grade C-phycocyanin."
+  study_type: tea
+  organism: Arthrospira platensis
+  cultivation_system: open raceway pond
+  trophic_mode: phototrophic
+  technology_scale: null
+  plant_maturity: null
+  geographical_context: null
+  functional_unit: 1 kg C-phycocyanin
+  system_boundary: null
+  economic_endpoint_type: production_cost
+  reported_value: 413.0
+  reported_low: 283.0
+  reported_high: 544.0
+  reported_unit: EUR/kg C-phycocyanin
+  reported_currency: EUR
+  reported_price_year: null
+  currency_basis: null
+  nominal_or_real: null
+  coproduct_treatment: revenue_credit
+  allocation_method: economic
+  environmental_endpoint_type: none
+  published_gwp_available: false
+  reconstructability_tier: B
+  validation_mode: range
+  reconstruction_builder: phycocyanin
+  reconstruction_status: reproduced
+  published_inventory_available: true
+  published_capex_available: true
+  published_opex_available: true
+  todos:
+    - "Price year not recorded; the record is not normalizable until it is extracted."
+    - "PROVENANCE MISMATCH found 2026-08-02: the 283-544 EUR/kg range is attributed in the
+       secondary literature to Padi et al. (2023, Algal Research 74:103190), not to the
+       cited 2025 paper, and the reported 413 is the arithmetic midpoint of 283 and 544
+       rather than a published point value. Re-extract the point and the envelope from
+       whichever source actually publishes them."
+
+- study_id: astaxanthin
+  author_overlap_with_algametrix: false
+  full_citation: "Panis & Carreon 2016, Algal Research"
+  doi: 10.1016/j.algal.2016.05.001
+  publication_year: 2016
+  data_location_in_source: null
+  eligibility_status: included
+  eligibility_reason: "Published cost envelope for astaxanthin from Haematococcus."
+  study_type: tea
+  organism: Haematococcus pluvialis
+  cultivation_system: flat-panel PBR
+  trophic_mode: phototrophic
+  technology_scale: null
+  plant_maturity: null
+  geographical_context: null
+  functional_unit: 1 kg astaxanthin
+  system_boundary: null
+  economic_endpoint_type: production_cost
+  reported_value: 718.0
+  reported_low: 500.0
+  reported_high: 1500.0
+  reported_unit: USD/kg astaxanthin
+  reported_currency: USD
+  reported_price_year: null
+  currency_basis: null
+  nominal_or_real: null
+  coproduct_treatment: revenue_credit
+  allocation_method: economic
+  environmental_endpoint_type: none
+  published_gwp_available: false
+  reconstructability_tier: B
+  validation_mode: range
+  reconstruction_builder: astaxanthin
+  reconstruction_status: reproduced
+  published_inventory_available: true
+  published_capex_available: true
+  published_opex_available: true
+  todos:
+    - "Price year not recorded; the record is not normalizable until it is extracted.
+       Until it is, no comparison against this record is possible at all: the engine
+       reports EUR and no year-specific USD rate can be chosen."
+    - "The 500-1500 USD/kg envelope is a market range, the 718 a cost model: the record
+       currently conflates the two. Separate them or reclassify."
+    - "PROVENANCE MISMATCH found 2026-08-02: the cited source (Panis & Carreon 2016,
+       Algal Research 18:175-190) reports EUR 1536/kg (Livadeia) and EUR 6403/kg
+       (Amsterdam) for its best case. Neither the 718 USD/kg point nor the 500-1500
+       USD/kg envelope appears to come from it. Re-extract from the source or re-attribute
+       the numbers before this record is cited."
+
+- study_id: frontiers2026_spirulina
+  full_citation: "Frontiers in Sustainable Food Systems 2026 (organic Spirulina, Italy)"
+  doi: 10.3389/fsufs.2026.1763476
+  publication_year: 2026
+  data_location_in_source: null
+  eligibility_status: included
+  eligibility_reason: "Published cradle-to-gate GWP for bicarbonate-fed Spirulina."
+  study_type: lca
+  organism: Arthrospira platensis
+  cultivation_system: open raceway pond (Spirulina, NaHCO3)
+  trophic_mode: phototrophic
+  technology_scale: null
+  plant_maturity: null
+  geographical_context: Italy
+  functional_unit: 1 kg dry biomass
+  system_boundary: cradle-to-gate
+  environmental_endpoint_type: gwp_cradle_to_gate
+  reported_gwp: 15.0
+  reported_gwp_unit: kg CO2-eq/kg dry biomass
+  biogenic_carbon_convention: null
+  published_gwp_available: true
+  economic_endpoint_type: null
+  reconstructability_tier: B
+  validation_mode: calibrated
+  reconstruction_builder: spirulina_padi
+  reconstruction_status: reproduced
+  gwp_reconstruction_status: reproduced
+  published_inventory_available: true
+  published_capex_available: true
+  published_opex_available: true
+  assumptions_required:
+    - "The registered builder reconstructs the Padi et al. (2023) Scenario-I bicarbonate
+       Spirulina plant, which the legacy work used as the reconstruction for this LCA;
+       calibrated, not blind."
+  todos:
+    - "The paper's own biogenic-carbon convention is not recorded; needed before the
+       gross/net comparison can be attributed to the source rather than to AlgaMetrix."
+
+- study_id: gwp_iceland_spirulina
+  full_citation: "Marine Biotechnology 24 (2022), Hellisheidi geothermal park, Iceland"
+  doi: 10.1007/s10126-022-10162-8
+  publication_year: 2022
+  data_location_in_source: null
+  eligibility_status: included
+  eligibility_reason: "Published cradle-to-gate GWP for LED-lit Spirulina on a geothermal grid."
+  study_type: lca
+  organism: Arthrospira platensis
+  cultivation_system: LED photobioreactor (geothermal)
+  trophic_mode: phototrophic
+  technology_scale: null
+  plant_maturity: null
+  geographical_context: Iceland
+  functional_unit: 1 kg dry biomass
+  system_boundary: cradle-to-gate
+  environmental_endpoint_type: gwp_cradle_to_gate
+  reported_gwp: -0.54
+  reported_gwp_unit: kg CO2-eq/kg dry biomass
+  biogenic_carbon_convention: null
+  published_gwp_available: true
+  economic_endpoint_type: null
+  reconstructability_tier: B
+  validation_mode: blind
+  reconstruction_builder: iceland_spirulina
+  reconstruction_status: reproduced
+  gwp_reconstruction_status: reproduced
+  published_inventory_available: true
+  published_capex_available: true
+  published_opex_available: true
+  assumptions_required:
+    - "Scenario definition recovered from the unmerged feature branch
+       `m2-harmonization` (PR #1), where it was committed but never merged into main.
+       Ported verbatim into paper/reconstructions.py; reproduces the published value."
+    - "The paper reports per kg WET biomass including construction (-0.008); the engine has no
+       infrastructure term and works per kg DRY, so the comparison is per-kg-dry OPERATIONAL
+       (-0.54). Both are carbon-neutral."
+  todos:
+    - "A NET GWP below zero cannot be interpreted without the source's biogenic-carbon
+       convention and its gross value. Extract both."
+
+- study_id: spiralg2019
+  full_citation: "Braud et al. 2025, Bioresource Technology Reports 29:102027 (SpiralG pilot, 2019 inventory)"
+  doi: 10.1016/j.biteb.2025.102027
+  publication_year: 2025
+  data_location_in_source: null
+  eligibility_status: included
+  eligibility_reason: "Published pilot-scale cradle-to-gate GWP with a documented Brightway2/ecoinvent background."
+  study_type: lca
+  organism: Arthrospira platensis
+  cultivation_system: open raceway pond (Spirulina, NaHCO3)
+  trophic_mode: phototrophic
+  technology_scale: pilot
+  plant_maturity: pilot
+  geographical_context: France
+  functional_unit: 1 kg dry biomass
+  system_boundary: cradle-to-gate
+  environmental_endpoint_type: gwp_cradle_to_gate
+  reported_gwp: 14.10
+  reported_gwp_unit: kg CO2-eq/kg dry biomass
+  biogenic_carbon_convention: null
+  published_gwp_available: true
+  economic_endpoint_type: null
+  reconstructability_tier: B
+  validation_mode: blind
+  reconstruction_builder: spiralg2019
+  reconstruction_status: reproduced
+  gwp_reconstruction_status: reproduced
+  published_inventory_available: true
+  published_capex_available: true
+  published_opex_available: true
+  biogenic_carbon_convention: no_biogenic_credit
+  assumptions_required:
+    - "Scenario definition recovered from the unmerged feature branch
+       `m2-harmonization` (PR #1), where it was committed but never merged into main.
+       Ported verbatim into paper/reconstructions.py; reproduces the published value."
+    - "Engine reproduces the operational path only; the source's S1 total includes
+       infrastructure and transport, which this engine does not model (~2 kg CO2-eq/kg)."
+  todos: []
+
+- study_id: mckuin_schizo
+  # Verified against Crossref 2026-08-04. The article number was previously recorded as
+  # 00083, which is a different McKuin paper (Nannochloropsis sp. and fishmeal, Elementa
+  # 11(1):00083, 2023, doi 10.1525/elementa.2022.00083). The Schizochytrium study this
+  # record reproduces is 10(1):00098.
+  full_citation: "McKuin et al. 2022, Elementa: Science of the Anthropocene 10(1):00098 (Schizochytrium, whole cell)"
+  doi: 10.1525/elementa.2021.00098
+  publication_year: 2022
+  data_location_in_source: null
+  eligibility_status: included
+  eligibility_reason: "Published cradle-to-gate GWP for heterotrophic thraustochytrid biomass."
+  study_type: lca
+  organism: Schizochytrium sp.
+  cultivation_system: heterotrophic fermenter
+  trophic_mode: heterotrophic
+  technology_scale: null
+  plant_maturity: null
+  geographical_context: null
+  functional_unit: 1 kg dry biomass
+  system_boundary: cradle-to-gate
+  environmental_endpoint_type: gwp_cradle_to_gate
+  reported_gwp: 2.33
+  reported_gwp_unit: kg CO2-eq/kg dry biomass
+  biogenic_carbon_convention: null
+  published_gwp_available: true
+  economic_endpoint_type: null
+  reconstructability_tier: B
+  validation_mode: blind
+  reconstruction_builder: mckuin_schizo
+  reconstruction_status: reproduced
+  gwp_reconstruction_status: reproduced
+  published_inventory_available: true
+  published_capex_available: true
+  published_opex_available: true
+  assumptions_required:
+    - "Scenario definition recovered from the unmerged feature branch
+       `m2-harmonization` (PR #1), where it was committed but never merged into main.
+       Ported verbatim into paper/reconstructions.py; reproduces the published value."
+    - "Modelled in the published sugar-biorefinery context: sugarcane sucrose 0.45 and bagasse
+       electricity 0.05 kg CO2-eq. The source reports 1.85 (BR) to 2.33 (US); the 2.33 US case
+       is the encoded reference."
+  todos: []
+
+- study_id: padi2023_spirulina
+  author_overlap_with_algametrix: false
+  full_citation: "Padi et al. 2023, Algal Research 74:103190 (Spirulina DSFP, greenhouse ORP)"
+  doi: 10.1016/j.algal.2023.103190
+  publication_year: 2023
+  data_location_in_source: "data/validation_references.yaml (three metrics); data/systems.yaml
+    'Open raceway pond (Spirulina, NaHCO3)' is calibrated to this paper"
+  eligibility_status: included
+  eligibility_reason: >
+    Bottom-up TEA of a bicarbonate-fed Spirulina plant. ADDED IN THIS REVISION: the study
+    drives a shipped cultivation system and a registered scenario builder, and is used for
+    validation in data/validation_references.yaml, but it was absent from the 39-study
+    dataset described in paper_handoff/DATASET.md.
+  study_type: tea
+  organism: Arthrospira platensis
+  cultivation_system: open raceway pond (Spirulina, NaHCO3)
+  trophic_mode: phototrophic
+  technology_scale: "~1 t microalgae/d (11.6 ha)"
+  plant_maturity: projected
+  geographical_context: Ireland / Southern Italy
+  functional_unit: 1 kg dry biomass
+  system_boundary: null
+  economic_endpoint_type: minimum_product_selling_price
+  reported_value: 13.20
+  reported_low: 13.20
+  reported_high: 17.30
+  reported_unit: EUR/kg dried spirulina food product (MEPP)
+  reported_currency: EUR
+  reported_price_year: null
+  includes_return_on_capital: true
+  coproduct_treatment: unknown
+  allocation_method: unknown
+  environmental_endpoint_type: none
+  published_gwp_available: false
+  reconstructability_tier: B
+  validation_mode: calibrated
+  reconstruction_builder: spirulina_padi
+  reconstruction_status: reproduced
+  published_inventory_available: true
+  published_capex_available: true
+  published_opex_available: true
+  assumptions_required:
+    - "MEPP embeds a required return on capital by construction; the discount rate used is
+       not recorded here, so the value cannot be recomputed to the production-cost endpoint."
+  todos:
+    - "ENDPOINT MISMATCH IN THE REPOSITORY: data/validation_references.yaml compares the
+       engine's PRODUCTION COST (13.47 EUR/kg) against this paper's MEPP range
+       (13.2-17.3 EUR/kg). Those are different economic quantities. Either compare the
+       engine's MEPP (minimum_selling_price(), which returns 18.08 EUR/kg for this
+       scenario) against the paper's MEPP, or extract the paper's own production cost."
+    - "Price year not recorded; the record is not normalizable until it is extracted."
+
+# =====================================================================
+# Tier A - literature points for descriptive statistics only
+# =====================================================================
+
+- study_id: norsker2011_pond
+  author_overlap_with_algametrix: false
+  full_citation: "Norsker et al. 2011, Biotechnology Advances 29:24-27"
+  doi: 10.1016/j.biotechadv.2010.08.005
+  publication_year: 2011
+  data_location_in_source: null
+  eligibility_status: included
+  eligibility_reason: "Bottom-up cost comparison of three cultivation systems."
+  study_type: tea
+  cultivation_system: open raceway pond
+  trophic_mode: phototrophic
+  functional_unit: 1 kg dry biomass
+  economic_endpoint_type: production_cost
+  reported_value: 4.95
+  reported_unit: EUR/kg dry biomass
+  reported_currency: EUR
+  reported_price_year: 2011
+  coproduct_treatment: unknown
+  allocation_method: unknown
+  environmental_endpoint_type: none
+  published_gwp_available: false
+  reconstructability_tier: A
+  validation_mode: none
+  reconstruction_status: not_applicable
+  assumptions_required:
+    - "Endpoint classified as production_cost from the dataset label 'cost'."
+  todos:
+    - "Multiple scenarios from one publication (pond / tubular / flat panel) enter the
+       cohort as three records: confirm this is the intended treatment (see
+       docs/STUDY_SELECTION.md)."
+
+- study_id: norsker2011_tubular
+  author_overlap_with_algametrix: false
+  full_citation: "Norsker et al. 2011, Biotechnology Advances 29:24-27"
+  doi: 10.1016/j.biotechadv.2010.08.005
+  publication_year: 2011
+  eligibility_status: included
+  eligibility_reason: "Bottom-up cost comparison of three cultivation systems."
+  study_type: tea
+  cultivation_system: tubular PBR
+  trophic_mode: phototrophic
+  functional_unit: 1 kg dry biomass
+  economic_endpoint_type: production_cost
+  reported_value: 4.15
+  reported_unit: EUR/kg dry biomass
+  reported_currency: EUR
+  reported_price_year: 2011
+  coproduct_treatment: unknown
+  allocation_method: unknown
+  environmental_endpoint_type: none
+  published_gwp_available: false
+  reconstructability_tier: A
+  validation_mode: none
+  reconstruction_status: not_applicable
+  assumptions_required:
+    - "Endpoint classified as production_cost from the dataset label 'cost'."
+
+- study_id: norsker2011_flatpanel
+  author_overlap_with_algametrix: false
+  full_citation: "Norsker et al. 2011, Biotechnology Advances 29:24-27"
+  doi: 10.1016/j.biotechadv.2010.08.005
+  publication_year: 2011
+  eligibility_status: included
+  eligibility_reason: "Bottom-up cost comparison of three cultivation systems."
+  study_type: tea
+  cultivation_system: flat-panel PBR
+  trophic_mode: phototrophic
+  functional_unit: 1 kg dry biomass
+  economic_endpoint_type: production_cost
+  reported_value: 5.96
+  reported_unit: EUR/kg dry biomass
+  reported_currency: EUR
+  reported_price_year: 2011
+  coproduct_treatment: unknown
+  allocation_method: unknown
+  environmental_endpoint_type: none
+  published_gwp_available: false
+  reconstructability_tier: A
+  validation_mode: none
+  reconstruction_status: not_applicable
+  assumptions_required:
+    - "Endpoint classified as production_cost from the dataset label 'cost'."
+
+- study_id: acien2012_real
+  author_overlap_with_algametrix: false
+  full_citation: "Acien et al. 2012, Biotechnology Advances 30:1344-1353"
+  doi: 10.1016/j.biotechadv.2012.02.005
+  publication_year: 2012
+  eligibility_status: included
+  eligibility_reason: "Measured cost of an operating tubular PBR facility."
+  study_type: tea
+  cultivation_system: tubular PBR (real plant)
+  trophic_mode: phototrophic
+  technology_scale: "real plant, as operated"
+  functional_unit: 1 kg dry biomass
+  economic_endpoint_type: production_cost
+  reported_value: 69.0
+  reported_unit: EUR/kg dry biomass
+  reported_currency: EUR
+  reported_price_year: 2012
+  coproduct_treatment: unknown
+  allocation_method: unknown
+  environmental_endpoint_type: none
+  published_gwp_available: false
+  reconstructability_tier: A
+  validation_mode: none
+  reconstruction_status: not_applicable
+  assumptions_required:
+    - "Endpoint classified as production_cost from the dataset label 'cost'."
+
+- study_id: acien2012_scaled
+  author_overlap_with_algametrix: false
+  full_citation: "Acien et al. 2012, Biotechnology Advances 30:1344-1353"
+  doi: 10.1016/j.biotechadv.2012.02.005
+  publication_year: 2012
+  eligibility_status: included
+  eligibility_reason: "Scale-up projection from the same facility."
+  study_type: tea
+  cultivation_system: tubular PBR
+  trophic_mode: phototrophic
+  technology_scale: "200 t/yr projection"
+  plant_maturity: projected
+  functional_unit: 1 kg dry biomass
+  economic_endpoint_type: production_cost
+  reported_value: 12.60
+  reported_unit: EUR/kg dry biomass
+  reported_currency: EUR
+  reported_price_year: 2012
+  coproduct_treatment: unknown
+  allocation_method: unknown
+  environmental_endpoint_type: none
+  published_gwp_available: false
+  reconstructability_tier: A
+  validation_mode: none
+  reconstruction_status: not_applicable
+  assumptions_required:
+    - "Endpoint classified as production_cost from the dataset label 'cost'."
+    - "A projected cost and the measured cost from the same facility both enter the cohort."
+
+- study_id: nrel_davis2016
+  author_overlap_with_algametrix: false
+  full_citation: "Davis et al. 2016, NREL/TP-5100-64772"
+  doi: 10.2172/1239893
+  publication_year: 2016
+  eligibility_status: included
+  eligibility_reason: "Reference nth-plant algal biomass cost target."
+  study_type: tea
+  cultivation_system: open raceway pond
+  trophic_mode: phototrophic
+  technology_scale: "nth plant"
+  plant_maturity: nth_plant
+  functional_unit: 1 kg dry biomass
+  economic_endpoint_type: minimum_biomass_selling_price
+  reported_value: 0.74
+  reported_unit: USD/kg dry biomass (MBSP)
+  reported_currency: USD
+  reported_price_year: 2016
+  includes_return_on_capital: true
+  coproduct_treatment: unknown
+  allocation_method: unknown
+  environmental_endpoint_type: none
+  published_gwp_available: false
+  reconstructability_tier: A
+  validation_mode: none
+  reconstruction_status: not_applicable
+  assumptions_required:
+    - "MBSP by construction embeds a required return on capital (the discount rate at which
+       NPV = 0); the specific rate used is not recorded here."
+  todos:
+    - "Extract the discount rate embedded in the MBSP so the value can be recomputed to a
+       production-cost endpoint and re-enter the primary spread."
+
+- study_id: ruiz2016
+  author_overlap_with_algametrix: false
+  full_citation: "Ruiz et al. 2016, Energy & Environmental Science 9:3036-3043"
+  doi: 10.1039/C6EE01493C
+  publication_year: 2016
+  eligibility_status: included
+  eligibility_reason: "Biorefinery TEA reporting a biomass cost."
+  study_type: tea
+  cultivation_system: PBR (biorefinery)
+  trophic_mode: phototrophic
+  functional_unit: 1 kg dry biomass
+  economic_endpoint_type: production_cost
+  reported_value: 3.40
+  reported_unit: EUR/kg dry biomass
+  reported_currency: EUR
+  reported_price_year: 2016
+  coproduct_treatment: unknown
+  allocation_method: unknown
+  environmental_endpoint_type: none
+  published_gwp_available: false
+  reconstructability_tier: A
+  validation_mode: none
+  reconstruction_status: not_applicable
+  assumptions_required:
+    - "Endpoint classified as production_cost from the dataset label 'cost'."
+  todos:
+    - "Biorefinery context: whether the biomass cost is net of co-product credits is not
+       recorded. This materially affects comparability."
+
+- study_id: oostlander2020_tub
+  author_overlap_with_algametrix: false
+  full_citation: "Oostlander et al. 2020, Aquaculture 525:735310"
+  doi: 10.1016/j.aquaculture.2020.735310
+  publication_year: 2020
+  eligibility_status: included
+  eligibility_reason: "Hatchery-scale microalgae production cost."
+  study_type: tea
+  cultivation_system: tubular PBR (hatchery)
+  trophic_mode: phototrophic
+  functional_unit: 1 kg dry biomass
+  economic_endpoint_type: production_cost
+  reported_value: 290.0
+  reported_unit: EUR/kg dry biomass
+  reported_currency: EUR
+  reported_price_year: 2020
+  coproduct_treatment: unknown
+  allocation_method: unknown
+  environmental_endpoint_type: none
+  published_gwp_available: false
+  reconstructability_tier: A
+  validation_mode: none
+  reconstruction_status: not_applicable
+  assumptions_required:
+    - "Endpoint classified as production_cost from the dataset label 'cost'."
+
+- study_id: oostlander2020_bc
+  author_overlap_with_algametrix: false
+  full_citation: "Oostlander et al. 2020, Aquaculture 525:735310"
+  doi: 10.1016/j.aquaculture.2020.735310
+  publication_year: 2020
+  eligibility_status: included
+  eligibility_reason: "Hatchery-scale microalgae production cost."
+  study_type: tea
+  cultivation_system: bubble-column PBR (hatchery)
+  trophic_mode: phototrophic
+  functional_unit: 1 kg dry biomass
+  economic_endpoint_type: production_cost
+  reported_value: 587.0
+  reported_unit: EUR/kg dry biomass
+  reported_currency: EUR
+  reported_price_year: 2020
+  coproduct_treatment: unknown
+  allocation_method: unknown
+  environmental_endpoint_type: none
+  published_gwp_available: false
+  reconstructability_tier: A
+  validation_mode: none
+  reconstruction_status: not_applicable
+  assumptions_required:
+    - "Endpoint classified as production_cost from the dataset label 'cost'."
+
+- study_id: oostlander2020_scaled
+  author_overlap_with_algametrix: false
+  full_citation: "Oostlander et al. 2020, Aquaculture 525:735310"
+  doi: 10.1016/j.aquaculture.2020.735310
+  publication_year: 2020
+  eligibility_status: included
+  eligibility_reason: "Scale-up projection to 1500 m2 from the same study."
+  study_type: tea
+  cultivation_system: tubular PBR
+  trophic_mode: phototrophic
+  technology_scale: "1500 m2"
+  plant_maturity: projected
+  functional_unit: 1 kg dry biomass
+  economic_endpoint_type: production_cost
+  reported_value: 43.0
+  reported_unit: EUR/kg dry biomass
+  reported_currency: EUR
+  reported_price_year: 2020
+  coproduct_treatment: unknown
+  allocation_method: unknown
+  environmental_endpoint_type: none
+  published_gwp_available: false
+  reconstructability_tier: A
+  validation_mode: none
+  reconstruction_status: not_applicable
+  assumptions_required:
+    - "Endpoint classified as production_cost from the dataset label 'cost'."
+    - "Three scenarios from one publication enter the cohort as three records."
+
+- study_id: ruiz2022_hetero
+  author_overlap_with_algametrix: false
+  full_citation: "Ruiz et al. 2022, Algal Research 64:102698"
+  doi: 10.1016/j.algal.2022.102698
+  publication_year: 2022
+  eligibility_status: included
+  eligibility_reason: "Heterotrophic microalgal biomass cost."
+  study_type: tea
+  cultivation_system: heterotrophic fermenter
+  trophic_mode: heterotrophic
+  functional_unit: 1 kg dry biomass
+  economic_endpoint_type: production_cost
+  reported_value: 4.00
+  reported_unit: EUR/kg dry biomass
+  reported_currency: EUR
+  reported_price_year: 2022
+  coproduct_treatment: unknown
+  allocation_method: unknown
+  environmental_endpoint_type: none
+  published_gwp_available: false
+  reconstructability_tier: A
+  validation_mode: none
+  reconstruction_status: not_applicable
+  assumptions_required:
+    - "Endpoint classified as production_cost from the dataset label 'cost'."
+
+- study_id: russo2022_foodwaste_b
+  author_overlap_with_algametrix: true
+  full_citation: "Russo et al. 2022, Bioresource Technology Reports 18:100997"
+  doi: 10.1016/j.biteb.2022.100997
+  publication_year: 2022
+  eligibility_status: included
+  eligibility_reason: "Alternative substrate scenario from the same publication."
+  study_type: tea
+  cultivation_system: heterotrophic fermenter
+  trophic_mode: heterotrophic
+  functional_unit: 1 kg dry biomass
+  economic_endpoint_type: production_cost
+  reported_value: 12.52
+  reported_unit: USD/kg dry biomass
+  reported_currency: USD
+  reported_price_year: 2022
+  coproduct_treatment: unknown
+  allocation_method: unknown
+  environmental_endpoint_type: none
+  published_gwp_available: false
+  reconstructability_tier: A
+  validation_mode: none
+  reconstruction_status: not_applicable
+  assumptions_required:
+    - "Endpoint classified as production_cost from the dataset label 'cost'."
+    - "Self-citation: the authors of AlgaMetrix are authors of this source."
+
+- study_id: russo2022_foodwaste_c
+  author_overlap_with_algametrix: true
+  full_citation: "Russo et al. 2022, Bioresource Technology Reports 18:100997"
+  doi: 10.1016/j.biteb.2022.100997
+  publication_year: 2022
+  eligibility_status: included
+  eligibility_reason: "Alternative substrate scenario from the same publication."
+  study_type: tea
+  cultivation_system: heterotrophic fermenter
+  trophic_mode: heterotrophic
+  functional_unit: 1 kg dry biomass
+  economic_endpoint_type: production_cost
+  reported_value: 14.02
+  reported_unit: USD/kg dry biomass
+  reported_currency: USD
+  reported_price_year: 2022
+  coproduct_treatment: unknown
+  allocation_method: unknown
+  environmental_endpoint_type: none
+  published_gwp_available: false
+  reconstructability_tier: A
+  validation_mode: none
+  reconstruction_status: not_applicable
+  assumptions_required:
+    - "Endpoint classified as production_cost from the dataset label 'cost'."
+    - "Self-citation: the authors of AlgaMetrix are authors of this source."
+
+# --- Tier A: published GWP points -------------------------------------
+
+- study_id: gwp_spirulina_artisanal
+  full_citation: "Science of the Total Environment 2024 (artisanal Spirulina), PII S0195925524001665"
+  doi: null
+  publication_year: 2024
+  eligibility_status: included
+  eligibility_reason: "Published cradle-to-gate GWP for artisanal Spirulina."
+  study_type: lca
+  organism: Arthrospira platensis
+  cultivation_system: open raceway pond (Spirulina)
+  trophic_mode: phototrophic
+  functional_unit: 1 kg dry biomass
+  system_boundary: cradle-to-gate
+  environmental_endpoint_type: gwp_cradle_to_gate
+  reported_gwp: 3.50
+  reported_gwp_unit: kg CO2-eq/kg dry biomass
+  published_gwp_available: true
+  reconstructability_tier: A
+  validation_mode: none
+  reconstruction_status: not_applicable
+  gwp_reconstruction_status: not_applicable
+  todos:
+    - "No DOI recorded; only a publisher PII. Resolve to a DOI."
+
+- study_id: gwp_spirulina_france
+  full_citation: "Journal of Cleaner Production 2021 (eco-design of Spirulina production), PII S0959652621009604"
+  doi: null
+  publication_year: 2021
+  eligibility_status: included
+  eligibility_reason: "Published cradle-to-gate GWP range for Spirulina."
+  study_type: lca
+  organism: Arthrospira platensis
+  cultivation_system: open raceway pond (Spirulina)
+  trophic_mode: phototrophic
+  geographical_context: France
+  functional_unit: 1 kg dry biomass
+  system_boundary: cradle-to-gate
+  environmental_endpoint_type: gwp_cradle_to_gate
+  reported_gwp: 15.50
+  reported_gwp_low: 15.50
+  reported_gwp_high: 67.30
+  reported_gwp_unit: kg CO2-eq/kg dry biomass
+  published_gwp_available: true
+  reconstructability_tier: A
+  validation_mode: none
+  reconstruction_status: not_applicable
+  gwp_reconstruction_status: not_applicable
+  assumptions_required:
+    - "Only the lower bound of the published 15.5-67.3 range enters the point statistics.
+       This truncates the study's own spread."
+  todos:
+    - "No DOI recorded. Decide whether the point or the full range should enter the
+       descriptive statistics, and apply the same rule to every range-reporting study."
+
+- study_id: gwp_maiolo_tetra_s1
+  full_citation: "Maiolo et al. 2020, International Journal of LCA 25:1455-1471 (Tetraselmis, flue gas)"
+  doi: 10.1007/s11367-020-01759-z
+  publication_year: 2020
+  eligibility_status: included
+  eligibility_reason: "Published cradle-to-gate GWP, flue-gas CO2 scenario."
+  study_type: lca
+  organism: Tetraselmis
+  cultivation_system: flat-panel PBR
+  trophic_mode: phototrophic
+  functional_unit: 1 kg dry biomass
+  system_boundary: cradle-to-gate
+  environmental_endpoint_type: gwp_cradle_to_gate
+  reported_gwp: 15.37
+  reported_gwp_unit: kg CO2-eq/kg dry biomass
+  published_gwp_available: true
+  reconstructability_tier: A
+  validation_mode: none
+  reconstruction_status: not_applicable
+  gwp_reconstruction_status: not_applicable
+  notes: >
+    paper_handoff/METHODS.md 1.3 reports an in-tool demonstration that ~61% of this
+    study's GWP traces to one anomalous sodium-nitrate background factor. That
+    demonstration is a contribution-level diagnostic, not a reproduction of the endpoint,
+    and no scenario builder for it exists in the repository.
+
+- study_id: gwp_maiolo_tetra_s2
+  full_citation: "Maiolo et al. 2020, International Journal of LCA 25:1455-1471 (Tetraselmis, pure CO2)"
+  doi: 10.1007/s11367-020-01759-z
+  publication_year: 2020
+  eligibility_status: included
+  eligibility_reason: "Published cradle-to-gate GWP, pure-CO2 scenario."
+  study_type: lca
+  organism: Tetraselmis
+  cultivation_system: flat-panel PBR
+  trophic_mode: phototrophic
+  functional_unit: 1 kg dry biomass
+  system_boundary: cradle-to-gate
+  environmental_endpoint_type: gwp_cradle_to_gate
+  reported_gwp: 22.75
+  reported_gwp_unit: kg CO2-eq/kg dry biomass
+  published_gwp_available: true
+  reconstructability_tier: A
+  validation_mode: none
+  reconstruction_status: not_applicable
+  gwp_reconstruction_status: not_applicable
+
+- study_id: gwp_pond_biofuel
+  full_citation: "Biochemical Engineering Journal 2024 (microalgae biofuel), PII S1369703X24003589"
+  doi: null
+  publication_year: 2024
+  eligibility_status: included
+  eligibility_reason: "Published GWP for the cultivation+harvesting stages."
+  study_type: lca
+  cultivation_system: open raceway pond
+  trophic_mode: phototrophic
+  functional_unit: 1 kg dry biomass
+  system_boundary: "cultivation + harvesting only (NOT cradle-to-gate)"
+  environmental_endpoint_type: gwp_other_boundary
+  reported_gwp: 29.17
+  reported_gwp_unit: kg CO2-eq/kg dry biomass
+  published_gwp_available: true
+  reconstructability_tier: A
+  validation_mode: none
+  reconstruction_status: not_applicable
+  gwp_reconstruction_status: not_applicable
+  assumptions_required:
+    - "System boundary differs from the rest of the cohort (no drying). Pooling it with
+       cradle-to-gate values compares different systems."
+  todos:
+    - "No DOI recorded. Decide whether partial-boundary studies belong in the GWP spread."
+
+- study_id: gwp_pbr_biofuel
+  full_citation: "Biochemical Engineering Journal 2024 (microalgae biofuel), PII S1369703X24003589"
+  doi: null
+  publication_year: 2024
+  eligibility_status: included
+  eligibility_reason: "Published GWP for the cultivation+harvesting stages."
+  study_type: lca
+  cultivation_system: tubular PBR
+  trophic_mode: phototrophic
+  functional_unit: 1 kg dry biomass
+  system_boundary: "cultivation + harvesting only (NOT cradle-to-gate)"
+  environmental_endpoint_type: gwp_other_boundary
+  reported_gwp: 28.26
+  reported_gwp_unit: kg CO2-eq/kg dry biomass
+  published_gwp_available: true
+  reconstructability_tier: A
+  validation_mode: none
+  reconstruction_status: not_applicable
+  gwp_reconstruction_status: not_applicable
+  assumptions_required:
+    - "System boundary differs from the rest of the cohort."
+
+- study_id: gwp_pbr_tubular_pilot
+  full_citation: "Energy Procedia 2018 (PBR carbon footprint), PII S1876610218308518"
+  doi: null
+  publication_year: 2018
+  eligibility_status: included
+  eligibility_reason: "Published pilot-scale PBR carbon footprint."
+  study_type: lca
+  cultivation_system: tubular PBR
+  trophic_mode: phototrophic
+  plant_maturity: pilot
+  functional_unit: 1 kg dry biomass
+  system_boundary: cradle-to-gate
+  environmental_endpoint_type: gwp_cradle_to_gate
+  reported_gwp: 68.34
+  reported_gwp_unit: kg CO2-eq/kg dry biomass
+  published_gwp_available: true
+  reconstructability_tier: A
+  validation_mode: none
+  reconstruction_status: not_applicable
+  gwp_reconstruction_status: not_applicable
+  todos:
+    - "No DOI recorded."
+
+- study_id: gwp_pbr_lightguided
+  full_citation: "Algal Research 2026 (light-guiding cultivation), PII S2211926426001463"
+  doi: null
+  publication_year: 2026
+  eligibility_status: included
+  eligibility_reason: "Published GWP for a light-guided PBR."
+  study_type: lca
+  cultivation_system: light-guided PBR
+  trophic_mode: phototrophic
+  functional_unit: 1 kg dry biomass
+  system_boundary: cradle-to-gate
+  environmental_endpoint_type: gwp_cradle_to_gate
+  reported_gwp: 90.82
+  reported_gwp_unit: kg CO2-eq/kg dry biomass
+  published_gwp_available: true
+  reconstructability_tier: A
+  validation_mode: none
+  reconstruction_status: not_applicable
+  gwp_reconstruction_status: not_applicable
+  todos:
+    - "No DOI recorded."
+
+- study_id: gwp_pbr_industrial
+  full_citation: "Gueguen et al. 2024, Sustainable Production and Consumption, PII S2352554124001736"
+  doi: null
+  publication_year: 2024
+  eligibility_status: included
+  eligibility_reason: "Published GWP for an industrial vertical-stacked PBR; the cohort maximum."
+  study_type: lca
+  cultivation_system: vertical-stacked PBR
+  trophic_mode: phototrophic
+  functional_unit: 1 kg dry biomass
+  system_boundary: cradle-to-gate
+  environmental_endpoint_type: gwp_cradle_to_gate
+  reported_gwp: 153.0
+  reported_gwp_unit: kg CO2-eq/kg dry biomass
+  published_gwp_available: true
+  reconstructability_tier: A
+  validation_mode: none
+  reconstruction_status: not_applicable
+  gwp_reconstruction_status: not_applicable
+  todos:
+    - "No DOI recorded. This point sets the maximum of the published GWP spread and
+       therefore the headline ratio: verify it directly against the source."
+
+- study_id: gwp_spiralg2022
+  full_citation: "Braud et al. 2025, Bioresource Technology Reports 29:102027 (SpiralG, 2022 inventory)"
+  doi: 10.1016/j.biteb.2025.102027
+  publication_year: 2025
+  eligibility_status: included
+  eligibility_reason: "Second inventory year from the SpiralG pilot."
+  study_type: lca
+  organism: Arthrospira platensis
+  cultivation_system: open raceway pond (Spirulina, NaHCO3)
+  trophic_mode: phototrophic
+  plant_maturity: pilot
+  geographical_context: France
+  functional_unit: 1 kg dry biomass
+  system_boundary: cradle-to-gate
+  environmental_endpoint_type: gwp_cradle_to_gate
+  reported_gwp: 10.50
+  reported_gwp_unit: kg CO2-eq/kg dry biomass
+  published_gwp_available: true
+  reconstructability_tier: A
+  validation_mode: none
+  reconstruction_status: not_applicable
+  gwp_reconstruction_status: not_applicable
+  assumptions_required:
+    - "Two inventory years from one pilot enter the cohort as two independent points."
+
+- study_id: gwp_mckuin_nanno
+  # Verified against Crossref 2026-08-04. The volume and year were previously recorded
+  # as Elementa 10 (2022), which belongs to the companion Schizochytrium study
+  # (`mckuin_schizo`, 10(1):00098). This DOI is the Nannochloropsis paper: 11(1):00083, 2023.
+  full_citation: "McKuin et al. 2023, Elementa: Science of the Anthropocene 11(1):00083 (Nannochloropsis meal)"
+  doi: 10.1525/elementa.2022.00083
+  publication_year: 2023
+  eligibility_status: included
+  eligibility_reason: "Published cradle-to-gate GWP for Nannochloropsis meal."
+  study_type: lca
+  organism: Nannochloropsis sp.
+  cultivation_system: photobioreactor
+  trophic_mode: phototrophic
+  functional_unit: 1 kg dry biomass
+  system_boundary: cradle-to-gate
+  environmental_endpoint_type: gwp_cradle_to_gate
+  reported_gwp: 1.10
+  reported_gwp_low: 0.85
+  reported_gwp_high: 1.38
+  reported_gwp_unit: kg CO2-eq/kg dry biomass
+  published_gwp_available: true
+  reconstructability_tier: A
+  validation_mode: none
+  reconstruction_status: not_applicable
+  gwp_reconstruction_status: not_applicable
+  assumptions_required:
+    - "This point sets the lower end of the positive published range and therefore the
+       denominator of the published max/min ratio."
+
+- study_id: gwp_pechsiri_orp
+  full_citation: "Pechsiri et al. 2023, Science of the Total Environment 854:158445 (Scenedesmus, ORP)"
+  doi: 10.1016/j.scitotenv.2022.158445
+  publication_year: 2023
+  eligibility_status: included
+  eligibility_reason: "Published cradle-to-gate GWP, one of three systems in the source."
+  study_type: lca
+  organism: Scenedesmus
+  cultivation_system: open raceway pond
+  trophic_mode: phototrophic
+  functional_unit: 1 kg dry biomass
+  system_boundary: cradle-to-gate
+  environmental_endpoint_type: gwp_cradle_to_gate
+  reported_gwp: 5.46
+  reported_gwp_unit: kg CO2-eq/kg dry biomass
+  published_gwp_available: true
+  reconstructability_tier: A
+  validation_mode: none
+  reconstruction_status: not_applicable
+  gwp_reconstruction_status: not_applicable
+
+- study_id: gwp_pechsiri_tlc
+  full_citation: "Pechsiri et al. 2023, Science of the Total Environment 854:158445 (thin-layer cascade)"
+  doi: 10.1016/j.scitotenv.2022.158445
+  publication_year: 2023
+  eligibility_status: included
+  eligibility_reason: "Published cradle-to-gate GWP, one of three systems in the source."
+  study_type: lca
+  organism: Scenedesmus
+  cultivation_system: thin-layer cascade
+  trophic_mode: phototrophic
+  functional_unit: 1 kg dry biomass
+  system_boundary: cradle-to-gate
+  environmental_endpoint_type: gwp_cradle_to_gate
+  reported_gwp: 5.14
+  reported_gwp_unit: kg CO2-eq/kg dry biomass
+  published_gwp_available: true
+  reconstructability_tier: A
+  validation_mode: none
+  reconstruction_status: not_applicable
+  gwp_reconstruction_status: not_applicable
+
+- study_id: gwp_pechsiri_vst
+  full_citation: "Pechsiri et al. 2023, Science of the Total Environment 854:158445 (tubular PBR)"
+  doi: 10.1016/j.scitotenv.2022.158445
+  publication_year: 2023
+  eligibility_status: included
+  eligibility_reason: "Published cradle-to-gate GWP, one of three systems in the source."
+  study_type: lca
+  organism: Scenedesmus
+  cultivation_system: tubular PBR
+  trophic_mode: phototrophic
+  functional_unit: 1 kg dry biomass
+  system_boundary: cradle-to-gate
+  environmental_endpoint_type: gwp_cradle_to_gate
+  reported_gwp: 5.00
+  reported_gwp_unit: kg CO2-eq/kg dry biomass
+  published_gwp_available: true
+  reconstructability_tier: A
+  validation_mode: none
+  reconstruction_status: not_applicable
+  gwp_reconstruction_status: not_applicable

@@ -1,0 +1,238 @@
+# =====================================================================
+# Price indices and currency conversion, with provenance
+# =====================================================================
+# Every number used to move a monetary value between price years or currencies
+# lives here, with the metadata needed to audit the transformation. Nothing in
+# the code hard-codes an index value.
+#
+# Values in the three Eurostat series and in the ECB exchange rates are fetched,
+# not typed, by `python scripts/fetch_indices.py --write`. Re-run it to refresh
+# them and record a new retrieval date.
+#
+# CEPCI is the exception: it is published by Chemical Engineering magazine
+# behind a paywall with no open API, so its values here were RECOVERED BY
+# BACK-CALCULATION from the committed legacy output results/harmonization.txt.
+# They reproduce the legacy 2022-normalized column to the two decimals that file
+# reports, which establishes *what was used* - it does NOT establish that they
+# are the published index values.
+# =====================================================================
+
+currency:
+  common_currency: EUR
+  rates:
+    - from_currency: USD
+      to_currency: EUR
+      year_specific: true
+      source: >
+        European Central Bank, annual average euro reference exchange rate,
+        series EXR/A.USD.EUR.SP00.A
+        (https://data-api.ecb.europa.eu/service/data/EXR/A.USD.EUR.SP00.A?format=csvdata).
+        Published as USD per EUR and inverted here to USD -> EUR.
+      retrieval_date: 2026-08-02
+      provenance: fetched_from_provider_api
+      notes: >
+        Applied at each study's own price year. The euro/dollar rate moved from
+        0.718 (2011) to 0.950 (2022) - a 32% swing - so a single flat rate, as the
+        previous version used, folds an exchange-rate effect into what is reported
+        as a price-year effect.
+      rates_by_year:
+        2010: 0.75431
+        2011: 0.71841
+        2012: 0.77834
+        2013: 0.75295
+        2014: 0.75273
+        2015: 0.90130
+        2016: 0.90342
+        2017: 0.88521
+        2018: 0.84677
+        2019: 0.89328
+        2020: 0.87551
+        2021: 0.84549
+        2022: 0.94962
+        2023: 0.92484
+      # Retained only so the legacy 2022-normalized column can be reproduced for
+      # comparison. Never used for a new result.
+      legacy_flat_rate: 0.92
+      legacy_flat_rate_source: "back-calculated from results/harmonization.txt (legacy output)"
+
+indices:
+
+  - index_name: CEPCI
+    normalization_class: capital
+    description: "Chemical Engineering Plant Cost Index - equipment, installation and plant cost."
+    source: "Chemical Engineering (CEPCI), annual average"
+    retrieval_date: null
+    provenance: back_calculated_from_legacy_results
+    max_recommended_span_years: 5
+    values_by_year:
+      2011: 585.7
+      2012: 584.6
+      2015: 556.8
+      2016: 541.7
+      2020: 596.2
+      2021: 708.8
+      2022: 816.0
+    notes: >
+      Reproduces the legacy 2022-normalized column: 2011->2022 x1.3932,
+      2012->2022 x1.3958, 2016->2022 x1.5064, 2020->2022 x1.3687, 2021->2022 x1.1512.
+      The 2015 entry is NOT exercised by the legacy output and is therefore unverified
+      even by back-calculation.
+      CEPCI is itself a composite of four published sub-indices - equipment (~50.7%),
+      construction labour (~29%), engineering and supervision (~15.8%) and buildings
+      (~4.6%) - so applying the composite to a whole unit cost double-counts a labour
+      component that is already inside it while missing the labour in the operating cost.
+      The index is documented as reliable for escalation over intervals of no more than
+      about five years; this cohort spans 2011-2022, so several transformations exceed
+      that window and are flagged in the audit trail.
+    applies_to:
+      - capital_annualised
+      - depreciation
+      - maintenance
+    todos:
+      - "Confirm every annual value against the published index issues and record
+         retrieval_date. Until then, no CEPCI-derived figure should be cited as an
+         index value, only as 'the escalation used to produce the legacy column'."
+      - "The 2015 value is unverified: superpro_algaloil (USD 2015) depends on it."
+      - "Consider using the published CEPCI equipment sub-index for the capital
+         component instead of the composite, which already contains construction labour."
+
+  - index_name: labour_cost_index
+    normalization_class: labour
+    description: >
+      Eurostat labour cost index, wages and salaries, EU27, NACE Rev. 2 B-S
+      (industry and services), nominal, index 2020 = 100.
+    source: >
+      Eurostat dataset lc_lci_r2_a
+      (https://ec.europa.eu/eurostat/databrowser/view/lc_lci_r2_a)
+    retrieval_date: 2026-08-02
+    provider_last_updated: "2026-06-16T11:00:00+0200"
+    provenance: fetched_from_provider_api
+    values_by_year:
+      2010: 79.9
+      2011: 81.7
+      2012: 83.6
+      2013: 84.7
+      2014: 86.0
+      2015: 87.6
+      2016: 89.1
+      2017: 91.4
+      2018: 94.0
+      2019: 96.7
+      2020: 100.0
+      2021: 101.5
+      2022: 105.9
+      2023: 111.5
+    notes: >
+      EU-wide aggregate. A study set in a single country should use that country's
+      series; the EU aggregate is used here because most records do not record a
+      geographical context.
+    applies_to:
+      - labour
+    todos:
+      - "Use a country-specific series for studies whose geographical_context is known."
+
+  - index_name: general_opex_index
+    normalization_class: general_opex
+    description: >
+      Eurostat HICP, all items, EU27, annual average index 2015 = 100. Applied to
+      non-energy, non-labour operating expenditure (consumables, overhead, services).
+    source: >
+      Eurostat dataset prc_hicp_aind
+      (https://ec.europa.eu/eurostat/databrowser/view/prc_hicp_aind)
+    retrieval_date: 2026-08-02
+    provider_last_updated: "2026-02-06T23:00:00+0100"
+    provenance: fetched_from_provider_api
+    values_by_year:
+      2010: 93.03
+      2011: 95.69
+      2012: 98.19
+      2013: 99.49
+      2014: 99.89
+      2015: 100.00
+      2016: 100.18
+      2017: 101.74
+      2018: 103.57
+      2019: 105.04
+      2020: 105.76
+      2021: 108.82
+      2022: 118.82
+      2023: 126.38
+    notes: >
+      A consumer price index is a proxy for industrial non-energy input costs. A
+      producer price index for the relevant NACE division would be closer; HICP is
+      used because it is available as one consistent EU aggregate over the whole span.
+    applies_to:
+      - overhead
+      - other_opex
+      - nutrients
+    todos:
+      - "Consider replacing with an industrial producer price index (Eurostat sts_inppd_a)
+         for the chemical or food sector."
+
+  - index_name: energy_price_series
+    normalization_class: energy
+    description: >
+      Eurostat electricity price for industrial consumers, EU27, band IC
+      (500-1 999 MWh/yr), excluding taxes and levies, EUR/kWh. The two semesters of
+      each year are averaged. Used as a price level, so the ratio of two years is
+      the escalation factor.
+    source: >
+      Eurostat dataset nrg_pc_205
+      (https://ec.europa.eu/eurostat/databrowser/view/nrg_pc_205)
+    retrieval_date: 2026-08-02
+    provider_last_updated: "2026-07-29T11:00:00+0200"
+    provenance: fetched_from_provider_api
+    values_by_year:
+      2010: 0.08875
+      2011: 0.09225
+      2012: 0.09295
+      2013: 0.09100
+      2014: 0.08705
+      2015: 0.08325
+      2016: 0.07880
+      2017: 0.07630
+      2018: 0.07830
+      2019: 0.08135
+      2020: 0.08220
+      2021: 0.09495
+      2022: 0.17900
+      2023: 0.18525
+    notes: >
+      THIS IS THE SERIES THAT BREAKS THE OLD METHOD. Industrial electricity went from
+      0.0788 EUR/kWh in 2016 to 0.1790 in 2022, a factor of 2.27, while CEPCI over the
+      same span is 1.51. Escalating the energy component of a 2016 cost with CEPCI
+      understates it by roughly a third. Band choice matters: a larger consumer (band IE)
+      pays less and saw a different trajectory.
+    applies_to:
+      - electricity
+      - heat_fuel
+    todos:
+      - "Heat/fuel currently inherits the electricity series. Add Eurostat nrg_pc_305
+         (natural gas for industrial consumers) and split the two."
+
+# ---------------------------------------------------------------------
+# Bounding analysis for studies with no published cost breakdown
+# ---------------------------------------------------------------------
+# When only a total unit cost is known, the split across expenditure classes is
+# unknown too. Rather than hide one assumption inside a point estimate, the split
+# is taken from the engine's OWN executable reconstructions - which do have a
+# full cost breakdown - and the result is reported as an interval:
+#
+#   point   : the median share vector across the reconstructions
+#   bounds  : the minimum and maximum factor over the individual share vectors
+#   legacy  : CEPCI applied to 100% of the cost, reported for comparison only
+#
+# See paper/indices.py:component_share_bounds().
+bounding:
+  method: engine_derived_component_shares
+  notes: >
+    The shares come from TEAResult.opex_categories of every registered
+    reconstruction, mapped onto the normalization classes: facility-dependent ->
+    capital, utilities -> energy, labour -> labour, raw materials / overhead /
+    other -> general OPEX. They describe what this engine's reconstructions look
+    like, not what the unreconstructed studies look like; that is why the result is
+    an interval and why the interval is always printed.
+  todos:
+    - "Extract published CAPEX/OPEX breakdowns for the Tier-B studies so their own
+       shares replace the engine-derived interval and the quality flag reaches
+       component_resolved."

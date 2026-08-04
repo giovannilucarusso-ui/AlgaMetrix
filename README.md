@@ -102,10 +102,27 @@ A web version (Streamlit) is also available: `streamlit run app/streamlit_app.py
 
 ## Validation & transparency
 
-The tool is validated on three independent levels — against SuperPro Designer, against
-published techno-economic studies (omega-3, phycocyanin, astaxanthin, single-cell protein,
-biodiesel), and against open-access literature benchmark ranges. See **[docs/VALIDATION.md](docs/VALIDATION.md)**
-for the full table with deviations and sources.
+The tool is validated against published techno-economic and LCA studies, against SuperPro Designer,
+and against open-literature benchmark ranges — **12 point reproductions (9 of them blind), 2 range
+plausibility checks and 1 comparison that could not be made**, drawn from 13 sources. Blind cost
+reproductions agree within −14% to +6%, blind cradle-to-gate GWP within −11% to +4%.
+
+**Every one of those numbers is reproducible from this repository:**
+
+```bash
+python reproduce.py
+```
+
+regenerates [`results/`](results) and [`figures/`](figures) from
+[`data/studies/studies.yaml`](data/studies/studies.yaml), the dataset of published estimates. The
+failing cases are reported too — one plausibility check falls outside its published envelope, and
+one comparison is refused because the two sides could not be brought to a common price basis.
+
+See **[docs/VALIDATION.md](docs/VALIDATION.md)** for the tables,
+[docs/STUDY_SELECTION.md](docs/STUDY_SELECTION.md) for how the studies were chosen (and why this is
+not a systematic review), [docs/PRICE_BASIS.md](docs/PRICE_BASIS.md) for currency and price-year
+handling, and [docs/CARBON_ACCOUNTING.md](docs/CARBON_ACCOUNTING.md) for the biogenic-carbon
+conventions.
 
 ## Validating against SuperPro Designer
 
