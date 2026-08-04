@@ -29,12 +29,19 @@ from .models import (
     Utility,
 )
 
-# Repository layout:  <root>/data/*.yaml  and  <root>/src/algametrix/library.py
-# In a PyInstaller bundle the data folder is shipped alongside the executable.
+# Where the built-in YAML library lives, in each of the three ways it is shipped:
+#   * PyInstaller bundle — alongside the executable;
+#   * repository checkout — <root>/data, next to <root>/src/algametrix/library.py;
+#   * installed distribution — algametrix/data, placed there by `package-dir`
+#     (the checkout path would resolve to <site-packages>/../data, which is wrong).
 if getattr(sys, "frozen", False):
     DEFAULT_DATA_DIR = Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent)) / "data"
 else:
-    DEFAULT_DATA_DIR = Path(__file__).resolve().parents[2] / "data"
+    _CHECKOUT_DATA_DIR = Path(__file__).resolve().parents[2] / "data"
+    _INSTALLED_DATA_DIR = Path(__file__).resolve().parent / "data"
+    DEFAULT_DATA_DIR = (
+        _CHECKOUT_DATA_DIR if _CHECKOUT_DATA_DIR.is_dir() else _INSTALLED_DATA_DIR
+    )
 
 
 @dataclass
