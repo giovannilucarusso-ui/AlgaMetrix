@@ -27,9 +27,10 @@ jobs:
           python -m pip install --upgrade pip
           # Engine only: the desktop UI (PySide6) is not needed to run the
           # tests and pulls a large wheel. openpyxl is required by the
-          # spreadsheet-export test, and matplotlib by the PDF-report module
-          # that tests/test_report.py imports.
-          python -m pip install numpy pandas PyYAML openpyxl matplotlib pytest
+          # spreadsheet-export test, matplotlib by the PDF-report module that
+          # tests/test_report.py imports, and scipy by the Sobol' sampler in the
+          # evidence layer (the `paper` extra).
+          python -m pip install numpy pandas PyYAML openpyxl matplotlib scipy pytest
 
       - name: Run the test suite
         run: python -m pytest tests -q

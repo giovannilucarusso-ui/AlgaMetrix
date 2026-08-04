@@ -28,6 +28,10 @@ dependencies = [
 desktop = ["PySide6>=6.6", "matplotlib>=3.8", "openpyxl>=3.1"]
 web = ["streamlit>=1.36", "plotly>=5.22"]
 dev = ["pytest>=8.0", "pyinstaller>=6.0"]
+# The evidence layer (src/algametrix/paper, reproduce.py): scipy supplies the
+# scrambled Sobol' sequences for the global sensitivity analysis, matplotlib the
+# figures. The engine itself needs neither.
+paper = ["scipy>=1.11", "matplotlib>=3.8"]
 
 [project.scripts]
 algametrix = "desktop.app:main"
