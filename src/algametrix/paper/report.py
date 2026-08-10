@@ -16,6 +16,13 @@ RULE = "=" * 78
 THIN = "-" * 78
 
 
+def _wrap(text: str, width: int) -> list[str]:
+    """Wrap a paragraph, collapsing the newlines a YAML block scalar leaves behind."""
+    import textwrap
+
+    return textwrap.wrap(" ".join(str(text).split()), width=width) or [""]
+
+
 def header(title: str, subtitle: str = "", seed: int | None = None) -> list[str]:
     lines = [title, RULE]
     if subtitle:
@@ -510,7 +517,7 @@ def carbon_accounting(reports, spreads) -> str:
 # Reproductions (replaces the legacy validation.txt / lca_validation.txt)
 # --------------------------------------------------------------------------
 
-def reproductions(rows, blocked) -> str:
+def reproductions(rows, blocked, excluded=None) -> str:
     lines = header(
         "ENGINE REPRODUCTIONS VERSUS SOURCE VALUES",
         "point reproductions, range plausibility checks and endpoint mismatches, "
@@ -587,6 +594,24 @@ def reproductions(rows, blocked) -> str:
             lines.append(f"  {sid:26s} legacy result: {why}")
     else:
         lines.append("  none")
+    lines += [
+        "",
+        "EXCLUDED - withdrawn from every population, with the reason",
+        THIN,
+        "  These records are kept in the dataset rather than deleted, so that an exclusion",
+        "  is countable and a reader can see what was taken out and why. Their scenario",
+        "  builders still exist and still run: what was found unsound is the PUBLISHED",
+        "  VALUE, not the reconstruction, and the scenarios remain in the software",
+        "  verification suite.",
+        "",
+    ]
+    if excluded:
+        for sid, why in sorted(excluded.items()):
+            lines.append(f"  {sid}")
+            for chunk in _wrap(why, 74):
+                lines.append(f"      {chunk}")
+    else:
+        lines.append("  none")
     lines.append("")
     return "\n".join(lines)
 
@@ -595,7 +620,8 @@ def reproductions(rows, blocked) -> str:
 # Task 5 - Sobol
 # --------------------------------------------------------------------------
 
-def sobol_validation(outcomes, salib_present: bool, tolerance: float) -> str:
+def sobol_validation(outcomes, salib_present: bool, tolerance: float,
+                     group_outcomes=None) -> str:
     lines = header(
         "SOBOL IMPLEMENTATION VALIDATION",
         "synthetic benchmarks with analytical indices, plus an independent "
@@ -609,6 +635,12 @@ def sobol_validation(outcomes, salib_present: bool, tolerance: float) -> str:
         "  ST_i = (1/2N) sum [f(A) - f(AB_i)]^2 / Var(Y)       Jansen",
         "  A and B: two halves of one scrambled Sobol' sequence in 2k dimensions.",
         "  Var(Y) over the pooled A and B outputs. N(k+2) evaluations.",
+        "",
+        "  The GROUP estimator (sobol.analyze_groups) is the same pair of formulas with a",
+        "  whole block of columns swapped at a time, so S[G] = Var(E[Y|X_G])/Var(Y). It is",
+        "  validated separately below, because its headline quantity - the remainder, i.e.",
+        "  the variance carried by interactions BETWEEN groups - has no per-parameter",
+        "  analogue and cannot be checked by the benchmarks above.",
         "",
         f"  reference library available: {'SALib' if salib_present else 'NO (not installed)'}",
         "  reproduce the cross-check with:  pip install SALib && python reproduce.py --only sobol",
@@ -655,6 +687,44 @@ def sobol_validation(outcomes, salib_present: bool, tolerance: float) -> str:
         if ref and "error" in ref:
             lines.append(f"  reference library error: {ref['error']}")
             lines.append("")
+
+    for o in group_outcomes or []:
+        lines += [
+            THIN,
+            f"GROUP BENCHMARK: {o.benchmark}   N={o.n_base}  "
+            f"evaluations={o.result.n_evaluations}  seed={o.seed}",
+            THIN,
+            f"  {o.description}",
+            "  partition: " + "; ".join(f"{g} = {{{', '.join(o.members[g])}}}"
+                                        for g in o.groups),
+            "",
+            f"  {'group':6s} {'S exact':>10s} {'S algam.':>10s} "
+            f"{'S 95% CI':>20s} {'S |err|':>9s}",
+        ]
+        for i, g in enumerate(o.groups):
+            e = o.result.s[i]
+            lines.append(f"  {g:6s} {o.s_exact[i]:10.4f} {e.value:10.4f} "
+                         f"[{e.ci_low:+8.4f},{e.ci_high:+8.4f}] {o.s_abs_error[i]:9.4f}")
+        lines.append(f"  {'group':6s} {'ST exact':>10s} {'ST algam.':>10s} "
+                     f"{'ST 95% CI':>20s} {'ST |err|':>9s}")
+        for i, g in enumerate(o.groups):
+            e = o.result.st[i]
+            lines.append(f"  {g:6s} {o.st_exact[i]:10.4f} {e.value:10.4f} "
+                         f"[{e.ci_low:+8.4f},{e.ci_high:+8.4f}] {o.st_abs_error[i]:9.4f}")
+        # The remainder is the quantity the group decomposition reports and the
+        # only one with no per-parameter analogue, so it is checked explicitly.
+        lines.append(f"  {'rest':6s} {o.interactions_exact:10.4f} "
+                     f"{o.result.interactions:10.4f} {'':20s} "
+                     f"{o.interactions_abs_error:9.4f}   "
+                     "(variance carried by interactions BETWEEN groups)")
+        ok = o.max_abs_error <= tolerance and not o.result.violations()
+        all_ok = all_ok and ok
+        lines += [f"  max absolute error : {o.max_abs_error:.4f}  -> "
+                  f"{'PASS' if ok else 'FAIL'}",
+                  f"  index violations   : {o.result.violations() or 'none'}",
+                  f"  dropped rows       : {o.result.dropped_rows}",
+                  f"  runtime            : {o.result.runtime_s:.2f} s", ""]
+
     lines += [RULE, f"OVERALL: {'PASS' if all_ok else 'FAIL'}", RULE, ""]
     return "\n".join(lines)
 
@@ -736,12 +806,44 @@ def sensitivity(blocks, mode_descriptions, validation_passed: bool, seed: int) -
 # Task 6 - uncertainty
 # --------------------------------------------------------------------------
 
-def uncertainty(blocks, convergence_blocks, parameter_metadata, seed: int, n_chosen: int) -> str:
+def uncertainty(blocks, convergence_blocks, parameter_metadata, seed: int, n_chosen: int,
+                groups=None) -> str:
+    """``groups`` maps ``(archetype_label, metric)`` to a ``GroupSobolResult``.
+
+    The Monte-Carlo runs give the quantile *bands*; the variance *decomposition*
+    comes from the group Sobol' analysis, because a conditional variance taken
+    with the other groups pinned at nominal is not a variance decomposition of a
+    non-additive model. Both are printed, the second explicitly as screening.
+    """
     lines = header(
         "MONTE-CARLO UNCERTAINTY, SEPARATED BY SOURCE",
         f"triangular sampling, mode at nominal; n={n_chosen} chosen by convergence",
         seed=seed,
     )
+    lines += [
+        "HOW THE VARIANCE IS DECOMPOSED",
+        THIN,
+        "  Two different things are printed for each (archetype, metric) and they must",
+        "  not be confused.",
+        "",
+        "  GROUP SOBOL' DECOMPOSITION - the decomposition used in the paper. S_G is",
+        "  Var(E[Y|X_G])/Var(Y), the main effect of the group INCLUDING every interaction",
+        "  among its own members; ST_G adds every interaction with parameters outside it.",
+        "  First-order group indices sum to at most 1 and the remainder is the share of",
+        "  variance carried by interactions BETWEEN groups. Nothing is assumed additive.",
+        "  Estimated by the Saltelli/Jansen estimator with a whole block of columns",
+        "  swapped at a time (sobol.analyze_groups), over UNIFORM supports.",
+        "",
+        "  CONDITIONAL-VARIANCE RATIOS - screening only. Each is the variance of one",
+        "  Monte-Carlo run in which a single group varies and the others are PINNED at",
+        "  their nominal values, divided by the joint variance. That is a slice through",
+        "  the nominal point, not Var(E[Y|X_G]); the two coincide only for a model that",
+        "  is additive in the groups. The ratios can sum to more or less than 1, they",
+        "  depend on where the other groups were pinned, and the remainder is a leftover",
+        "  rather than an interaction term. They are printed because the quantile bands",
+        "  above come from the same runs and answer a legitimate what-if question.",
+        "",
+    ]
     lines += [
         "MODES",
         THIN,
@@ -778,9 +880,31 @@ def uncertainty(blocks, convergence_blocks, parameter_metadata, seed: int, n_cho
                     f"P50[{res.p50.ci_low:,.4g}, {res.p50.ci_high:,.4g}] "
                     f"P90[{res.p90.ci_low:,.4g}, {res.p90.ci_high:,.4g}]"
                 )
-            shares = dec.variance_shares()
-            lines.append("    variance share of the joint variance:")
-            for k, v in shares.items():
+            group = (groups or {}).get((block["archetype_label"], metric))
+            if group is not None:
+                lines.append(
+                    "    GROUP SOBOL' DECOMPOSITION  Var(E[Y|X_G])/Var(Y), "
+                    f"n_base={group.n_base}, {group.n_evaluations} evaluations:")
+                lines.append(f"      {'group':24s} {'S':>9s} {'S 95% CI':>20s} "
+                             f"{'ST':>9s} {'ST 95% CI':>20s}")
+                for g, (s, st) in group.by_group().items():
+                    lines.append(
+                        f"      {g:24s} {s.value:9.4f} "
+                        f"[{s.ci_low:+8.4f},{s.ci_high:+8.4f}] {st.value:9.4f} "
+                        f"[{st.ci_low:+8.4f},{st.ci_high:+8.4f}]")
+                lines.append(
+                    f"      {'between-group interactions':24s} "
+                    f"{group.interactions:9.4f}   (= 1 - sum of first-order group indices)")
+                if group.violations():
+                    lines.append(f"      !! {'; '.join(group.violations())}")
+            lines.append(
+                "    conditional-variance ratios (SCREENING ONLY - one group varying, the")
+            lines.append(
+                "    others PINNED at nominal; NOT a Sobol' decomposition, does not")
+            lines.append(
+                "    decompose the variance of a non-additive model, depends on where the")
+            lines.append("    other groups were pinned):")
+            for k, v in dec.conditional_variance_ratios().items():
                 lines.append(f"      {k:24s} {('n/a' if v is None else f'{v:6.1%}'):>8s}")
             for mode, res in dec.results.items():
                 for n in res.notes:

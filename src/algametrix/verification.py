@@ -1,18 +1,31 @@
-"""Internal verification — mass-balance closure and model invariants.
+"""Internal verification — construction identities and physical admissibility.
 
 *Verification* (is the maths self-consistent?) is distinct from *validation* (does it match
-an external reference — see :mod:`validation`). This module checks that the conserved
-quantities close and that structural invariants hold:
+an external reference — see :mod:`validation`). This module reports two families of check
+that answer different questions and must not be presented as one.
 
-* **Carbon** — supplied inorganic carbon x utilization equals the carbon fixed into biomass
-  (phototrophic), or substrate x yield equals the biomass grown (heterotrophic);
-* **Nitrogen / Phosphorus** — supplied x uptake equals the nutrient in the biomass, and the
-  supplied amount equals assimilated + emitted;
-* **Product mass** — the downstream products never sum to more than the biomass fed;
-* **Scale invariance** — per-kg flows do not depend on the absolute plant scale (continuous).
+**Construction identities** (:class:`IdentityCheck`). Each restates a field of the inventory
+as a closed form of the scenario, written here independently of :mod:`inventory`, and
+compares the two. They close at machine precision *by construction*: ``build_inventory``
+derives the nitrogen supply as ``org.nitrogen x gpp / uptake``, so ``supply x uptake ==
+org.nitrogen x gpp`` cannot fail for any parameter values. What they can catch is a change to
+:mod:`inventory` that is not mirrored here — they are specification tests, and their tiny
+residuals are evidence that the implementation matches its specification, **not** that a
+conservation law holds. They were previously named as carbon, nitrogen and phosphorus
+"balances", which claimed more than they test.
 
-A correct model closes the balances to numerical tolerance; the residuals are reportable as
-the paper's Verification section.
+**Physical admissibility** (:class:`InvariantCheck`). Inequalities that a scenario can
+genuinely violate:
+
+* the elemental composition cannot exceed the dry mass it is a fraction of;
+* recovery, nutrient uptake and carbon utilization are fractions in (0, 1];
+* a heterotroph cannot put more carbon into biomass than its substrate supplied — the
+  quantity the construction identity above does *not* test, since it never mentions carbon;
+* the downstream products never sum to more than the biomass fed;
+* per-kg flows do not depend on the absolute plant scale (continuous mode).
+
+These are the checks that can fail, so they are the ones that carry evidential weight. They
+are booleans, not residuals, and are reported as such.
 """
 
 from __future__ import annotations
@@ -26,21 +39,40 @@ TOL = 1e-9
 
 
 @dataclass
-class BalanceCheck:
-    """An equality that a conserved quantity must satisfy (inflow == outflow)."""
+class IdentityCheck:
+    """An inventory field against a closed form of the scenario, written here.
+
+    Not a conservation law. See the module docstring: the equality holds by
+    construction, and the residual measures floating-point round-off plus any
+    drift between :mod:`inventory` and this restatement of it.
+    """
 
     name: str
-    inflow: float
-    outflow: float
+    lhs: float
+    rhs: float
 
     @property
     def residual(self) -> float:
-        denom = max(abs(self.inflow), abs(self.outflow), 1e-12)
-        return abs(self.inflow - self.outflow) / denom
+        denom = max(abs(self.lhs), abs(self.rhs), 1e-12)
+        return abs(self.lhs - self.rhs) / denom
 
     @property
     def closes(self) -> bool:
         return self.residual < TOL
+
+    # Retained so existing readers of the older field names keep working.
+    @property
+    def inflow(self) -> float:
+        return self.lhs
+
+    @property
+    def outflow(self) -> float:
+        return self.rhs
+
+
+#: Previous name of :class:`IdentityCheck`, kept as an alias so that external
+#: code importing it does not break on the rename.
+BalanceCheck = IdentityCheck
 
 
 @dataclass
@@ -54,12 +86,25 @@ class InvariantCheck:
 
 @dataclass
 class VerificationReport:
-    balances: list[BalanceCheck] = field(default_factory=list)
+    #: Construction identities. ``balances`` is retained as the attribute name
+    #: because it is what the figure and report code already read; what it holds
+    #: is documented at the top of this module and is not a set of balances.
+    balances: list[IdentityCheck] = field(default_factory=list)
     invariants: list[InvariantCheck] = field(default_factory=list)
+
+    @property
+    def identities(self) -> list[IdentityCheck]:
+        """Preferred name for :attr:`balances`."""
+        return self.balances
 
     @property
     def max_residual(self) -> float:
         return max((c.residual for c in self.balances), default=0.0)
+
+    @property
+    def admissibility(self) -> list[InvariantCheck]:
+        """The checks that can actually fail."""
+        return self.invariants
 
     @property
     def all_pass(self) -> bool:
@@ -74,42 +119,77 @@ def verify(scenario: Scenario) -> VerificationReport:
     gpp = 1.0 / recovery                       # gross biomass per kg product
     uptake = min(max(sys.nutrient_uptake, 1e-6), 1.0)
 
-    balances: list[BalanceCheck] = []
+    balances: list[IdentityCheck] = []
 
     # --- carbon --------------------------------------------------------------
     if sys.mode == TrophicMode.PHOTOTROPHIC:
         util = min(max(sys.co2_utilization, MIN_CARBON_UTILIZATION), 1.0)
-        balances.append(BalanceCheck(
-            "Carbon: fixed == biomass C",
+        balances.append(IdentityCheck(
+            "Identity: CO2 fixed / M(CO2:C) == biomass C",
             inv.co2_fixed_per_kg / CO2_PER_C, org.carbon * gpp))
         if sys.carbon_source == CarbonSource.BICARBONATE:
             supplied_as_co2 = inv.bicarbonate_supply_per_kg * util * (CO2_PER_C / NAHCO3_PER_C)
         else:
             supplied_as_co2 = inv.co2_supply_per_kg * util
-        balances.append(BalanceCheck(
-            "Carbon: supplied x utilization == fixed",
+        balances.append(IdentityCheck(
+            "Identity: inorganic C supplied x utilization == fixed",
             supplied_as_co2, inv.co2_fixed_per_kg))
-    else:  # heterotrophic: carbon from substrate
+    else:
+        # Deliberately no longer called a carbon check: it never mentions carbon.
+        # It restates how the substrate demand is derived from the mass yield.
+        # The carbon question this used to be presented as answering is the
+        # admissibility constraint below.
         yield_ = max(sys.substrate_yield, 1e-6)
-        balances.append(BalanceCheck(
-            "Carbon: substrate x yield == biomass",
+        balances.append(IdentityCheck(
+            "Identity: substrate x mass yield == gross biomass",
             inv.substrate_per_kg * yield_, gpp))
 
     # --- nitrogen & phosphorus ----------------------------------------------
-    balances.append(BalanceCheck(
-        "Nitrogen: supplied x uptake == biomass N",
+    balances.append(IdentityCheck(
+        "Identity: N supplied x uptake == biomass N",
         inv.nitrogen_per_kg * uptake, org.nitrogen * gpp))
-    balances.append(BalanceCheck(
-        "Nitrogen: supplied == assimilated + emitted",
+    balances.append(IdentityCheck(
+        "Identity: N supplied == assimilated + emitted",
         inv.nitrogen_per_kg, inv.nitrogen_per_kg * uptake + inv.nitrogen_emitted_per_kg))
-    balances.append(BalanceCheck(
-        "Phosphorus: supplied x uptake == biomass P",
+    balances.append(IdentityCheck(
+        "Identity: P supplied x uptake == biomass P",
         inv.phosphorus_per_kg * uptake, org.phosphorus * gpp))
-    balances.append(BalanceCheck(
-        "Phosphorus: supplied == assimilated + emitted",
+    balances.append(IdentityCheck(
+        "Identity: P supplied == assimilated + emitted",
         inv.phosphorus_per_kg, inv.phosphorus_per_kg * uptake + inv.phosphorus_emitted_per_kg))
 
     invariants: list[InvariantCheck] = []
+
+    # --- physical admissibility ---------------------------------------------
+    # Unlike the identities above, every one of these can fail.
+    composition = org.carbon + org.nitrogen + org.phosphorus
+    invariants.append(InvariantCheck(
+        "Admissible: biomass C+N+P <= 1 kg/kg dry",
+        composition <= 1.0 + TOL,
+        f"C+N+P = {composition:.3f} kg/kg dry"))
+
+    for label, value in (("harvesting recovery", scenario.harvesting.recovery),
+                         ("nutrient uptake", sys.nutrient_uptake)):
+        invariants.append(InvariantCheck(
+            f"Admissible: {label} in (0, 1]",
+            0.0 < value <= 1.0 + TOL, f"{value:.4g}"))
+    if sys.mode == TrophicMode.PHOTOTROPHIC:
+        invariants.append(InvariantCheck(
+            "Admissible: carbon utilization in (0, 1]",
+            0.0 < sys.co2_utilization <= 1.0 + TOL, f"{sys.co2_utilization:.4g}"))
+
+    # The elemental carbon constraint the old "Carbon:" identity did not test:
+    # a heterotroph cannot incorporate more carbon than its substrate carried.
+    # The remainder is respired, and is reported rather than assumed away.
+    if sys.mode != TrophicMode.PHOTOTROPHIC and inv.substrate_co2_supplied_per_kg > 0:
+        c_in = inv.substrate_co2_supplied_per_kg
+        c_biomass = inv.biogenic_co2_in_gross_biomass_per_kg
+        fraction = c_biomass / c_in
+        invariants.append(InvariantCheck(
+            "Admissible: biomass C <= substrate C (heterotrophic)",
+            c_biomass <= c_in * (1.0 + TOL),
+            f"{fraction:.3f} of substrate carbon into biomass; "
+            f"{inv.biogenic_co2_respired_per_kg:.3f} kg CO2-eq/kg respired"))
 
     # --- downstream product mass never exceeds the biomass fed ---------------
     if scenario.products:
@@ -138,11 +218,22 @@ def verify(scenario: Scenario) -> VerificationReport:
 
 
 def format_report(scenario_name: str, report: VerificationReport) -> str:
-    """Human-readable verification report (for the reproduce script / paper appendix)."""
+    """Human-readable verification report (for the reproduce script / paper appendix).
+
+    The two families are printed under separate headings on purpose: reading a
+    machine-precision residual as though it were a conservation result is the
+    misreading this module exists to prevent.
+    """
     lines = [f"Verification - {scenario_name}: "
-             f"{'PASS' if report.all_pass else 'FAIL'} (max residual {report.max_residual:.1e})"]
+             f"{'PASS' if report.all_pass else 'FAIL'} "
+             f"(max identity residual {report.max_residual:.1e}; "
+             f"{sum(1 for i in report.invariants if i.passed)}/{len(report.invariants)} "
+             f"admissibility constraints hold)"]
+    lines.append("  construction identities - hold by construction; a residual above "
+                 "round-off means inventory.py and verification.py have diverged")
     for c in report.balances:
-        lines.append(f"    [{'ok' if c.closes else 'XX'}] {c.name:44s} residual {c.residual:.1e}")
+        lines.append(f"    [{'ok' if c.closes else 'XX'}] {c.name:52s} residual {c.residual:.1e}")
+    lines.append("  physical admissibility - these can fail")
     for i in report.invariants:
-        lines.append(f"    [{'ok' if i.passed else 'XX'}] {i.name:44s} {i.detail}")
+        lines.append(f"    [{'ok' if i.passed else 'XX'}] {i.name:52s} {i.detail}")
     return "\n".join(lines)

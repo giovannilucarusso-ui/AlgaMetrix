@@ -132,13 +132,21 @@ class SobolResult:
 # --------------------------------------------------------------------------
 
 def saltelli_matrices(
-    k: int, n_base: int, seed: int
+    k: int, n_base: int, seed: int, blocks: Sequence[Sequence[int]] | None = None
 ) -> tuple[np.ndarray, np.ndarray, list[np.ndarray]]:
-    """Return ``(A, B, [AB_0 ... AB_{k-1}])`` on the unit hypercube.
+    """Return ``(A, B, [AB_0 ... AB_{m-1}])`` on the unit hypercube.
 
     A and B are the two halves of a single scrambled Sobol' sequence of length
     ``2 * n_base`` in ``2k`` dimensions, which is what keeps the two samples
     independent while both remain low-discrepancy.
+
+    ``blocks`` gives the column indices swapped in each ``AB`` matrix. The
+    default swaps one column at a time, which yields per-parameter indices.
+    Passing a partition of the columns instead yields **group** indices: with a
+    whole block swapped, the resulting :math:`S_G` is
+    :math:`\\mathrm{Var}(E[Y \\mid X_G]) / \\mathrm{Var}(Y)`, i.e. the main
+    effect of the group *including* every interaction inside it. The estimator
+    itself is unchanged; only which columns move together differs.
     """
     from scipy.stats import qmc
 
@@ -151,10 +159,11 @@ def saltelli_matrices(
     pts = sampler.random(n_base)
     A = pts[:, :k]
     B = pts[:, k:]
+    blocks = [[i] for i in range(k)] if blocks is None else blocks
     AB = []
-    for i in range(k):
+    for cols in blocks:
         m = A.copy()
-        m[:, i] = B[:, i]
+        m[:, list(cols)] = B[:, list(cols)]
         AB.append(m)
     return A, B, AB
 
@@ -275,6 +284,148 @@ def analyze(
 
 
 # --------------------------------------------------------------------------
+# Group-wise decomposition
+# --------------------------------------------------------------------------
+
+@dataclass
+class GroupSobolResult:
+    """First- and total-order Sobol' indices for a *partition* of the inputs.
+
+    The question this answers is "how much of the spread in this output is
+    physics, how much is prices, how much is the LCIA background". A group index
+    is the ordinary Sobol' index with a whole block of columns swapped together:
+
+    * :math:`S_G = \\mathrm{Var}(E[Y \\mid X_G]) / \\mathrm{Var}(Y)` — the main
+      effect of the group, *including* every interaction among its own members;
+    * :math:`S_{T_G} = 1 - \\mathrm{Var}(E[Y \\mid X_{\\sim G}]) / \\mathrm{Var}(Y)`
+      — that plus every interaction with parameters outside the group.
+
+    Two properties make this a genuine decomposition, and both are checked in
+    :meth:`violations`: the first-order group indices sum to at most 1, and
+    :attr:`interactions` — the remainder — is the share of variance carried by
+    interactions *between* groups. Nothing is assumed to be additive.
+
+    This replaces an earlier diagnostic that ran one group at a time with the
+    others pinned at their nominal values and divided the resulting variances by
+    the joint variance. That ratio is not a Sobol' index and does not decompose
+    the variance of a non-additive model; it is retained, renamed, as a
+    screening statistic only.
+    """
+
+    output: str
+    groups: list[str]
+    members: dict[str, list[str]]
+    n_base: int
+    n_evaluations: int
+    seed: int
+    s: list[IndexEstimate] = field(default_factory=list)
+    st: list[IndexEstimate] = field(default_factory=list)
+    variance: float = 0.0
+    mean: float = 0.0
+    dropped_rows: int = 0
+    runtime_s: float = 0.0
+    bootstrap: int = DEFAULT_BOOTSTRAP
+
+    @property
+    def first_order_sum(self) -> float:
+        return float(sum(e.value for e in self.s))
+
+    @property
+    def interactions(self) -> float:
+        """Share of variance carried by interactions *between* groups."""
+        return 1.0 - self.first_order_sum
+
+    def by_group(self) -> dict[str, tuple[IndexEstimate, IndexEstimate]]:
+        return {g: (s, st) for g, s, st in zip(self.groups, self.s, self.st)}
+
+    def violations(self, tol: float = INDEX_TOLERANCE) -> list[str]:
+        """Point estimates that are impossible for a group decomposition."""
+        out = []
+        for g, s, st in zip(self.groups, self.s, self.st):
+            if s.value < -tol:
+                out.append(f"S[{g}]={s.value:.3f} < 0")
+            if s.value > 1 + tol:
+                out.append(f"S[{g}]={s.value:.3f} > 1")
+            if s.value > st.value + tol:
+                out.append(f"S[{g}]={s.value:.3f} > ST[{g}]={st.value:.3f}")
+        if self.first_order_sum > 1 + tol:
+            out.append(f"sum of first-order group indices = "
+                       f"{self.first_order_sum:.3f} > 1")
+        if sum(e.value for e in self.st) < 1 - tol:
+            out.append("sum of total-order group indices < 1")
+        return out
+
+
+def analyze_groups(
+    parameters: Sequence[Parameter],
+    model: Callable[[np.ndarray], np.ndarray],
+    n_base: int,
+    seed: int,
+    output_name: str = "output",
+    bootstrap: int = DEFAULT_BOOTSTRAP,
+    group_order: Sequence[str] | None = None,
+) -> GroupSobolResult:
+    """Sobol' decomposition over the partition induced by ``Parameter.group``.
+
+    Costs ``n_base * (n_groups + 2)`` model evaluations, against
+    ``n_base * (k + 2)`` for the per-parameter analysis, so with three groups it
+    is far cheaper than the full per-parameter run and answers a different,
+    coarser question.
+    """
+    t0 = time.perf_counter()
+    k = len(parameters)
+    names = [p.group or "ungrouped" for p in parameters]
+    order = list(group_order) if group_order else []
+    for g in names:
+        if g not in order:
+            order.append(g)
+    blocks = [[i for i, g in enumerate(names) if g == grp] for grp in order]
+    members = {grp: [parameters[i].name for i in cols] for grp, cols in zip(order, blocks)}
+
+    A_u, B_u, AB_u = saltelli_matrices(k, n_base, seed, blocks=blocks)
+
+    def to_real(U: np.ndarray) -> np.ndarray:
+        X = np.empty_like(U)
+        for i, p in enumerate(parameters):
+            X[:, i] = p.map_unit(U[:, i])
+        return X
+
+    fA = _evaluate(model, to_real(A_u))
+    fB = _evaluate(model, to_real(B_u))
+    fAB = np.column_stack([_evaluate(model, to_real(M)) for M in AB_u])
+
+    finite = np.isfinite(fA) & np.isfinite(fB) & np.all(np.isfinite(fAB), axis=1)
+    dropped = int((~finite).sum())
+    fA, fB, fAB = fA[finite], fB[finite], fAB[finite]
+    if fA.size < 8:
+        raise ValueError(
+            f"only {fA.size} finite rows remain out of {n_base}; the model is failing "
+            "over most of the sampled space"
+        )
+
+    s, st, var = _indices(fA, fB, fAB)
+    s_lo, s_hi, st_lo, st_hi = _bootstrap_ci(fA, fB, fAB, bootstrap, seed)
+
+    return GroupSobolResult(
+        output=output_name,
+        groups=order,
+        members=members,
+        n_base=n_base,
+        n_evaluations=n_base * (len(order) + 2),
+        seed=seed,
+        s=[IndexEstimate(g, float(v), float(lo), float(hi))
+           for g, v, lo, hi in zip(order, s, s_lo, s_hi)],
+        st=[IndexEstimate(g, float(v), float(lo), float(hi))
+            for g, v, lo, hi in zip(order, st, st_lo, st_hi)],
+        variance=var,
+        mean=float(np.mean(np.concatenate([fA, fB]))),
+        dropped_rows=dropped,
+        runtime_s=time.perf_counter() - t0,
+        bootstrap=bootstrap,
+    )
+
+
+# --------------------------------------------------------------------------
 # Synthetic benchmarks with known analytical indices
 # --------------------------------------------------------------------------
 
@@ -351,6 +502,143 @@ BENCHMARKS: list[Callable[[], Benchmark]] = [
     additive_linear,
     interaction_only,
 ]
+
+
+# --------------------------------------------------------------------------
+# Synthetic benchmarks for the GROUP estimator
+#
+# The per-parameter benchmarks above do not exercise :func:`analyze_groups`:
+# that estimator swaps a whole block of columns at a time, and its headline
+# quantity - the remainder, i.e. the variance carried by interactions BETWEEN
+# groups - has no per-parameter analogue. It is the grey bar of the group
+# decomposition figure, so it needs a case where its exact value is known and
+# non-zero.
+# --------------------------------------------------------------------------
+
+@dataclass
+class GroupBenchmark:
+    """A test function whose *group* Sobol' indices are known in closed form."""
+
+    name: str
+    parameters: list[Parameter]
+    model: Callable[[np.ndarray], np.ndarray]
+    groups: list[str]
+    s_exact: list[float]
+    st_exact: list[float]
+    description: str = ""
+
+    @property
+    def interactions_exact(self) -> float:
+        """Exact share of variance carried by interactions between groups."""
+        return 1.0 - float(sum(self.s_exact))
+
+
+def group_interaction_inside() -> GroupBenchmark:
+    """``f = x1 x2 + 3 x3`` on U(0,1)^3, groups ``{x1,x2}`` and ``{x3}``.
+
+    The interaction sits *inside* G1, so a group index must absorb it: with
+    Var(x1x2) = 7/144 and Var(3x3) = 3/4, S[G1] = 7/115 and S[G2] = 108/115,
+    the two sum to exactly 1 and the between-group remainder is exactly 0. A
+    per-parameter analysis cannot produce this - it splits the x1x2 term across
+    two inputs and leaves an interaction residual behind - so the case
+    distinguishes a genuine group estimator from a sum of per-parameter indices.
+    """
+    v1, v2 = 7 / 144, 3 / 4
+    total = v1 + v2
+    s = [v1 / total, v2 / total]
+
+    def model(X: np.ndarray) -> np.ndarray:
+        return X[:, 0] * X[:, 1] + 3.0 * X[:, 2]
+
+    params = [Parameter("x1", 0.0, 1.0, group="G1"),
+              Parameter("x2", 0.0, 1.0, group="G1"),
+              Parameter("x3", 0.0, 1.0, group="G2")]
+    return GroupBenchmark(
+        "group_interaction_inside", params, model, ["G1", "G2"], s, list(s),
+        "interaction inside a group; group indices sum to 1, remainder exactly 0")
+
+
+def group_interaction_between() -> GroupBenchmark:
+    """``f = x1 + x2 x3`` on U(0,1)^3, groups ``{x1,x2}`` and ``{x3}``.
+
+    Here the interaction straddles the partition, so the remainder is exactly
+    non-zero and the estimator has to find it. Var(Y) = 19/144;
+    S[G1] = 15/19, S[G2] = 3/19, ST[G1] = 16/19, ST[G2] = 4/19, and the
+    between-group share is exactly 1/19 = 0.0526. This is the quantity reported
+    as the grey remainder in the group decomposition, so it is validated here
+    rather than assumed.
+    """
+    var_y = 19 / 144
+    s = [(15 / 144) / var_y, (3 / 144) / var_y]
+    st = [1.0 - s[1], 1.0 - s[0]]
+
+    def model(X: np.ndarray) -> np.ndarray:
+        return X[:, 0] + X[:, 1] * X[:, 2]
+
+    params = [Parameter("x1", 0.0, 1.0, group="G1"),
+              Parameter("x2", 0.0, 1.0, group="G1"),
+              Parameter("x3", 0.0, 1.0, group="G2")]
+    return GroupBenchmark(
+        "group_interaction_between", params, model, ["G1", "G2"], s, st,
+        "interaction between groups; exact remainder 1/19 = 0.0526")
+
+
+GROUP_BENCHMARKS: list[Callable[[], GroupBenchmark]] = [
+    group_interaction_inside,
+    group_interaction_between,
+]
+
+
+@dataclass
+class GroupBenchmarkOutcome:
+    benchmark: str
+    n_base: int
+    seed: int
+    groups: list[str]
+    members: dict[str, list[str]]
+    s_exact: list[float]
+    st_exact: list[float]
+    interactions_exact: float
+    result: GroupSobolResult
+    description: str = ""
+
+    @property
+    def s_abs_error(self) -> list[float]:
+        return [abs(e.value - x) for e, x in zip(self.result.s, self.s_exact)]
+
+    @property
+    def st_abs_error(self) -> list[float]:
+        return [abs(e.value - x) for e, x in zip(self.result.st, self.st_exact)]
+
+    @property
+    def interactions_abs_error(self) -> float:
+        return abs(self.result.interactions - self.interactions_exact)
+
+    @property
+    def max_abs_error(self) -> float:
+        return max(self.s_abs_error + self.st_abs_error
+                   + [self.interactions_abs_error])
+
+
+def run_group_benchmark(
+    benchmark: GroupBenchmark, n_base: int, seed: int,
+    bootstrap: int = DEFAULT_BOOTSTRAP,
+) -> GroupBenchmarkOutcome:
+    res = analyze_groups(benchmark.parameters, benchmark.model, n_base, seed,
+                         output_name=benchmark.name, bootstrap=bootstrap,
+                         group_order=benchmark.groups)
+    return GroupBenchmarkOutcome(
+        benchmark=benchmark.name,
+        n_base=n_base,
+        seed=seed,
+        groups=list(benchmark.groups),
+        members=dict(res.members),
+        s_exact=list(benchmark.s_exact),
+        st_exact=list(benchmark.st_exact),
+        interactions_exact=benchmark.interactions_exact,
+        result=res,
+        description=benchmark.description,
+    )
 
 
 @dataclass

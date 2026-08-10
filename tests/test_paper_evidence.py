@@ -318,3 +318,134 @@ def test_common_accounting_profile_is_actually_applied(dataset):
     # and it must not touch prices
     assert harmonized.economics.nitrogen_price == scn.economics.nitrogen_price
     del replace
+
+
+# --------------------------------------------------------------------------
+# Group-wise Sobol' decomposition (replaces the pinned conditional-variance
+# ratios as the decomposition the paper reports)
+# --------------------------------------------------------------------------
+
+def test_group_sobol_recovers_a_known_partition():
+    """Two groups, one with an interaction INSIDE it, and no interaction between.
+
+    Y = x1*x2 + 3*x3, groups {x1,x2} and {x3}. Var(x1x2) = 7/144, Var(3x3) = 3/4,
+    the groups are independent, so S[G1] and S[G2] are the exact variance shares
+    and the between-group interaction is zero. A per-parameter analysis would
+    NOT give this: it would split the x1*x2 term across two parameters and leave
+    an interaction residual behind.
+    """
+    from algametrix.paper.sobol import Parameter, analyze_groups
+
+    def model(X):
+        return X[:, 0] * X[:, 1] + 3.0 * X[:, 2]
+
+    ps = [Parameter("x1", 0, 1, group="G1"),
+          Parameter("x2", 0, 1, group="G1"),
+          Parameter("x3", 0, 1, group="G2")]
+    r = analyze_groups(ps, model, 4096, 20260801, "Y", bootstrap=100)
+
+    v1, v2 = 7 / 144, 0.75
+    total = v1 + v2
+    got = r.by_group()
+    assert got["G1"][0].value == pytest.approx(v1 / total, abs=0.02)
+    assert got["G2"][0].value == pytest.approx(v2 / total, abs=0.02)
+    assert r.interactions == pytest.approx(0.0, abs=0.02)
+    assert not r.violations()
+    # A group's total index is at least its first-order index. For a model that
+    # is additive in the groups the two are EQUAL, and S and ST come from two
+    # different estimators (Saltelli and Jansen), so they agree only up to
+    # Monte-Carlo error - the tolerance is sampling noise, not slack.
+    for g, (s, st) in got.items():
+        assert st.value >= s.value - 0.01, g
+
+
+def test_group_estimator_benchmarks_recover_the_exact_remainder():
+    """The published group-estimator validation, asserted at its own tolerance.
+
+    ``test_group_sobol_recovers_a_known_partition`` above covers the estimator.
+    This one covers the *reportable* benchmarks: they are what
+    ``results/sobol_validation.txt`` prints, so a change that broke their exact
+    values would ship a wrong validation table rather than fail a test.
+    """
+    from algametrix.paper import sobol
+
+    for factory in sobol.GROUP_BENCHMARKS:
+        o = sobol.run_group_benchmark(factory(), 2048, 20260801, bootstrap=100)
+        assert o.max_abs_error <= 0.02, o.benchmark
+        assert not o.result.violations(), o.benchmark
+        # The remainder has no per-parameter analogue and is the quantity the
+        # figure reports, so it is asserted separately rather than folded into
+        # max_abs_error alone.
+        assert o.interactions_abs_error <= 0.02, o.benchmark
+
+    inside, between = (f() for f in sobol.GROUP_BENCHMARKS)
+    assert inside.interactions_exact == pytest.approx(0.0, abs=1e-12)
+    assert between.interactions_exact == pytest.approx(1 / 19, abs=1e-12)
+
+
+def test_group_sobol_first_order_indices_do_not_exceed_one():
+    """The property that makes it a decomposition, asserted on the real engine."""
+    from algametrix.library import load_library
+    from algametrix.paper import archetypes, parameters
+    from algametrix.paper.evaluate import make_model, sobol_parameters
+    from algametrix.paper.sobol import analyze_groups
+
+    lib = load_library()
+    scn = archetypes.build("open_raceway_pond", lib)
+    params = parameters.mode_parameters(parameters.MODE_B_FULL_DECISION, scn)
+    r = analyze_groups(sobol_parameters(scn, params),
+                       make_model(scn, params, "GWP net (kg CO2-eq/kg)"),
+                       512, 20260801, "GWP net (kg CO2-eq/kg)", bootstrap=50,
+                       group_order=list(parameters.GROUPS))
+    assert r.first_order_sum <= 1.05
+    assert sum(e.value for e in r.st) >= 0.95
+    # Prices cannot move a GWP: the economic group must contribute nothing.
+    assert r.by_group()["economic"][1].value == pytest.approx(0.0, abs=1e-9)
+
+
+def test_excluded_records_leave_every_population_but_stay_countable():
+    """An exclusion must be visible, not silent, and must not block a builder."""
+    from algametrix.paper import reproduction, studies
+
+    ds = studies.default_dataset()
+    excluded = reproduction.excluded_rows(ds)
+    assert {"astaxanthin", "phycocyanin"} <= set(excluded)
+    for sid, reason in excluded.items():
+        assert reason and reason != "no reason recorded", sid
+        rec = ds.by_id(sid)
+        assert not rec.is_included
+        assert not rec.is_executable          # no comparison may be produced
+    # ... but they are not reported as missing scenario definitions, because the
+    # builders are present and still run.
+    assert not (set(excluded) & set(reproduction.blocked_rows(ds)))
+
+
+def test_a_gwp_comparison_is_refused_when_the_convention_is_unknown_and_material():
+    """The convention gate, exercised on a synthetic record.
+
+    Mirrors the currency rule: a percentage between two different carbon
+    conventions is not a deviation, so the row is refused rather than printed.
+    """
+    from copy import deepcopy
+    from algametrix.library import load_library
+    from algametrix.paper import reproduction, studies
+
+    ds = studies.default_dataset()
+    rec = deepcopy(ds.by_id("gwp_iceland_spirulina"))
+    rec.biogenic_carbon_convention = None
+    rec.reported_gwp_gross = None            # nothing convention-free to fall back on
+    row = reproduction.gwp_row(rec, load_library())
+    assert row.comparison_kind == "not_comparable"
+    assert row.model is None
+    assert any("NOT COMPARABLE" in n for n in row.notes)
+
+
+def test_an_immaterial_adjustment_does_not_block_the_comparison():
+    """A heterotrophic case with no biogenic adjustment stays comparable."""
+    from algametrix.library import load_library
+    from algametrix.paper import reproduction, studies
+
+    row = reproduction.gwp_row(
+        studies.default_dataset().by_id("mckuin_schizo"), load_library())
+    assert row.comparison_kind == "point"
+    assert any("immaterial" in n for n in row.notes)

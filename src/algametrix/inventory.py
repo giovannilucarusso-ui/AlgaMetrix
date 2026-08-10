@@ -60,6 +60,20 @@ class Inventory:
     substrate_co2_supplied_per_kg: float = 0.0
     # Inorganic carbon supplied to the culture, expressed as CO2 (CO2 gas or NaHCO3).
     inorganic_co2_supplied_per_kg: float = 0.0
+    # Carbon in the GROSS biomass cultivated, expressed as CO2 - i.e. including
+    # the biomass that harvesting loses. ``biogenic_co2_in_product_per_kg`` is
+    # the same quantity after those losses.
+    biogenic_co2_in_gross_biomass_per_kg: float = 0.0
+    # Substrate carbon NOT incorporated into biomass, expressed as CO2: what a
+    # heterotrophic culture respires. Reported, never summed. Under the biogenic
+    # 0/0 convention this carbon enters as biogenic substrate carbon and leaves
+    # as biogenic CO2, so both sides are excluded from the GWP - the same
+    # treatment ``substrate_co2_supplied_per_kg`` already receives. It is
+    # computed so the carbon balance can be *stated* rather than assumed, and it
+    # is signed: a negative value means more carbon leaves in the biomass than
+    # entered with the substrate, which is physically impossible and is what
+    # :func:`algametrix.verification.verify` tests for.
+    biogenic_co2_respired_per_kg: float = 0.0
     batches_per_year: float = 0.0     # 0 in continuous mode
     batch_product_kg: float = 0.0     # final product per batch (batch mode)
     elec_breakdown: dict = field(default_factory=dict)  # kWh/kg by stage
@@ -190,6 +204,14 @@ def build_inventory(scenario: Scenario) -> Inventory:
     biogenic_co2_in_product = org.carbon * CO2_PER_C
     substrate_co2_supplied = substrate * SUBSTRATE_CARBON_FRACTION * CO2_PER_C
     inorganic_co2_supplied = co2_supply + bicarbonate_supply * (12.011 / 84.007) * CO2_PER_C
+    # Carbon into the gross biomass cultivated, and - for a heterotroph - the
+    # substrate carbon left over, which is respired. For a phototroph the carbon
+    # entering the biomass IS the carbon fixed, so there is no residual to
+    # report: the model works on a net-fixation basis and does not resolve gross
+    # photosynthesis from respiration.
+    biogenic_co2_in_gross_biomass = org.carbon * gross_per_product * CO2_PER_C
+    respired_co2 = (substrate_co2_supplied - biogenic_co2_in_gross_biomass
+                    if substrate > 0 else 0.0)
 
     # --- land occupation --------------------------------------------------
     land_m2a = total_land_m2 / annual_kg if annual_kg > 0 else 0.0
@@ -212,6 +234,8 @@ def build_inventory(scenario: Scenario) -> Inventory:
         biogenic_co2_in_product_per_kg=biogenic_co2_in_product,
         substrate_co2_supplied_per_kg=substrate_co2_supplied,
         inorganic_co2_supplied_per_kg=inorganic_co2_supplied,
+        biogenic_co2_in_gross_biomass_per_kg=biogenic_co2_in_gross_biomass,
+        biogenic_co2_respired_per_kg=respired_co2,
         batches_per_year=batches_per_year,
         batch_product_kg=batch_product_kg,
         elec_breakdown={
