@@ -28,7 +28,7 @@
   "task_6_uncertainty_decomposition": "pass",
   "task_7_study_audit": "pass",
   "task_8_biogenic_carbon": "pass",
-  "tests_passed": 361,
+  "tests_passed": 369,
   "tests_failed": 0,
   "notes": [
     "0 declared Tier-B studies have no scenario builder in the repository.",

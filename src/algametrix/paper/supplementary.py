@@ -47,8 +47,8 @@ from pathlib import Path
 #: :func:`build` checks the claim against the files it actually embedded.
 PRINT_WIDTH = 200
 
-#: Marker that separates the flow-by-flow recovery (S1) from the controlled
-#: counter-examples (S2) inside one generated report.
+#: Marker that separates the flow-by-flow recovery (S2) from the controlled
+#: counter-examples (S3) inside one generated report.
 COUNTEREXAMPLE_MARKER = "CONTROLLED COUNTER-EXAMPLE"
 
 
@@ -77,7 +77,7 @@ def _versions(results_dir: Path | None = None) -> dict[str, str]:
     """Versions of everything a number in this SI could depend on.
 
     Brightway is a special case and has to be, or the table contradicts the
-    document: the cross-check in S6 deliberately runs in its own environment,
+    document: the cross-check in S7 deliberately runs in its own environment,
     because bw2calc pulls in around thirty packages the engine does not need.
     When it is absent here, the version that produced the embedded result is
     read out of that result rather than reported as missing.
@@ -99,7 +99,7 @@ def _versions(results_dir: Path | None = None) -> dict[str, str]:
         if payload.exists():
             got = json.loads(payload.read_text(encoding="utf-8")).get("bw2calc_version")
             if got:
-                out["bw2calc"] = f"{got} (separate environment; see S6.2)"
+                out["bw2calc"] = f"{got} (separate environment; see S7.2)"
     return out
 
 
@@ -325,8 +325,9 @@ def build(run, outdir: Path, results_dir: Path, root: Path,
     the console: an SI assembled from a partial run has to say so where a reader
     will see it.
     """
-    from . import archetypes, parameters
+    from . import archetypes, parameters, specification, suite
 
+    spec_cases, _ = suite.distinct_cases(run.lib)
     docs = docs_dir or (root / "docs")
     data_dir = outdir / "data"
     outdir.mkdir(parents=True, exist_ok=True)
@@ -384,7 +385,7 @@ def build(run, outdir: Path, results_dir: Path, root: Path,
         "listed here. The claim is deliberately not stated as byte-identity: the "
         "Sobol' validation and convergence reports print wall-clock timings, which "
         "differ between runs and are diagnostics rather than results. Every other file "
-        "listed in S7.4 is byte-identical across runs.",
+        "listed in S8.4 is byte-identical across runs.",
         "",
         "### Provenance of this build",
         "",
@@ -412,8 +413,8 @@ def build(run, outdir: Path, results_dir: Path, root: Path,
         "",
         "**Verification** asks whether the software is self-consistent and whether "
         "independent implementations of it agree. **Validation** asks whether it "
-        "reproduces something published. Sections S1, S2, S4 and S6 are verification; "
-        "only S3 is validation, and it is much weaker evidence. The two are never "
+        "reproduces something published. Sections S2, S3, S5 and S7 are verification; "
+        "only S4 is validation, and it is much weaker evidence. The two are never "
         "pooled, and no verification result in this document is offered as evidence "
         "that the model is right.",
         "",
@@ -421,23 +422,31 @@ def build(run, outdir: Path, results_dir: Path, root: Path,
         "",
         "| Section | Content |",
         "|---|---|",
-        "| S1 | Verification suite and flow-by-flow TEA/LCA recovery, 26 scenarios |",
-        "| S2 | Controlled duplicated-foreground counter-examples, both archetypes |",
-        "| S3 | External validation: protocol, price basis, carbon accounting, "
+        "| S1 | Model specification: symbols, governing equations, assumptions |",
+        "| S2 | Verification suite and flow-by-flow TEA/LCA recovery, 26 scenarios |",
+        "| S3 | Controlled duplicated-foreground counter-examples, both archetypes |",
+        "| S4 | External validation: protocol, price basis, carbon accounting, "
         "exclusions, failed range check |",
-        "| S4 | Global sensitivity: estimator and group-estimator validation, "
+        "| S5 | Global sensitivity: estimator and group-estimator validation, "
         "convergence, full Sobol' tables |",
-        "| S5 | Monte-Carlo uncertainty: input distributions and full P10/P50/P90 |",
-        "| S6 | LCA implementation cross-checks: sequential vs matrix vs Brightway |",
-        "| S7 | Machine-readable dataset, parameter provenance, software map, manifest |",
+        "| S6 | Monte-Carlo uncertainty: input distributions and full P10/P50/P90 |",
+        "| S7 | LCA implementation cross-checks: sequential vs matrix vs Brightway |",
+        "| S8 | Machine-readable dataset, parameter provenance, software map, manifest |",
         "",
         "---",
         "",
     ]
 
     # ---- S1 ----------------------------------------------------------
+    # The specification comes before the evidence: a reader cannot judge whether
+    # a residual matters without knowing what equation produced it.
+    L += ["## S1 Model specification", ""]
+    L += specification.render_markdown(run.lib, spec_cases)
+    L += ["---", ""]
+
+    # ---- S2 ----------------------------------------------------------
     L += [
-        "## S1 Verification suite and flow-by-flow recovery",
+        "## S2 Verification suite and flow-by-flow recovery",
         "",
         "```bash",
         "python reproduce.py --only verification --only consistency",
@@ -447,9 +456,9 @@ def build(run, outdir: Path, results_dir: Path, root: Path,
         "results describe the same population: 34 members, **26 structurally "
         "distinct**, because several members build an identical `Scenario` by "
         "different routes and are counted once rather than inflating the evidence "
-        "base. The coverage table at the head of S1.2 states what those 26 span.",
+        "base. The coverage table at the head of S2.2 states what those 26 span.",
         "",
-        "S1.1 reports two families of check that are not equally strong evidence. The "
+        "S2.1 reports two families of check that are not equally strong evidence. The "
         "**construction identities** restate each inventory field as a closed form of "
         "the scenario, written independently of `inventory.py`, and compare the two. "
         "They hold *by construction*: `build_inventory` derives the nitrogen supply as "
@@ -466,7 +475,7 @@ def build(run, outdir: Path, results_dir: Path, root: Path,
         "respired; it is reported per scenario and is not summed into the GWP, under "
         "the same biogenic 0/0 convention the substrate carbon already receives.",
         "",
-        "S1.2 asks a different question again: `run_scenario` builds one `Inventory` "
+        "S2.2 asks a different question again: `run_scenario` builds one `Inventory` "
         "and hands the *same "
         "object* to `run_tea` and `run_lca`, so agreement between them is an "
         "architectural invariant rather than an empirical finding — but sharing an "
@@ -479,19 +488,19 @@ def build(run, outdir: Path, results_dir: Path, root: Path,
         "inventory, so a re-basing between the two would also appear.",
         "",
     ]
-    L += _embed("S1.1 Construction identities and physical admissibility, per scenario",
+    L += _embed("S2.1 Construction identities and physical admissibility, per scenario",
                 results_dir / "verification.txt", root, manifest)
-    L += _embed("S1.2 Flow-by-flow TEA/LCA recovery, per scenario",
+    L += _embed("S2.2 Flow-by-flow TEA/LCA recovery, per scenario",
                 results_dir / "shared_inventory_consistency.txt", root, manifest,
                 text=recovery_text,
                 note="*The controlled counter-examples that close this report are "
                      "reproduced separately in S2.*")
 
-    # ---- S2 ----------------------------------------------------------
+    # ---- S3 ----------------------------------------------------------
     L += [
         "---",
         "",
-        "## S2 Controlled duplicated-foreground counter-examples",
+        "## S3 Controlled duplicated-foreground counter-examples",
         "",
         "A verification that always passes proves nothing unless the check can fail. "
         "The two cases below are that demonstration, run **on this engine against "
@@ -511,17 +520,17 @@ def build(run, outdir: Path, results_dir: Path, root: Path,
         "a different plant.",
         "",
     ]
-    L += _embed("S2 Duplicated-inventory drift, phototrophic and heterotrophic",
+    L += _embed("S3 Duplicated-inventory drift, phototrophic and heterotrophic",
                 results_dir / "shared_inventory_consistency.txt", root, manifest,
                 text=counterexample_text,
-                note="*Extracted from the same generated report as S1.2; the hash below "
+                note="*Extracted from the same generated report as S2.2; the hash below "
                      "is that of the whole file.*")
 
-    # ---- S3 ----------------------------------------------------------
+    # ---- S4 ----------------------------------------------------------
     L += [
         "---",
         "",
-        "## S3 External validation",
+        "## S4 External validation",
         "",
         "```bash",
         "python reproduce.py --only reproductions --only carbon",
@@ -548,25 +557,25 @@ def build(run, outdir: Path, results_dir: Path, root: Path,
         "",
     ]
     for title, path in (
-        ("S3.1 Validation protocol and classification", docs / "VALIDATION.md"),
-        ("S3.2 Price-basis notes", docs / "PRICE_BASIS.md"),
-        ("S3.3 Carbon-accounting notes", docs / "CARBON_ACCOUNTING.md"),
+        ("S4.1 Validation protocol and classification", docs / "VALIDATION.md"),
+        ("S4.2 Price-basis notes", docs / "PRICE_BASIS.md"),
+        ("S4.3 Carbon-accounting notes", docs / "CARBON_ACCOUNTING.md"),
     ):
         L += _embed(title, path, root, manifest)
-    L += _embed("S3.4 Carbon accounting under each convention, per scenario",
+    L += _embed("S4.4 Carbon accounting under each convention, per scenario",
                 results_dir / "carbon_accounting.txt", root, manifest)
-    L += _embed("S3.5 Full comparison table, exclusions and the failed range check",
+    L += _embed("S4.5 Full comparison table, exclusions and the failed range check",
                 results_dir / "validation.txt", root, manifest,
                 note="*The range check is reported here and nowhere else in the "
                      "manuscript as a point prediction: it is a plausibility check, it "
                      "fell outside its published envelope, and it was retained rather "
                      "than removed.*")
 
-    # ---- S4 ----------------------------------------------------------
+    # ---- S5 ----------------------------------------------------------
     L += [
         "---",
         "",
-        "## S4 Global sensitivity",
+        "## S5 Global sensitivity",
         "",
         "```bash",
         "python reproduce.py --only sobol",
@@ -575,11 +584,11 @@ def build(run, outdir: Path, results_dir: Path, root: Path,
         "Sobol' indices are only worth reporting if the estimator that produced them "
         "has been shown to recover indices that are known in closed form, and if the "
         "sample size has been shown to be large enough that the ranking is not an "
-        "artefact of it. S4.1 and S4.2 are those two demonstrations; S4.3 is the "
-        "result. The pipeline refuses to draw the sensitivity figure at all if S4.1 "
+        "artefact of it. S5.1 and S5.2 are those two demonstrations; S5.3 is the "
+        "result. The pipeline refuses to draw the sensitivity figure at all if S5.1 "
         "does not pass.",
         "",
-        "S4.1 covers **two different estimators**. The per-parameter estimator is "
+        "S5.1 covers **two different estimators**. The per-parameter estimator is "
         "checked against three analytical functions, and additionally against SALib "
         "where it is installed. The **group** estimator is checked separately, because "
         "its headline quantity — the share of variance carried by interactions "
@@ -589,12 +598,12 @@ def build(run, outdir: Path, results_dir: Path, root: Path,
         "exactly 1/19 in the other.",
         "",
     ]
-    L += _embed("S4.1 Estimator validation: analytical benchmarks, SALib cross-check, "
+    L += _embed("S5.1 Estimator validation: analytical benchmarks, SALib cross-check, "
                 "and group-estimator validation",
                 results_dir / "sobol_validation.txt", root, manifest)
-    L += _embed("S4.2 Convergence diagnostics and the declared acceptance criteria",
+    L += _embed("S5.2 Convergence diagnostics and the declared acceptance criteria",
                 results_dir / "sobol_convergence.txt", root, manifest)
-    L += _embed("S4.3 Full first- and total-order tables with bootstrap 95% CIs",
+    L += _embed("S5.3 Full first- and total-order tables with bootstrap 95% CIs",
                 results_dir / "sensitivity.txt", root, manifest,
                 note="*Two parameter modes are reported. Mode A restricts every output "
                      "to the same shared physical parameter set, so the TEA and LCA "
@@ -603,11 +612,11 @@ def build(run, outdir: Path, results_dir: Path, root: Path,
                      "that assignment and are not evidence that one physical driver "
                      "matters more than another.*")
 
-    # ---- S5 ----------------------------------------------------------
+    # ---- S6 ----------------------------------------------------------
     L += [
         "---",
         "",
-        "## S5 Monte-Carlo uncertainty",
+        "## S6 Monte-Carlo uncertainty",
         "",
         "```bash",
         "python reproduce.py --only uncertainty",
@@ -621,7 +630,7 @@ def build(run, outdir: Path, results_dir: Path, root: Path,
         "same supports. The two therefore share supports, not distributions, and their "
         "numbers are not interchangeable.",
         "",
-        "No range in S5.1 is presented as an empirical distribution, because none of "
+        "No range in S6.1 is presented as an empirical distribution, because none of "
         "them is. The `evidence_quality` column is the one to read first: "
         "`derived_from_repository` marks a range already declared in the tool and cited "
         "as such, `scenario_assumption` marks a first-order band with no evidence "
@@ -630,12 +639,12 @@ def build(run, outdir: Path, results_dir: Path, root: Path,
         "switched off, because no correlation data exist for these systems. That too is "
         "an assumption, not a finding.",
         "",
-        f"The machine-readable form of S5.1 is `data/parameter_provenance.csv` "
+        f"The machine-readable form of S6.1 is `data/parameter_provenance.csv` "
         f"({len(params)} rows: every parameter against every archetype, with the "
         "support actually sampled after physical clipping).",
         "",
     ]
-    L += _embed("S5.1–S5.2 Input distributions with provenance, and complete "
+    L += _embed("S6.1–S6.2 Input distributions with provenance, and complete "
                 "P10/P50/P90 outputs by source of uncertainty",
                 results_dir / "uncertainty.txt", root, manifest,
                 note="*The report carries both the quantile bands and the group Sobol' "
@@ -644,11 +653,11 @@ def build(run, outdir: Path, results_dir: Path, root: Path,
                      "printed alongside are screening statistics, not a variance "
                      "decomposition, and are labelled as such in the report itself.*")
 
-    # ---- S6 ----------------------------------------------------------
+    # ---- S7 ----------------------------------------------------------
     L += [
         "---",
         "",
-        "## S6 LCA implementation cross-checks",
+        "## S7 LCA implementation cross-checks",
         "",
         "```bash",
         "python reproduce.py --only benchmark",
@@ -665,21 +674,21 @@ def build(run, outdir: Path, results_dir: Path, root: Path,
         "problem when it is not.",
         "",
     ]
-    L += _embed("S6.1 Sequential engine against an independent matrix implementation",
+    L += _embed("S7.1 Sequential engine against an independent matrix implementation",
                 results_dir / "lca_implementation_benchmark.txt", root, manifest)
-    L += _embed("S6.2 Matrix implementation against bw2calc",
+    L += _embed("S7.2 Matrix implementation against bw2calc",
                 results_dir / "brightway_crosscheck.txt", root, manifest,
                 note="*The machine-readable result, including every per-scenario "
                      "relative difference plotted in Figure 2b, is "
                      "`results/brightway_crosscheck.json`.*")
 
-    # ---- S7 ----------------------------------------------------------
+    # ---- S8 ----------------------------------------------------------
     L += [
         "---",
         "",
-        "## S7 Machine-readable data, parameter provenance and software map",
+        "## S8 Machine-readable data, parameter provenance and software map",
         "",
-        "### S7.1 Study dataset",
+        "### S8.1 Study dataset",
         "",
         f"`data/studies.csv` and `data/studies.json` carry all {len(studies)} records "
         "of the study dataset, one row each, with every field: identity and "
@@ -691,12 +700,12 @@ def build(run, outdir: Path, results_dir: Path, root: Path,
         "`data/studies/studies.yaml` in the software repository; these two files are "
         "flattened exports of it.",
         "",
-        "### S7.2 Sampled parameter supports and their provenance",
+        "### S8.2 Sampled parameter supports and their provenance",
         "",
-        f"`data/parameter_provenance.csv`, {len(params)} rows. See S5 for how to read "
+        f"`data/parameter_provenance.csv`, {len(params)} rows. See S6 for how to read "
         "the `evidence_quality` column.",
         "",
-        "### S7.3 Software module map",
+        "### S8.3 Software module map",
         "",
         "Every module behind a claim in this manuscript, with its own first docstring "
         "line as its summary — read out of the source at build time, so it cannot "
@@ -738,7 +747,7 @@ def build(run, outdir: Path, results_dir: Path, root: Path,
             "table."
         )
     L += [
-        "### S7.4 Manifest",
+        "### S8.4 Manifest",
         "",
         "`data/manifest.csv` lists every file embedded in this document and every file "
         "shipped alongside it, with its SHA-256, byte count, line count, longest line "
