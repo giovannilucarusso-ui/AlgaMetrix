@@ -49,11 +49,19 @@ Thumbs.db
 # and the three methodology notes in `docs/` are all tracked deliberately.
 # ---------------------------------------------------------------------------
 
+# The assembled Supplementary Information bundle. Its generator
+# (src/algametrix/paper/supplementary.py) and every input it embeds are tracked;
+# the bundle itself is not, because it is a byte-for-byte restatement of
+# results/ and docs/ and would double the repository's text for no added
+# checkability. `python reproduce.py --only supplementary` rebuilds it.
+/supplementary/
+
 # Manuscript drafts, revision reports and handoff bundles
 /paper_handoff/
 /revision_handoff/
 /revision_handoff_r2/
 /handoff_zip/
+/jie_handoff/
 /REVISION_REPORT.md
 /00_START_HERE.md
 *.zip
