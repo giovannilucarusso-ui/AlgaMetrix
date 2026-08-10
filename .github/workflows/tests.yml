@@ -33,6 +33,11 @@ jobs:
           python -m pip install numpy pandas PyYAML openpyxl matplotlib scipy pytest
 
       - name: Run the test suite
+        # Includes the shared-inventory consistency check and the independent
+        # matrix-LCA benchmark, both run over the full scenario suite. The
+        # Brightway cross-check is skipped here by design: bw2calc pulls in
+        # around thirty packages the engine does not need, so it runs from
+        # scripts/brightway_crosscheck.py in its own environment.
         run: python -m pytest tests -q
 
       - name: Smoke-test the bundled examples

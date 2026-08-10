@@ -5,9 +5,13 @@ abstract: >-
   Open-source techno-economic analysis (TEA) and life-cycle assessment (LCA)
   for microalgae, cyanobacteria and aquatic protist biomass. Both analyses are
   derived from a single shared mass and energy balance, so the economic and the
-  environmental results always describe the same process. Every organism,
-  cultivation system, price and characterization factor lives in editable,
-  citable YAML files.
+  environmental results always describe the same process. That property is
+  verified rather than asserted: the quantity of every shared physical flow is
+  recovered independently from the economic and from the environmental result
+  and the two are compared, and the impact calculation is benchmarked against an
+  independent matrix-formalism implementation. Every organism, cultivation
+  system, price and characterization factor lives in editable, citable YAML
+  files.
 type: software
 authors:
   - family-names: Russo
@@ -17,11 +21,13 @@ authors:
 repository-code: "https://github.com/giovannilucarusso-ui/AlgaMetrix"
 url: "https://github.com/giovannilucarusso-ui/AlgaMetrix"
 license: MIT
-version: 1.0.2
-date-released: "2026-08-04"
+version: 1.1.0
+date-released: "2026-08-07"
 # Concept DOI: resolves to the most recent archived release.
 doi: 10.5281/zenodo.21764183
 identifiers:
+  # No snapshot DOI is listed for 1.1.0: none exists until the GitHub release is
+  # cut and Zenodo mints one. Add it here at that point, never before.
   - type: doi
     value: 10.5281/zenodo.21797014
     description: "Archived snapshot of version 1.0.2"

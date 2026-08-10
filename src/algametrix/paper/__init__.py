@@ -13,9 +13,13 @@ than about a single scenario:
 * :mod:`carbon`          - biogenic-carbon accounting modes, gross vs net GWP
 * :mod:`gwp`             - GWP analysis populations
 * :mod:`archetypes`      - the archetypes used by the global-sensitivity work
+* :mod:`suite`           - the heterogeneous scenario set the verification runs over
+* :mod:`matrixlca`       - an independent, matrix-formalism LCA implementation
 * :mod:`sobol`           - Saltelli/Jansen Sobol estimators + benchmarks
 * :mod:`mcuncertainty`   - Monte-Carlo uncertainty by source group
-* :mod:`report`          - the ``results/*.txt`` writers
+* :mod:`report`          - the ``results/*.txt`` writers for the study audits
+* :mod:`report_verification` - the ``results/*.txt`` writers for the two
+  software-verification files
 
 The engine itself (``algametrix.inventory`` / ``tea`` / ``lca``) does not
 import anything from here: the evidence layer sits *on top of* the single shared
@@ -35,7 +39,10 @@ __all__ = [
     "carbon",
     "gwp",
     "archetypes",
+    "suite",
+    "matrixlca",
     "sobol",
     "mcuncertainty",
     "report",
+    "report_verification",
 ]

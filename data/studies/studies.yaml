@@ -526,8 +526,17 @@ studies:
   doi: 10.1007/s10811-025-03443-x
   publication_year: 2025
   data_location_in_source: null
-  eligibility_status: included
-  eligibility_reason: "Published cost envelope for food-grade C-phycocyanin."
+  eligibility_status: excluded
+  eligibility_reason: "Originally included as a published cost envelope for food-grade
+    C-phycocyanin."
+  exclusion_reason: "EXCLUDED 2026-08-07: the reported figures cannot be traced to the
+    cited source. The 283-544 EUR/kg range is attributed in the secondary literature to
+    Padi et al. (2023, Algal Research 74:103190), not to the cited 2025 paper, and the
+    reported 413 is the arithmetic MIDPOINT of 283 and 544 rather than a published point
+    value. A midpoint of an envelope is not an independent point prediction and must not
+    be compared as one. No price year is recorded either. Retained in the dataset with
+    this reason rather than deleted, so the exclusion is countable. Re-extract the point
+    and the envelope from whichever source actually publishes them."
   study_type: tea
   organism: Arthrospira platensis
   cultivation_system: open raceway pond
@@ -571,8 +580,17 @@ studies:
   doi: 10.1016/j.algal.2016.05.001
   publication_year: 2016
   data_location_in_source: null
-  eligibility_status: included
-  eligibility_reason: "Published cost envelope for astaxanthin from Haematococcus."
+  eligibility_status: excluded
+  eligibility_reason: "Originally included as a published cost envelope for astaxanthin
+    from Haematococcus."
+  exclusion_reason: "EXCLUDED 2026-08-07: the reported figures cannot be traced to the
+    cited source. Panis & Carreon (2016, Algal Research 18:175-190) report EUR 1536/kg
+    (Livadeia) and EUR 6403/kg (Amsterdam) for their best case; neither the 718 USD/kg
+    point nor the 500-1500 USD/kg envelope appears in it. The record additionally
+    conflates a market range with a cost model and carries no price year, so no
+    comparison against it was possible in any case. Retained in the dataset with this
+    reason rather than deleted, so the exclusion is countable. Re-extract from whichever
+    source actually publishes these numbers, or drop the record."
   study_type: tea
   organism: Haematococcus pluvialis
   cultivation_system: flat-panel PBR
@@ -615,10 +633,13 @@ studies:
        the numbers before this record is cited."
 
 - study_id: frontiers2026_spirulina
-  full_citation: "Frontiers in Sustainable Food Systems 2026 (organic Spirulina, Italy)"
+  full_citation: "Ahmed AEEMS et al. (2026). Organic Spirulina production, Italy.
+    Frontiers in Sustainable Food Systems 10:1763476."
   doi: 10.3389/fsufs.2026.1763476
   publication_year: 2026
-  data_location_in_source: null
+  data_location_in_source: "Impact assessment: baseline GWP 15.05 kg CO2-eq per kg dried
+    biomass, of which sodium bicarbonate 4.56 (about 30%), attributed to Solvay-process
+    production of the primary inorganic carbon source."
   eligibility_status: included
   eligibility_reason: "Published cradle-to-gate GWP for bicarbonate-fed Spirulina."
   study_type: lca
@@ -631,9 +652,11 @@ studies:
   functional_unit: 1 kg dry biomass
   system_boundary: cradle-to-gate
   environmental_endpoint_type: gwp_cradle_to_gate
-  reported_gwp: 15.0
+  reported_gwp: 15.05
   reported_gwp_unit: kg CO2-eq/kg dry biomass
-  biogenic_carbon_convention: null
+  reported_gwp_gross: 15.05
+  reported_biogenic_adjustment: 0.0
+  biogenic_carbon_convention: no_biogenic_credit
   published_gwp_available: true
   economic_endpoint_type: null
   reconstructability_tier: B
@@ -648,15 +671,30 @@ studies:
     - "The registered builder reconstructs the Padi et al. (2023) Scenario-I bicarbonate
        Spirulina plant, which the legacy work used as the reconstruction for this LCA;
        calibrated, not blind."
+    - "CONVENTION VERIFIED 2026-08-07 from the source: it does not discuss or apply a
+       biogenic-carbon credit, and the reported GWP is an operational-inputs figure with
+       no netting of photosynthetic uptake. Recorded as no_biogenic_credit. The engine
+       applies no credit to this scenario either, because the carbon arrives as NaHCO3
+       and the declared convention credits only carbon taken up as CO2, so the two sides
+       are on a MATCHED convention and gross equals net on both."
+    - "The source's boundary covers cultivation, harvesting, drying, packaging and energy
+       inputs. Infrastructure is acknowledged but not characterised as a distinct
+       contributor, so the boundary is close to the engine's but not identical."
   todos:
-    - "The paper's own biogenic-carbon convention is not recorded; needed before the
-       gross/net comparison can be attributed to the source rather than to AlgaMetrix."
+    - "Packaging is inside the source's boundary and outside the engine's. Quantify it
+       from the source's contribution analysis, or state the residual it leaves."
 
 - study_id: gwp_iceland_spirulina
-  full_citation: "Marine Biotechnology 24 (2022), Hellisheidi geothermal park, Iceland"
+  full_citation: "Tzachor A, Smidt-Jensen A, Ramel A, Geirsdottir M (2022).
+    Environmental impacts of large-scale Spirulina (Arthrospira platensis) production in
+    Hellisheidi geothermal park Iceland: life cycle assessment. Marine Biotechnology
+    24:991-1001. Correction: Mar Biotechnol 24 (2022), electricity per FU 137.9 -> 54.48 kWh."
   doi: 10.1007/s10126-022-10162-8
   publication_year: 2022
-  data_location_in_source: null
+  data_location_in_source: "LCA results: CO2-eq contributions listed as construction
+    materials 0.201, energy 0.460, nutrients 0.028, cleaning agent 0.004 (sum 0.693),
+    less CO2 biofixation -0.702, giving -0.008 kg CO2-eq per FU. FU = 1 kg edible
+    biomass at 61% water content."
   eligibility_status: included
   eligibility_reason: "Published cradle-to-gate GWP for LED-lit Spirulina on a geothermal grid."
   study_type: lca
@@ -669,9 +707,19 @@ studies:
   functional_unit: 1 kg dry biomass
   system_boundary: cradle-to-gate
   environmental_endpoint_type: gwp_cradle_to_gate
-  reported_gwp: -0.54
+  reported_gwp: -0.5385
   reported_gwp_unit: kg CO2-eq/kg dry biomass
-  biogenic_carbon_convention: null
+  reported_gwp_gross: 1.2615
+  reported_biogenic_adjustment: -1.8000
+  gwp_basis_conversion: "The source reports per kg WET biomass at 61% water content and
+    includes facility construction; the engine has no infrastructure term and works per
+    kg DRY. Operational gross per kg wet = 0.693 - 0.201 (construction) = 0.492; divided
+    by the 0.39 dry fraction gives 1.2615 per kg dry. The published biofixation credit
+    -0.702 per kg wet gives -1.800 per kg dry. Net = 1.2615 - 1.800 = -0.5385. Every
+    figure here is derived from the source's own published components by one declared
+    division; NONE of them is a value the source prints, so this row is a comparison
+    against a DERIVED quantity and is weaker than a comparison against a printed one."
+  biogenic_carbon_convention: source_specific_credit
   published_gwp_available: true
   economic_endpoint_type: null
   reconstructability_tier: B
@@ -687,11 +735,19 @@ studies:
        `m2-harmonization` (PR #1), where it was committed but never merged into main.
        Ported verbatim into paper/reconstructions.py; reproduces the published value."
     - "The paper reports per kg WET biomass including construction (-0.008); the engine has no
-       infrastructure term and works per kg DRY, so the comparison is per-kg-dry OPERATIONAL
-       (-0.54). Both are carbon-neutral."
-  todos:
-    - "A NET GWP below zero cannot be interpreted without the source's biogenic-carbon
-       convention and its gross value. Extract both."
+       infrastructure term and works per kg DRY, so the comparison is per-kg-dry OPERATIONAL.
+       See gwp_basis_conversion for the arithmetic."
+    - "CONVENTION VERIFIED 2026-08-07 from the source: it states that the carbon fixed by
+       Spirulina cells during cultivation contributes to the LCA and is regarded as negative,
+       -0.702 kg CO2-eq per kg biomass. That is a credit for CO2 taken up from the gas feed,
+       i.e. AlgaMetrix's source_specific_credit, which is the convention the engine applies
+       to this scenario. The two sides are therefore on a MATCHED convention, and the
+       convention-free gross comparison is available as well."
+    - "CORRECTION CHECKED 2026-08-07: the published correction changes the electricity per
+       functional unit from 137.9 to 54.48 kWh and nothing else. The reconstruction already
+       uses the corrected figure: 54.48 / 0.39 = 139.7 kWh per kg dry biomass, which is the
+       elec_kwh_per_kg in reconstructions._iceland_spirulina."
+  todos: []
 
 - study_id: spiralg2019
   full_citation: "Braud et al. 2025, Bioresource Technology Reports 29:102027 (SpiralG pilot, 2019 inventory)"

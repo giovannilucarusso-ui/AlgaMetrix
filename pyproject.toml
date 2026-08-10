@@ -32,6 +32,11 @@ dev = ["pytest>=8.0", "pyinstaller>=6.0"]
 # scrambled Sobol' sequences for the global sensitivity analysis, matplotlib the
 # figures. The engine itself needs neither.
 paper = ["scipy>=1.11", "matplotlib>=3.8"]
+# The optional third-party LCA cross-check (scripts/brightway_crosscheck.py).
+# Deliberately NOT in `paper`: bw2calc pulls in around thirty packages, and the
+# in-repository matrix implementation is the benchmark that runs in CI. Install
+# this in its own environment; see the script's docstring.
+benchmark = ["bw2calc>=2.0"]
 
 [project.scripts]
 algametrix = "desktop.app:main"

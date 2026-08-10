@@ -382,14 +382,23 @@ def test_quantiles_carry_confidence_intervals(lib):
         assert q.ci_low <= q.value <= q.ci_high
 
 
-def test_variance_shares_report_their_interaction_residual(lib):
+def test_conditional_variance_ratios_are_labelled_as_screening(lib):
+    """The screening diagnostic still runs, and still cannot move the wrong output.
+
+    It is deliberately NOT called a variance share: see
+    ``Decomposition.conditional_variance_ratios`` and
+    ``sobol.analyze_groups`` for the decomposition actually used.
+    """
     scn = archetypes.build("open_raceway_pond", lib)
     dec = mcuncertainty.decompose(scn, "pond", "GWP net (kg CO2-eq/kg)", 150, SEED,
                                   bootstrap=20)
-    shares = dec.variance_shares()
-    assert set(shares) == {mcuncertainty.MODE_FOREGROUND, mcuncertainty.MODE_ECONOMIC,
-                           mcuncertainty.MODE_BACKGROUND, "interaction_residual"}
-    assert shares[mcuncertainty.MODE_ECONOMIC] == pytest.approx(0.0, abs=1e-9)
+    ratios = dec.conditional_variance_ratios()
+    assert set(ratios) == {mcuncertainty.MODE_FOREGROUND, mcuncertainty.MODE_ECONOMIC,
+                           mcuncertainty.MODE_BACKGROUND, "unexplained_remainder"}
+    # Prices cannot move a GWP, whatever the estimator.
+    assert ratios[mcuncertainty.MODE_ECONOMIC] == pytest.approx(0.0, abs=1e-9)
+    assert not hasattr(dec, "variance_shares"), (
+        "the misleading name must not come back")
 
 
 def test_p90_p10_is_none_when_p10_is_not_positive():

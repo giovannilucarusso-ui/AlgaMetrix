@@ -223,6 +223,16 @@ class StudyRecord:
     reported_gwp_unit: str | None = None
     reported_gwp_low: float | None = None
     reported_gwp_high: float | None = None
+    #: The source's GWP *before* any biogenic-carbon adjustment, where it
+    #: publishes one. A net figure alone cannot be compared across conventions;
+    #: a gross figure can, because it is convention-free. Recording it turns a
+    #: convention-dependent comparison into a convention-free one.
+    reported_gwp_gross: float | None = None
+    #: The source's own biogenic-carbon adjustment (<= 0), where published.
+    reported_biogenic_adjustment: float | None = None
+    #: Free text stating exactly how the reported figures were placed on the
+    #: engine's basis (1 kg DRY biomass) when the source uses another one.
+    gwp_basis_conversion: str | None = None
     biogenic_carbon_convention: str | None = None
     published_gwp_available: bool | None = None
     gwp_reconstruction_status: str | None = None
@@ -287,13 +297,31 @@ class StudyRecord:
         return self.reported_gwp is not None or self.reported_gwp_low is not None
 
     @property
+    def is_included(self) -> bool:
+        """False once a record has been excluded, whatever else it carries.
+
+        An excluded record is kept in the dataset with its reason rather than
+        deleted, so the exclusion is countable and auditable, but it must not
+        reach any population, comparison or statistic.
+        """
+        return self.eligibility_status != "excluded"
+
+    @property
     def is_tier_b(self) -> bool:
         return self.reconstructability_tier == "B"
 
     @property
     def is_executable(self) -> bool:
-        """The repository contains a scenario builder that the engine can run."""
-        return bool(self.reconstruction_builder) and self.reconstruction_status == "reproduced"
+        """The engine can run this record, AND the record is still included.
+
+        Excluded records keep their scenario builder — the scenario is a valid
+        engine configuration and is still used for software verification — but
+        they must produce no comparison against a published value, because the
+        published value is what was found unsound.
+        """
+        return (self.is_included
+                and bool(self.reconstruction_builder)
+                and self.reconstruction_status == "reproduced")
 
     @property
     def has_cost_breakdown(self) -> bool:

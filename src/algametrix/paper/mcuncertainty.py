@@ -251,11 +251,24 @@ class Decomposition:
     def joint(self) -> ModeResult:
         return self.results[MODE_JOINT]
 
-    def variance_shares(self) -> dict[str, float | None]:
-        """Each group's variance as a share of the joint variance.
+    def conditional_variance_ratios(self) -> dict[str, float | None]:
+        """Variance with one group varying and the rest PINNED, over joint variance.
 
-        Shares do not have to sum to 1: with a non-linear model the groups
-        interact, and the residual is reported rather than forced away.
+        **This is not a Sobol' decomposition and must not be read as one.** Each
+        numerator is ``Var[Y | X_G varies, X_~G = nominal]`` — the spread of the
+        output along a single slice through the nominal point, not
+        ``Var(E[Y|X_G])``. The two coincide only if the model is additive in the
+        groups. For a non-additive model the ratios can sum to more or less than
+        1, they depend on *where* the other groups were pinned, and the
+        remainder below is a leftover, not an interaction term.
+
+        It is kept because it is cheap and answers a legitimate what-if — "how
+        wide is the band if only the physics is uncertain?" — and because the
+        matching quantile bands in :class:`ModeResult` are built from the same
+        runs. The actual variance decomposition used in the paper is
+        :func:`algametrix.paper.sobol.analyze_groups`, which estimates
+        ``Var(E[Y|X_G])`` properly and reports the between-group interaction
+        term as a genuine residual.
         """
         total = self.joint.variance
         out: dict[str, float | None] = {}
@@ -263,12 +276,12 @@ class Decomposition:
             v = self.results[mode].variance
             out[mode] = (v / total) if total > 0 else None
         if total > 0:
-            out["interaction_residual"] = 1.0 - sum(
+            out["unexplained_remainder"] = 1.0 - sum(
                 self.results[m].variance / total
                 for m in (MODE_FOREGROUND, MODE_ECONOMIC, MODE_BACKGROUND)
             )
         else:
-            out["interaction_residual"] = None
+            out["unexplained_remainder"] = None
         return out
 
 

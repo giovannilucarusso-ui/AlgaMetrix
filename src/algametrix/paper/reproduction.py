@@ -265,34 +265,109 @@ def cost_row(
     return row
 
 
+#: A net GWP comparison is only meaningful when both sides are on the same
+#: biogenic-carbon convention. Below this, the engine's own adjustment is small
+#: enough that the convention cannot materially move the number, so an
+#: unrecorded source convention is not fatal.
+IMMATERIAL_ADJUSTMENT = 0.01   # fraction of the gross result
+
+
 def gwp_row(rec: StudyRecord, lib: Library) -> ReproductionRow | None:
+    """Compare a published cradle-to-gate GWP, on a convention-free basis if possible.
+
+    Three cases, in order of strength:
+
+    1. the source publishes its **gross** figure (before any biogenic
+       adjustment). Gross is convention-free, so the comparison is made on it
+       and the net is reported alongside for information;
+    2. the source's convention is recorded and matches the engine's, so the net
+       comparison is like-for-like;
+    3. the source's convention is unknown. Then the engine's own adjustment
+       decides: if it is immaterial the comparison stands with a warning,
+       otherwise the row is refused, exactly as a cross-currency quotient is
+       refused. A percentage between two different carbon conventions is not a
+       deviation.
+    """
     if not rec.has_published_gwp:
         return None
     scn = reconstructions.build(rec.reconstruction_builder, lib)
     res = run_scenario(scn)
+    gross = res.lca.gwp_gross_kg_co2eq_per_kg
+    adj = res.lca.biogenic_adjustment_kg_co2eq_per_kg
+    engine_mode = res.lca.carbon_accounting_mode
+
     kind = "range" if (rec.reported_gwp_low is not None
                        and rec.reported_gwp_high is not None
                        and rec.reported_gwp is None) else "point"
+
+    # --- pick the basis both sides can stand on ---------------------------
+    if rec.reported_gwp_gross is not None:
+        basis = "gross (before any biogenic adjustment; convention-free)"
+        model, reference = gross, rec.reported_gwp_gross
+    else:
+        basis = f"net, engine convention {engine_mode}"
+        model, reference = res.lca.gwp_kg_co2eq_per_kg, rec.reported_gwp
+
     row = ReproductionRow(
         study_id=rec.study_id, metric="gwp",
-        endpoint=f"{rec.environmental_endpoint_type or 'unknown'} (net, "
-                 f"{res.lca.carbon_accounting_mode})",
+        endpoint=f"{rec.environmental_endpoint_type or 'unknown'} [{basis}]",
         validation_mode=rec.validation_mode or "none",
         comparison_kind=kind,
-        model=res.lca.gwp_kg_co2eq_per_kg,
-        reference=rec.reported_gwp,
+        model=model, reference=reference,
         ref_low=rec.reported_gwp_low, ref_high=rec.reported_gwp_high,
         unit="kg CO2-eq/kg",
     )
-    row.model_native = row.model
+    row.model_native = model
     row.notes.append(
-        f"gross {res.lca.gwp_gross_kg_co2eq_per_kg:.3f}, biogenic adjustment "
-        f"{res.lca.biogenic_adjustment_kg_co2eq_per_kg:+.3f}"
+        f"engine gross {gross:.3f}, biogenic adjustment {adj:+.3f}, net "
+        f"{res.lca.gwp_kg_co2eq_per_kg:.3f} under {engine_mode}"
     )
-    if rec.biogenic_carbon_convention is None:
+    if rec.reported_gwp_gross is not None:
         row.notes.append(
-            "the source's own biogenic-carbon convention is unknown, so this comparison "
-            "may be between two different conventions"
+            f"source gross {rec.reported_gwp_gross:.3f}"
+            + (f", source biogenic adjustment {rec.reported_biogenic_adjustment:+.3f}"
+               if rec.reported_biogenic_adjustment is not None else "")
+            + f", source net {rec.reported_gwp:.3f}. The comparison is made on the GROSS "
+              "figure, which carries no biogenic-carbon convention and is therefore "
+              "comparable whatever either side chose"
+        )
+    if rec.gwp_basis_conversion:
+        row.notes.append(f"basis: {rec.gwp_basis_conversion}")
+
+    # --- convention gate ---------------------------------------------------
+    if rec.biogenic_carbon_convention is None and rec.reported_gwp_gross is None:
+        if abs(adj) > IMMATERIAL_ADJUSTMENT * max(abs(gross), 1e-12):
+            row.comparison_kind = "not_comparable"
+            row.model = None
+            row.notes.append(
+                f"NOT COMPARABLE: the source's biogenic-carbon convention is unrecorded "
+                f"and the engine applies an adjustment of {adj:+.3f} on a gross of "
+                f"{gross:.3f} ({abs(adj) / max(abs(gross), 1e-12):.0%}), so the two sides "
+                "may be on different conventions and a percentage between them would not "
+                "be a deviation. Record the source's convention, or its gross figure, to "
+                "restore the comparison"
+            )
+        else:
+            row.notes.append(
+                "the source's biogenic-carbon convention is unrecorded, but the engine's "
+                f"own adjustment is {adj:+.3f} on a gross of {gross:.3f}, i.e. immaterial, "
+                "so the convention cannot materially move this comparison"
+            )
+    elif rec.biogenic_carbon_convention is not None:
+        matched = rec.biogenic_carbon_convention == engine_mode
+        on_gross = rec.reported_gwp_gross is not None
+        if matched:
+            tail = " - MATCHED"
+        elif on_gross:
+            tail = (" - not matched, but immaterial here: the comparison above is made on "
+                    "the gross figures, which carry no convention")
+        else:
+            tail = (" - NOT MATCHED and no gross figure is recorded, so the deviation "
+                    "above is between two different conventions and must not be read as "
+                    "a model error")
+        row.notes.append(
+            f"source convention {rec.biogenic_carbon_convention}; engine convention "
+            f"{engine_mode}{tail}"
         )
     return row
 
@@ -315,10 +390,27 @@ def build_rows(
 
 
 def blocked_rows(dataset: Dataset) -> dict[str, str]:
-    """Declared Tier-B studies whose reproduction cannot be run at all."""
+    """Declared Tier-B studies whose reproduction cannot be run at all.
+
+    Excluded records are *not* listed here: their scenario builders exist and
+    run perfectly well. What was found unsound is the published value, not the
+    reconstruction, and conflating the two would misreport both.
+    """
     return {
         r.study_id: reconstructions.MISSING_SCENARIOS.get(
             r.study_id, "no scenario builder registered")
         for r in dataset
-        if r.reconstructability_tier == "B" and not r.is_executable
+        if r.reconstructability_tier == "B" and r.is_included and not r.is_executable
+    }
+
+
+def excluded_rows(dataset: Dataset) -> dict[str, str]:
+    """Records withdrawn from every population, with the reason.
+
+    Kept in the dataset rather than deleted so that an exclusion is countable
+    and a reader can see what was taken out and why.
+    """
+    return {
+        r.study_id: (r.exclusion_reason or "no reason recorded")
+        for r in dataset if not r.is_included
     }

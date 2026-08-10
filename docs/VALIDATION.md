@@ -24,6 +24,16 @@ evidence.
 | **blind** | Every input traces to a value published by the source or to an itemised library default. The reported endpoint is never used as an input and is never tuned. |
 | **calibrated** | The reference's design assumptions are deliberately imposed, to show the engine agrees with a reference implementation under matched assumptions. |
 | **range** | A plausibility check against a published envelope. Never turned into a percentage deviation from an envelope midpoint. |
+| **excluded** | The reported figures could not be traced to the cited source. The record stays in the dataset with its reason, and enters no population. |
+
+### Biogenic carbon is not assumed either
+
+A percentage between two different biogenic-carbon conventions is no more a deviation than a
+percentage between two currencies. Every GWP comparison is therefore placed on the strongest
+available basis: on the source's **gross** figure where it publishes one, because a gross result
+carries no convention; otherwise on the net, where the source's convention is recorded. Where the
+convention is unrecorded, the row is **refused** unless the engine's own biogenic adjustment is
+below 1 % of its gross, in which case no convention could materially move it.
 
 ### Currency is not assumed
 
@@ -69,31 +79,48 @@ Russo et al. 2022 is a **self-citation** (`author_overlap_with_algametrix: true`
 
 | Case | Model | Envelope | Basis | Verdict |
 |---|---|---|---|:---:|
-| C-phycocyanin (Spirulina) | 382.8 | 283–544 | EUR, source year unknown | inside |
 | Spirulina MEPP (Padi et al. 2023) | 18.08 | 13.2–17.3 | EUR, year unknown | **OUTSIDE** |
-| Astaxanthin (*Haematococcus*) | — | 718 | engine EUR 2022 vs source USD, year unknown | **NOT COMPARABLE** |
 
 The Spirulina minimum expected product selling price **falls above its published envelope**. It is
-reported rather than dropped. The astaxanthin case carries no percentage at all: the basis transfer
-was refused. It is a comparison that could not be made, not a pass.
+reported rather than dropped, and it is now the only range check in the set.
+
+### Excluded records
+
+Two records were withdrawn on 2026-08-07 because their figures could not be traced to the sources
+they were attributed to. Both stay in the dataset with the reason — see
+[`results/validation.txt`](../results/validation.txt), section *EXCLUDED* — and both scenario
+builders remain in the software-verification suite: what was found unsound is the published
+value, not the reconstruction.
+
+| Record | Was | Why |
+|---|---|---|
+| astaxanthin | 718 USD/kg, envelope 500–1500, attributed to Panis & Carreon (2016) | that paper reports EUR 1536/kg and EUR 6403/kg; neither figure appears in it. Also conflated a market range with a cost model, and no price year |
+| C-phycocyanin | 413 EUR/kg inside 283–544 | the envelope is attributed in the secondary literature to Padi et al. (2023), not the cited source, and 413 is the arithmetic **midpoint** of the envelope, not a published value |
 
 ## 4. Cradle-to-gate GWP
 
-| Study | System | Model (net) | Source | Gross | Biogenic adj. | Deviation |
-|---|---|---|---|---|---|:---:|
-| McKuin et al. 2022 | *Schizochytrium*, fermenter | 2.385 | 2.33 | 2.385 | 0.000 | +2% |
-| Tzachor et al. 2022 | Spirulina, geothermal LED PBR | −0.5624 | −0.54 | **+1.310** | **−1.873** | +4% |
-| Braud et al. 2025 (SpiralG) | Spirulina raceway, NaHCO₃ | 12.61 | 14.10 | 12.614 | 0.000 | −11% |
-| Ahmed et al. 2026 *(calibrated)* | Spirulina raceway, NaHCO₃ | 14.24 | ~15 | 14.236 | 0.000 | −5% |
+| Study | System | Basis compared | Model | Source | Deviation |
+|---|---|---|---|---|:---:|
+| McKuin et al. 2022 | *Schizochytrium*, fermenter | net; engine adjustment 0.000, convention-free in practice | 2.385 | 2.33 | +2% |
+| Tzachor et al. 2022 | Spirulina, geothermal LED PBR | **gross**; conventions verified and matched | 1.310 | 1.262 | +4% |
+| Braud et al. 2025 (SpiralG) | Spirulina raceway, NaHCO₃ | net; conventions matched | 12.61 | 14.10 | −11% |
+| Ahmed et al. 2026 *(calibrated)* | Spirulina raceway, NaHCO₃ | gross; both sides apply no credit | 14.24 | 15.05 | −5% |
 
 **Blind range: −11% to +4%.** Functional unit: 1 kg dry biomass, kg CO₂-eq/kg.
 
 Three things a reader needs in order to use these numbers:
 
-1. **The negative result is a convention, not a measurement.** Iceland is net −0.56 only because a
-   biogenic-carbon credit of −1.87 is applied to a gross burden of **+1.31**. The source publishes
-   −0.008 per kg *wet* biomass, including construction, and does not state its own convention.
-   A +4% deviation on a near-zero net value is arithmetically unstable.
+1. **The conventions have been checked against the sources, and the comparisons moved onto bases
+   that do not depend on them.** Tzachor et al. apply an explicit −0.702 kg CO₂-eq/kg credit for
+   CO₂ biofixation (AlgaMetrix's `source_specific_credit`) and report a net of −0.008 per kg *wet*
+   biomass at 61 % water, including construction. Placed on the engine's basis — per kg dry,
+   operational — that is a gross of 1.262, a credit of −1.800 and a net of −0.539, and the
+   comparison is made on the **gross**, which carries no convention. Every figure on the source
+   side is *derived* from the paper's own components by one declared division, not printed by it,
+   which makes this row weaker than a comparison against a published value. The published
+   correction to that paper (electricity per FU 137.9 → 54.48 kWh) was checked; the reconstruction
+   already uses the corrected figure. Ahmed et al. apply no credit at all, and the engine applies
+   none to a bicarbonate-fed scenario, so both sides are gross.
 2. **SpiralG is not like-for-like.** The engine reproduces the operational path only; the published
    total also includes infrastructure and transport (~2 kg CO₂-eq/kg), which accounts for most of
    the −11%.
@@ -102,11 +129,33 @@ Three things a reader needs in order to use these numbers:
 
 ## 5. Internal verification
 
-[`results/verification.txt`](../results/verification.txt), over 17 scenarios: C, N and P balances
-closing to a maximum residual of 1.2 × 10⁻¹⁶ (most rows exactly 0) — algebraic self-consistency at
-floating-point precision, which is a statement about the implementation and not an accuracy claim;
-per-kilogram intensities invariant when plant scale is doubled; downstream product mass never
-exceeding the biomass supplied. Verdict: PASS.
+Three checks, all run over the same 26-scenario suite (`algametrix.paper.suite`), so they
+describe one population. **None of them is an accuracy claim** — they are statements about the
+implementation, and all three sit at floating-point resolution because they are supposed to.
+
+| Check | File | Scale | Max relative residual |
+|---|---|---|---|
+| C, N, P closure; scale invariance; product mass ≤ biomass fed | [`results/verification.txt`](../results/verification.txt) | 26 scenarios | 1.2 × 10⁻¹⁶ |
+| **Shared-inventory consistency**: the quantity the TEA priced vs the quantity the LCA characterized, each recovered independently from the published results | [`results/shared_inventory_consistency.txt`](../results/shared_inventory_consistency.txt) | 162 flow comparisons | 1.2 × 10⁻¹³ |
+| **LCA implementation**: sequential engine vs an independent matrix-formalism implementation (`A s = f`) | [`results/lca_implementation_benchmark.txt`](../results/lca_implementation_benchmark.txt) | 234 indicator comparisons | 2.4 × 10⁻¹⁵ |
+
+Optionally, the same matrices solved by Brightway's `bw2calc` agree to 4.9 × 10⁻¹⁵ over 182
+comparisons ([`results/brightway_crosscheck.txt`](../results/brightway_crosscheck.txt)); that
+check runs from `scripts/brightway_crosscheck.py` in its own environment, because `bw2calc`
+pulls in around thirty packages the engine does not need.
+
+The consistency result is an **architectural invariant**: `run_scenario` builds one `Inventory`
+and hands the same object to both analyses, so agreement is guaranteed by the call graph rather
+than discovered. It is measured anyway, because sharing an object does not guarantee that both
+analyses read the same *field* of it, and because recovering the quantities from the *results*
+also covers everything between the inventory and the reported number — overheads, allocation,
+functional unit.
+
+The same file carries a controlled counter-example: emulating duplicated inventories and
+applying one physical change (harvesting recovery 0.90 → 0.765) to the TEA copy only opens a
+15 % divergence in the flows and understates the reported GWP by 8.5 %, while the reported cost
+is unchanged. That is a demonstration of a failure mode run on this engine against itself, not
+a claim about any other software.
 
 ## 6. Open-literature benchmark ranges
 
@@ -130,15 +179,17 @@ Indicative product prices for sanity-checking selling prices are in
 | | |
 |---|---|
 | Point reproductions | **12** (blind: **9**) |
-| Range plausibility checks | 2 (1 inside, 1 outside) |
-| Not comparable | 1 |
-| Distinct publications | 13 (11 peer-reviewed + 2 vendor simulator reports) |
+| Range plausibility checks | 1 (**outside** its envelope) |
+| Excluded for untraceable provenance (this revision) | 2 |
+| Excluded earlier, no primary source (`scp_protein`) | 1 |
+| Distinct publications | 11 (9 peer-reviewed + 2 vendor simulator reports) |
 
 It supports the plausibility of the implementation across open ponds, photobioreactors and
 heterotrophic fermenters, for whole biomass and extracted products. It does not establish predictive
 accuracy for untested configurations: the base is small and partly clustered — three blind cost
 cases from one publication, one a self-citation, and two of the four GWP cases driven by the same
-scenario builder.
+scenario builder. The only surviving range check is one the engine fails, and the base became
+*smaller* at the last revision rather than larger.
 
 ## Where the underlying data lives
 

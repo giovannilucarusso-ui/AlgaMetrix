@@ -467,7 +467,7 @@ def figure5_uncertainty(blocks, outdir: Path) -> list[Path]:
         for mode in (MODE_FOREGROUND, MODE_ECONOMIC, MODE_BACKGROUND):
             vals = []
             for block in blocks:
-                s = block["metrics"][metric].variance_shares().get(mode)
+                s = block["metrics"][metric].conditional_variance_ratios().get(mode)
                 vals.append(max(0.0, min(s or 0.0, 1.0)))
             ax.bar(range(len(blocks)), vals, 0.62, bottom=bottoms,
                    color=colors[mode], alpha=0.9)
