@@ -349,6 +349,14 @@ def build(run, outdir: Path, results_dir: Path, root: Path,
         json.dumps(studies, indent=2, ensure_ascii=False), encoding="utf-8")
     written.append(data_dir / "studies.json")
 
+    # The reduced equation set for the manuscript. Written beside the SI rather
+    # than inside it: it is authoring material, not part of the deliverable.
+    main_text = outdir / "main_text_equations.md"
+    main_text.write_text(
+        "\n".join(specification.render_main_text_block(run.lib, spec_cases)) + "\n",
+        encoding="utf-8")
+    written.append(main_text)
+
     # ---------------------------------------------------------------- doc
     commit = _git_commit(root)
     versions = _versions(results_dir)

@@ -82,6 +82,39 @@ def test_the_assumptions_that_are_not_neutral_are_stated():
     assert "no return on capital" in titles
 
 
+def test_the_main_text_subset_is_a_subset_and_is_checked():
+    """What the manuscript prints must be under the same fidelity check.
+
+    The reduced set exists so the main text is not merely descriptive. If a core
+    equation had no numerical check it would be the one place where the paper
+    could print an equation the software does not run.
+    """
+    eqs = specification.equations()
+    core = [e for e in eqs if e.core]
+    assert core, "no equation is marked for the main text"
+    assert len(core) < len(eqs), "the reduced set is not reduced"
+    for eq in core:
+        assert eq.core_gloss.strip(), f"{eq.key} has no one-line gloss"
+        assert eq.stated is not None and eq.engine is not None, \
+            f"{eq.key} is printed in the main text but never checked"
+
+    # Both trophic routes must be represented, or the paper describes half the
+    # model in symbols and the other half in prose.
+    keys = {e.key for e in core}
+    assert "inv.carbon.photo" in keys and "inv.carbon.hetero" in keys
+    # And the argument the paper rests on: one inventory, two contractions.
+    assert "tea.cost" in keys and "lca.impact" in keys
+
+
+def test_every_cross_reference_names_a_section_that_exists():
+    """A pointer to a section the SI does not have is worse than no pointer."""
+    sections = {f"S{n}" for n in range(9)}
+    for where, cited, what in specification.CROSS_REFERENCES:
+        for token in cited.replace(",", " ").split():
+            assert token in sections, f"{where} cites {token!r}"
+        assert where.strip() and what.strip()
+
+
 def test_symbols_carry_a_unit_and_a_source():
     for sym in specification.SYMBOLS:
         assert sym.unit.strip(), sym.latex

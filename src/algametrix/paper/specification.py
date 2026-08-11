@@ -65,6 +65,14 @@ class Equation:
     engine: Callable | None = None
     applies: Callable | None = None
     note: str = ""
+    #: Belongs in the reduced set the main text carries. The criterion is not
+    #: importance but legibility: an equation is core when a reader cannot
+    #: follow the paper's argument without it. Everything else is complete in
+    #: the Supplementary Information and cited from there.
+    core: bool = False
+    #: One line for the main text, where the Supplementary Information's longer
+    #: description would not fit. Falls back to ``description``.
+    core_gloss: str = ""
 
     def evaluate(self, scenario, inv, tea, lca) -> tuple[float, float] | None:
         if self.stated is None or self.engine is None:
@@ -181,6 +189,8 @@ def _equations_inventory() -> list[Equation]:
             "inventory.build_inventory",
             stated=lambda s, inv, tea, lca: _stated_annual_kg(s),
             engine=lambda s, inv, tea, lca: inv.annual_biomass_kg,
+            core=True,
+            core_gloss="Annual gross biomass cultivated, and the product that survives harvesting. The functional unit is one kilogram of the latter.",
         ),
         Equation(
             "inv.gpp",
@@ -189,6 +199,16 @@ def _equations_inventory() -> list[Equation]:
             "flow below is referred to this factor, so harvesting losses propagate "
             "upstream and only upstream.",
             "inventory.build_inventory",
+            # The engine never reports g on its own, so it is recovered from a
+            # flow that carries nothing else: the nitrogen supply, multiplied by
+            # the uptake and divided by the biomass nitrogen it must deliver, is
+            # exactly g.
+            stated=lambda s, inv, tea, lca: _gpp(s),
+            engine=lambda s, inv, tea, lca: (
+                inv.nitrogen_per_kg * _uptake(s) / s.organism.nitrogen),
+            applies=lambda s, inv: s.organism.nitrogen > 0,
+            core=True,
+            core_gloss="Gross biomass per kilogram of product. Cultivation-stage flows carry this factor and downstream flows do not, which is why an error in the recovery propagates unevenly.",
         ),
         Equation(
             "inv.carbon.photo",
@@ -203,6 +223,8 @@ def _equations_inventory() -> list[Equation]:
                 s.organism.carbon * _gpp(s) * CO2_PER_C),
             engine=lambda s, inv, tea, lca: inv.co2_fixed_per_kg,
             applies=_is_photo,
+            core=True,
+            core_gloss="Phototrophic carbon: the biomass composition fixes the carbon demand, the utilization efficiency fixes the supply.",
         ),
         Equation(
             "inv.carbon.hetero",
@@ -218,6 +240,8 @@ def _equations_inventory() -> list[Equation]:
             stated=lambda s, inv, tea, lca: _gpp(s) / max(s.system.substrate_yield, 1e-6),
             engine=lambda s, inv, tea, lca: inv.substrate_per_kg,
             applies=_is_hetero,
+            core=True,
+            core_gloss="Heterotrophic carbon: the mass yield fixes the substrate demand; the substrate carbon not incorporated is respired, and is reported rather than summed into the GWP.",
         ),
         Equation(
             "inv.nutrients",
@@ -229,6 +253,8 @@ def _equations_inventory() -> list[Equation]:
             "inventory.build_inventory",
             stated=lambda s, inv, tea, lca: s.organism.nitrogen * _gpp(s) / _uptake(s),
             engine=lambda s, inv, tea, lca: inv.nitrogen_per_kg,
+            core=True,
+            core_gloss="Nitrogen and phosphorus supply, and the unassimilated fraction that leaves as a potential water emission.",
         ),
         Equation(
             "inv.water",
@@ -374,6 +400,8 @@ def _equations_operating() -> list[Equation]:
             "tea.run_tea",
             stated=lambda s, inv, tea, lca: _stated_aoc(s, inv, tea),
             engine=lambda s, inv, tea, lca: tea.annual_opex,
+            core=True,
+            core_gloss="Annual operating cost. Labour is a fixed annual figure, independent of capacity.",
         ),
         Equation(
             "tea.cost",
@@ -386,6 +414,8 @@ def _equations_operating() -> list[Equation]:
             stated=lambda s, inv, tea, lca: tea.annual_opex / inv.annual_biomass_kg,
             engine=lambda s, inv, tea, lca: tea.production_cost_eur_per_kg,
             applies=lambda s, inv: inv.annual_biomass_kg > 0,
+            core=True,
+            core_gloss="Production cost, gross and net of co-product revenue. Facility-dependent cost is straight-line depreciation, so this endpoint carries no return on capital.",
         ),
     ]
 
@@ -430,6 +460,8 @@ def _equations_profitability() -> list[Equation]:
             "tea.npv / tea.irr",
             stated=lambda s, inv, tea, lca: _stated_npv(s, tea),
             engine=lambda s, inv, tea, lca: tea.npv,
+            core=True,
+            core_gloss="Net present value and internal rate of return, on a flat cash-flow series over the evaluation horizon.",
         ),
         Equation(
             "tea.roi",
@@ -457,6 +489,8 @@ def _equations_lca() -> list[Equation]:
             "lca.run_lca",
             stated=lambda s, inv, tea, lca: _stated_gwp_gross(s, inv),
             engine=lambda s, inv, tea, lca: lca.gwp_gross_kg_co2eq_per_kg,
+            core=True,
+            core_gloss="Every impact category is the same inventory contracted with the characterization factors of that category.",
         ),
         Equation(
             "lca.biogenic",
@@ -474,6 +508,8 @@ def _equations_lca() -> list[Equation]:
             "lca._biogenic_adjustment",
             stated=lambda s, inv, tea, lca: _stated_biogenic(s, inv),
             engine=lambda s, inv, tea, lca: lca.biogenic_adjustment_kg_co2eq_per_kg,
+            core=True,
+            core_gloss="The biogenic-carbon adjustment, the only term that depends on a declared convention. The gross value, the adjustment and the convention are always reported together.",
         ),
     ]
 
@@ -839,6 +875,128 @@ def render_markdown(lib, cases) -> list[str]:
           "(`tests/test_specification.py`), so the specification cannot drift from "
           "the code without a test going red.",
           ""]
+    return L
+
+
+#: Where each part of the evidence belongs in the manuscript. The section
+#: numbers on the left are the ones peer review referred to; the right-hand
+#: column is what to say there, not merely what to cite. Kept here so that a
+#: renumbering of the Supplementary Information updates the guidance with it.
+CROSS_REFERENCES: list[tuple[str, str, str]] = [
+    ("§2.1 Framework overview", "S1",
+     "One sentence placing the full specification: \"The model is specified in "
+     "full in Supplementary Information S1: symbols and units, the governing "
+     "equations of the inventory, the techno-economic and the life-cycle "
+     "layers, and the assumptions that bound them.\""),
+    ("§2.2–2.4 Model description", "S1",
+     "Carry the reduced equation set below, numbered in the main text, and cite "
+     "S1 for the remainder — equipment scaling, the capital structure, "
+     "downstream yields and allocation. This is the section the review found "
+     "descriptive, so the equations must appear here rather than only being "
+     "pointed at."),
+    ("§2.2 immediately after the production-cost equation", "S1",
+     "State the endpoint definition where the cost is first defined: the "
+     "facility-dependent term is straight-line depreciation, so the reported "
+     "cost carries no required return on capital and is not a minimum selling "
+     "price. Return on capital is evaluated through NPV, IRR and ROI."),
+    ("§2.2 capital paragraph", "S1",
+     "State the validity range of the capital model: equipment cost is linear "
+     "in capacity, with no scaling exponent and no reference capacity, so the "
+     "unit costs hold near the capacities of the sources they were taken from "
+     "and the model does not predict economies of scale away from them."),
+    ("§2.5 Perturbation / consistency", "S2, S3",
+     "The flow-by-flow recovery is S2; the controlled duplicated-inventory "
+     "counter-example, on both archetypes, is S3."),
+    ("§2.x Verification", "S2",
+     "Distinguish the two families explicitly. The construction identities "
+     "hold by construction and evidence that the implementation matches its "
+     "specification; the physical admissibility constraints are the "
+     "falsifiable ones. Do not describe either as mass-balance closure."),
+    ("§2.x Validation", "S4",
+     "Protocol and classification, price basis, carbon-accounting conventions, "
+     "the exclusions and the range check that fell outside its envelope are all "
+     "in S4, which also carries the full comparison table."),
+    ("§2.x Sensitivity and uncertainty", "S5, S6",
+     "Estimator validation, convergence diagnostics and the full Sobol' tables "
+     "are S5; the sampled input distributions with their evidence quality, and "
+     "the complete quantile outputs, are S6."),
+    ("Figure 2 caption", "S2, S3",
+     "Cite S2 for the per-scenario identities and admissibility constraints, "
+     "and S3 for the counter-example the top series shows."),
+    ("Figure 3 caption", "S4",
+     "Cite S4 for the per-row basis notes, the exclusions and the range check."),
+    ("Figure 4 caption", "S5, S6",
+     "Cite S5 for the group-estimator validation behind the decomposition and "
+     "S6 for the supports the bands were sampled from."),
+    ("Results, first LCA number", "S7",
+     "Cite S7 for the two independent implementations the sequential engine "
+     "was checked against."),
+    ("Data availability / Code availability", "S8",
+     "Point at the machine-readable study dataset, the parameter provenance "
+     "table and the software module map, and at the repository and its "
+     "archived release."),
+]
+
+
+def render_main_text_block(lib, cases) -> list[str]:
+    """The reduced equation set for the manuscript, plus where to cite the rest.
+
+    Generated from the same declarations the Supplementary Information uses, so
+    an equation printed in the main text is under the same fidelity check as the
+    full specification and cannot drift from it independently.
+    """
+    core = [e for e in equations() if e.core]
+    checks = [c for case in cases
+              for c in check_against_engine(case.scenario(lib), case.label)]
+    core_keys = {e.key for e in core}
+    core_checks = [c for c in checks if c.equation in core_keys]
+    worst = max((c.residual for c in core_checks), default=0.0)
+
+    used = [s for s in SYMBOLS
+            if any(part.strip() in eq.latex
+                   for eq in core for part in s.latex.split(","))]
+
+    L: list[str] = [
+        "# Reduced equation set for the main text",
+        "",
+        "Paste-ready. These are the equations a reader needs to follow the "
+        "argument; the remainder — equipment scaling, the capital structure, "
+        "downstream yields and allocation — is complete in Supplementary "
+        "Information S1 and should be cited there rather than reproduced.",
+        "",
+        f"Generated from `algametrix.paper.specification`, the same declarations "
+        f"that produce SI S1, so these {len(core)} equations are under the same "
+        f"fidelity check as the full set: {len(core_checks)} evaluations over the "
+        f"scenario suite, maximum relative difference {worst:.1e}.",
+        "",
+        "## Equations",
+        "",
+    ]
+    for i, eq in enumerate(core, start=1):
+        L += [f"**({i})** {eq.core_gloss or eq.description}", "",
+              f"$$ {eq.latex} $$", ""]
+
+    L += ["## Symbols used above", "",
+          "| Symbol | Quantity | Unit |", "|---|---|---|"]
+    for s in used:
+        L.append(f"| ${s.latex}$ | {s.description} | {s.unit} |")
+    L += ["", "The functional unit is one kilogram of dry biomass leaving the "
+              "gate. Full symbol table, with the provenance of every value, in "
+              "SI S1.", ""]
+
+    L += ["## Assumptions to state in the main text", "",
+          "Three of the assumptions in SI S1 change how a number should be "
+          "read, so they belong in the text rather than only in the "
+          "supplement.", ""]
+    for title, body in ASSUMPTIONS[:3]:
+        L += [f"- **{title}.** {body}", ""]
+
+    L += ["## Where to cite the Supplementary Information", "",
+          "| Place in the manuscript | Cite | What to say there |",
+          "|---|---|---|"]
+    for where, section, what in CROSS_REFERENCES:
+        L.append(f"| {where} | {section} | {what} |")
+    L.append("")
     return L
 
 
