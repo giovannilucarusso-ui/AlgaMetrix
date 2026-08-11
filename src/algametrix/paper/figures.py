@@ -26,6 +26,7 @@ import matplotlib.pyplot as plt                      # noqa: E402
 from matplotlib.lines import Line2D                  # noqa: E402
 from matplotlib.patches import FancyArrowPatch, FancyBboxPatch  # noqa: E402
 from matplotlib.ticker import FixedLocator, NullFormatter, ScalarFormatter  # noqa: E402
+from matplotlib.transforms import ScaledTranslation  # noqa: E402
 
 DPI = 600
 
@@ -77,6 +78,25 @@ def _tidy_log_axis(ax, lo: float, hi: float) -> None:
     fmt.set_scientific(False)
     ax.xaxis.set_major_formatter(fmt)
     ax.xaxis.set_minor_formatter(NullFormatter())
+
+
+def _sublabels(ax, texts, fig, lift: float = 0.046, drop: float = 0.21,
+               fontsize: float = 5.9) -> None:
+    """Write a second, quieter line under each y tick label.
+
+    A row that names a study has to carry two things at two weights: the
+    citation, which the reader looks up, and which scenario of that source the
+    row is, which only has to be findable once they are on the right row. One
+    tick label sets both at one size and reads as a sentence, so the tick label
+    is lifted by ``lift`` inches and the rest is written under it in grey.
+    """
+    up = ScaledTranslation(0.0, lift, fig.dpi_scale_trans)
+    for tick in ax.get_yticklabels():
+        tick.set_transform(tick.get_transform() + up)
+    for i, text in enumerate(texts):
+        if text:
+            ax.text(-0.012, i + drop, text, transform=ax.get_yaxis_transform(),
+                    ha="right", va="center", fontsize=fontsize, color=C_NEUTRAL)
 
 
 def _save(fig, outdir: Path, stem: str, tight_bbox: bool = True) -> list[Path]:
@@ -195,7 +215,11 @@ def figure2_validation(rows, blocked, outdir: Path) -> list[Path]:
                     solid_capstyle="butt", zorder=2)
         ax.plot(r.ratio, i, marker.get(r.validation_mode, "o"), color=color,
                 markersize=6, markeredgecolor="white", markeredgewidth=0.6, zorder=3)
-        labels.append(f"{r.study_id}  [{r.metric}]\n{r.basis_label}")
+        # Citation over scenario: a row a reader cannot look up in a reference
+        # list is not a validation they can check. The row's price basis is not
+        # repeated here - the axis label already states that both sides are in
+        # the source's own currency and price year, and this panel is narrow.
+        labels.append(f"{r.citation or r.study_id}\n{r.scenario or r.metric}")
     ax.set_yticks(range(len(point_rows)))
     ax.set_yticklabels(labels, fontsize=6.4)
     ax.set_xlabel("AlgaMetrix / source  (both in the source's own currency\n"
@@ -229,7 +253,7 @@ def figure2_validation(rows, blocked, outdir: Path) -> list[Path]:
         ax.plot(min(max(pos, -0.12), 1.12), i, "^" if inside else "X",
                 color=color if inside else C_WARN, markersize=7,
                 markeredgecolor="white", markeredgewidth=0.6, zorder=3)
-        labels.append(f"{r.study_id}  [{r.metric}]\n{lo:g}-{hi:g} {r.unit}")
+        labels.append(f"{r.citation or r.study_id}\n{lo:g}-{hi:g} {r.unit}")
     ax.set_yticks(range(len(range_rows)))
     ax.set_yticklabels(labels, fontsize=6.2)
     # Same row pitch as panel a. Without this, two range checks are stretched over

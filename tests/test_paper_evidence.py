@@ -16,6 +16,7 @@ from algametrix.paper.harmonization import (
 from algametrix.paper.schema import (
     StudyRecord,
     VocabularyError,
+    citation_problems,
     tier_disagreements,
     tier_rule,
 )
@@ -82,6 +83,36 @@ def test_every_study_in_a_main_result_has_provenance(dataset):
             f"{rec.study_id} enters the primary cost spread without "
             f"{rec.missing_provenance()}"
         )
+
+
+def test_every_study_can_be_named_to_a_reader(dataset):
+    """A figure row must carry a citation, not the internal id.
+
+    ``vazquez2022b_nas_10ha`` identifies a record to this repository and to
+    nobody else: a reader who wants the source cannot look it up. The audit also
+    rejects a label that names two records and a label whose words are not in
+    the record's own ``full_citation``, which is what stops a label from
+    drifting onto a paper the number did not come from.
+    """
+    assert citation_problems(dataset.records) == []
+
+
+def test_a_label_that_drifted_from_its_source_is_caught():
+    r = StudyRecord(study_id="x", full_citation="Norsker et al. 2011, Biotech Adv 29:24-27",
+                    short_citation="Norsker et al., 2019")
+    assert citation_problems([r])           # the year is not the source's
+    ok = StudyRecord(**{**r.to_dict(), "short_citation": "Norsker et al., 2011"})
+    assert not citation_problems([ok])
+
+
+def test_two_scenarios_of_one_paper_must_not_share_a_label():
+    base = dict(full_citation="Russo et al. 2022, Bioresour Technol Rep 18:100997",
+                short_citation="Russo et al., 2022")
+    a = StudyRecord(study_id="a", **base)
+    b = StudyRecord(study_id="b", **base)
+    assert citation_problems([a, b])
+    b.scenario_label = "Food waste, scenario B"
+    assert not citation_problems([a, b])
 
 
 def test_traceability_gaps_are_visible_not_silent(dataset):
@@ -418,6 +449,19 @@ def test_excluded_records_leave_every_population_but_stay_countable():
     # ... but they are not reported as missing scenario definitions, because the
     # builders are present and still run.
     assert not (set(excluded) & set(reproduction.blocked_rows(ds)))
+
+
+def test_every_reproduction_row_carries_the_citation_a_figure_prints():
+    """The figures label rows from the row, so the row must know its source."""
+    from algametrix.paper import reproduction, studies
+
+    ds = studies.default_dataset()
+    for row in reproduction.build_rows(ds):
+        rec = ds.by_id(row.study_id)
+        assert row.citation == rec.short_citation
+        assert row.scenario == rec.scenario_label
+        assert row.label == rec.display_label
+        assert row.study_id not in row.label     # never the internal id
 
 
 def test_a_gwp_comparison_is_refused_when_the_convention_is_unknown_and_material():

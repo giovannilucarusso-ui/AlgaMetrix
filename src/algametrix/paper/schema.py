@@ -17,6 +17,8 @@ Two rules govern this module:
 
 from __future__ import annotations
 
+import re
+import unicodedata
 from dataclasses import dataclass, field, fields
 from typing import Any
 
@@ -121,6 +123,26 @@ def _check(value: Any, allowed: tuple[str, ...], field_name: str, study_id: str)
 
 
 # --------------------------------------------------------------------------
+# Naming a source to a reader
+# --------------------------------------------------------------------------
+
+def compose_label(short_citation: str | None, scenario_label: str | None,
+                  fallback: str) -> str:
+    """``"Russo et al., 2022 — Heterotrophic"``: the citation, then which scenario.
+
+    One rule, used by every figure and table, so the same source is named the
+    same way wherever it appears. Without a citation the caller's ``fallback``
+    (the internal id) shows through, which is the module's general rule: a gap
+    is displayed, never filled in with something that reads like an answer.
+    """
+    if not short_citation:
+        return fallback
+    if scenario_label:
+        return f"{short_citation} — {scenario_label}"
+    return short_citation
+
+
+# --------------------------------------------------------------------------
 # The record
 # --------------------------------------------------------------------------
 
@@ -170,6 +192,16 @@ class StudyRecord:
     # --- identity and provenance -----------------------------------------
     study_id: str
     full_citation: str
+    #: Reader-facing citation key, e.g. ``"Russo et al., 2022"``. ``study_id`` is
+    #: an internal join key and must never be the only thing a reader of a figure
+    #: is given: a row labelled ``vazquez2022b_nas_10ha`` cannot be looked up in
+    #: a reference list. Every label is checked back against ``full_citation`` by
+    #: :func:`citation_problems`, so it identifies the same source it names.
+    short_citation: str | None = None
+    #: What distinguishes this record from the other records of the same source
+    #: (``"N. oceanica, 10 ha"``). One paper often contributes several scenarios,
+    #: and they are different numbers, not repeats of one.
+    scenario_label: str | None = None
     doi: str | None = None
     publication_year: int | None = None
     search_source: str | None = None
@@ -288,6 +320,11 @@ class StudyRecord:
     # Derived properties
     # ------------------------------------------------------------------
     @property
+    def display_label(self) -> str:
+        """How this record is named to a reader: citation, then which scenario."""
+        return compose_label(self.short_citation, self.scenario_label, self.study_id)
+
+    @property
     def has_cost(self) -> bool:
         return self.reported_value is not None
 
@@ -385,6 +422,69 @@ def tier_rule(record: StudyRecord) -> str:
     economics = bool(record.published_capex_available) or bool(record.published_opex_available)
     builder = bool(record.reconstruction_builder)
     return "B" if (inventory and economics and builder) else "A"
+
+
+def _fold(text: str) -> str:
+    """Case- and accent-insensitive form of ``text``.
+
+    The dataset types author names without accents ("Vazquez-Romero"), while the
+    label a reader should see carries them. Folding both sides lets the check
+    below compare what the two strings *say* rather than how they are typed.
+    """
+    bare = "".join(c for c in unicodedata.normalize("NFKD", text)
+                   if not unicodedata.combining(c))
+    return bare.casefold()
+
+
+#: Tokens of a short citation with nothing to check back against the source.
+_CITATION_STOPWORDS = frozenset({"et", "al", "and", "the", "of", "in", "nd"})
+
+
+def citation_problems(records: list[StudyRecord]) -> list[tuple[str, str]]:
+    """``(study_id, problem)`` for every label a reader could not act on.
+
+    Three failures, each of which has a reader-visible consequence:
+
+    1. **no label at all** - the figure falls back to the internal id, which
+       appears in no reference list;
+    2. **a label that names two different records** - the reader cannot tell
+       which row is which, and two scenarios of one paper are not one number;
+    3. **a label that has drifted from its source** - every word and the year of
+       ``short_citation`` must occur in ``full_citation``, so a label cannot
+       quietly come to name a paper the record was not taken from.
+
+    Returns an empty list when every record is citable. This is the guard that
+    makes the labels evidence rather than decoration.
+    """
+    problems: list[tuple[str, str]] = []
+    seen: dict[str, str] = {}
+    for r in records:
+        if not r.short_citation:
+            problems.append((r.study_id, "no short_citation: a figure would show the "
+                                         "internal id, which is in no reference list"))
+        else:
+            folded_source = _fold(r.full_citation)
+            for token in re.findall(r"[a-z0-9]+", _fold(r.short_citation)):
+                if token in _CITATION_STOPWORDS or len(token) < 3:
+                    continue
+                year = re.fullmatch(r"(\d{4})[a-z]?", token)
+                # A "2022b" suffix disambiguates two papers of one author-year:
+                # it is a property of the reference list, not of the source.
+                needle = year.group(1) if year else token
+                if year and needle == str(r.publication_year):
+                    continue        # the year is evidence in its own field
+                if needle not in folded_source:
+                    problems.append((
+                        r.study_id,
+                        f"short_citation {r.short_citation!r} says {needle!r}, which does "
+                        f"not appear in full_citation {r.full_citation!r}"))
+        label = r.display_label
+        if label in seen:
+            problems.append((r.study_id, f"label {label!r} already names {seen[label]}; "
+                                         "add a scenario_label to tell them apart"))
+        else:
+            seen[label] = r.study_id
+    return problems
 
 
 def tier_disagreements(records: list[StudyRecord]) -> list[tuple[str, str, str]]:

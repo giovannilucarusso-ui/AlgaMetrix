@@ -43,7 +43,7 @@ from . import indices, reconstructions
 from .basis import PriceBasis, basis_of_source
 from .endpoints import PRIMARY_ENDPOINT
 from .indices import BasisTransfer
-from .schema import StudyRecord
+from .schema import StudyRecord, compose_label
 from .studies import Dataset
 
 #: Source endpoints the engine can produce a like-for-like value for.
@@ -58,6 +58,13 @@ _ENGINE_ENDPOINT = {
 @dataclass
 class ReproductionRow:
     study_id: str
+    #: The source as a reader has to be given it, carried with the row so a
+    #: figure never has to reach back into the dataset - or, worse, print
+    #: ``study_id``, which identifies the record to this repository and to
+    #: nobody else. The two parts are kept apart because a figure with one row
+    #: per scenario sets them on two lines; :attr:`label` joins them.
+    citation: str | None
+    scenario: str | None
     metric: str                 # "cost" | "gwp"
     endpoint: str
     validation_mode: str
@@ -80,6 +87,11 @@ class ReproductionRow:
     transfer: BasisTransfer | None = None
 
     # ------------------------------------------------------------------
+    @property
+    def label(self) -> str:
+        """The row's name in one line, by the same rule the dataset uses."""
+        return compose_label(self.citation, self.scenario, self.study_id)
+
     @property
     def model_low(self) -> float | None:
         if self.model is None:
@@ -172,7 +184,8 @@ def cost_row(
 
     if endpoint not in _ENGINE_ENDPOINT:
         return ReproductionRow(
-            rec.study_id, "cost", endpoint, rec.validation_mode or "none",
+            rec.study_id, rec.short_citation, rec.scenario_label,
+            "cost", endpoint, rec.validation_mode or "none",
             "endpoint_mismatch", None, rec.reported_value,
             unit=rec.reported_unit or "",
             notes=["source endpoint is unknown; the engine has no like-for-like output"],
@@ -183,7 +196,8 @@ def cost_row(
     source_basis = basis_of_source(rec.reported_currency, rec.reported_price_year)
 
     row = ReproductionRow(
-        study_id=rec.study_id, metric="cost",
+        study_id=rec.study_id, citation=rec.short_citation,
+        scenario=rec.scenario_label, metric="cost",
         endpoint=f"{endpoint} vs engine {engine_endpoint}",
         validation_mode=rec.validation_mode or "none",
         comparison_kind="not_comparable", model=None, reference=rec.reported_value,
@@ -309,7 +323,8 @@ def gwp_row(rec: StudyRecord, lib: Library) -> ReproductionRow | None:
         model, reference = res.lca.gwp_kg_co2eq_per_kg, rec.reported_gwp
 
     row = ReproductionRow(
-        study_id=rec.study_id, metric="gwp",
+        study_id=rec.study_id, citation=rec.short_citation,
+        scenario=rec.scenario_label, metric="gwp",
         endpoint=f"{rec.environmental_endpoint_type or 'unknown'} [{basis}]",
         validation_mode=rec.validation_mode or "none",
         comparison_kind=kind,

@@ -33,6 +33,7 @@ from .figures import (
     C_TEA,
     C_WARN,
     _save,
+    _sublabels,
     plt,
 )
 from matplotlib.lines import Line2D                              # noqa: E402
@@ -286,12 +287,17 @@ def figure3_validation(rows, blocked, outdir: Path, excluded=None) -> list[Path]
     why ``blocked`` and ``excluded`` are still accepted and no longer drawn: the
     counts belong to the caller's caption, and the reasons to
     ``results/validation.txt``.
+
+    Each row is named by its citation and by which scenario of that source it is
+    ("Russo et al., 2022 — Heterotrophic"), because a reader has to be able to
+    find the reference. The internal ``study_id`` is a join key for
+    ``results/validation.txt`` and appears nowhere a reader is expected to read.
     """
     point_rows = [r for r in rows if r.comparison_kind == "point" and r.ratio]
     point_rows = sorted(point_rows, key=lambda r: (r.validation_mode != "blind",
-                                                   r.metric, r.study_id))
+                                                   r.metric, r.label))
 
-    fig, ax = plt.subplots(figsize=(7.2, 0.27 * max(len(point_rows), 6) + 1.4))
+    fig, ax = plt.subplots(figsize=(7.2, 0.34 * max(len(point_rows), 6) + 1.4))
     marker = {"blind": "o", "calibrated": "s", "range": "^", "none": "D"}
 
     ax.grid(axis="x", color="#e6e6e6", lw=0.5)
@@ -309,10 +315,18 @@ def figure3_validation(rows, blocked, outdir: Path, excluded=None) -> list[Path]
                     solid_capstyle="butt", zorder=2)
         ax.plot(r.ratio, i, marker.get(r.validation_mode, "o"), color=color,
                 markersize=6.5, markeredgecolor="white", markeredgewidth=0.6, zorder=3)
-        labels.append(f"{r.study_id}  [{r.metric}]     {r.basis_label}")
+        labels.append(r.citation or r.study_id)
+    # Two lines, not one: the citation is the tick label, so the layout reserves
+    # room for it, and which scenario of that source this is, in what unit, is a
+    # quieter line under it. On one line the longest row is half the figure wide
+    # and the reader parses a sentence to find a name.
     ax.set_yticks(range(len(point_rows)))
-    ax.set_yticklabels(labels, fontsize=6.6)
+    ax.set_yticklabels(labels, fontsize=6.9, color="#1a1a1a")
     ax.tick_params(axis="y", length=0)
+    # The metric is not written out on the second line: colour and the legend
+    # already carry it, and the basis says it again in the unit.
+    _sublabels(ax, [" · ".join(x for x in (r.scenario, r.basis_label) if x)
+                    for r in point_rows], fig)
     ax.set_xlabel("AlgaMetrix / source     (dimensionless)")
 
     # Symmetric about parity and no wider than the data need: on a fixed 0.5-1.5

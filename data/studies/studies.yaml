@@ -49,6 +49,8 @@ studies:
 # =====================================================================
 
 - study_id: tredici2016
+  short_citation: "Tredici et al., 2016"
+  scenario_label: "Flat-panel PBR"
   author_overlap_with_algametrix: false
   full_citation: "Tredici et al. 2016, Algal Research 19:253-263"
   doi: 10.1016/j.algal.2016.09.005
@@ -104,6 +106,8 @@ studies:
     - "Record economic endpoint definition and system boundary from the source."
 
 - study_id: vazquez2022
+  short_citation: "Vázquez-Romero et al., 2022a"
+  scenario_label: "Tubular PBR + LED"
   author_overlap_with_algametrix: false
   full_citation: "Vazquez-Romero et al. 2022, Algal Research 64:102679"
   doi: 10.1016/j.algal.2022.102679
@@ -160,6 +164,8 @@ studies:
 # system from `vazquez2022`, but the same first author. Disclosed rather than
 # counted as a fully independent group.
 - study_id: vazquez2022b_nas
+  short_citation: "Vázquez-Romero et al., 2022b"
+  scenario_label: "N. oceanica, 1 ha"
   author_overlap_with_algametrix: false
   full_citation: "Vazquez-Romero et al. 2022, Science of the Total Environment 837:155742"
   doi: 10.1016/j.scitotenv.2022.155742
@@ -231,6 +237,8 @@ studies:
        capital is not carried entirely on the cultivation line."
 
 - study_id: vazquez2022b_tiso_pht
+  short_citation: "Vázquez-Romero et al., 2022b"
+  scenario_label: "P. tricornutum / T. lutea, 1 ha"
   author_overlap_with_algametrix: false
   full_citation: "Vazquez-Romero et al. 2022, Science of the Total Environment 837:155742"
   doi: 10.1016/j.scitotenv.2022.155742
@@ -289,6 +297,8 @@ studies:
     - "Split the published MEC across cultivation, harvesting and drying."
 
 - study_id: vazquez2022b_nas_10ha
+  short_citation: "Vázquez-Romero et al., 2022b"
+  scenario_label: "N. oceanica, 10 ha"
   author_overlap_with_algametrix: false
   full_citation: "Vazquez-Romero et al. 2022, Science of the Total Environment 837:155742"
   doi: 10.1016/j.scitotenv.2022.155742
@@ -348,6 +358,8 @@ studies:
     - "Split the published MEC across cultivation, harvesting and drying."
 
 - study_id: russo2022_aury
+  short_citation: "Russo et al., 2022"
+  scenario_label: "Heterotrophic"
   author_overlap_with_algametrix: true
   full_citation: "Russo et al. 2022, Bioresource Technology Reports 18:100997"
   doi: 10.1016/j.biteb.2022.100997
@@ -391,6 +403,8 @@ studies:
        normalization quality."
 
 - study_id: scp_protein
+  short_citation: "Engine benchmark, no primary source"
+  scenario_label: "SCP cost envelope"
   full_citation: "Single-cell-protein cost envelope, no primary source (engine benchmark)"
   doi: null
   publication_year: null
@@ -443,6 +457,8 @@ studies:
        found, restore the record with that citation and re-run the cohorts."
 
 - study_id: superpro_algaloil
+  short_citation: "Intelligen Inc., 2015"
+  scenario_label: "SuperPro algal-oil report"
   author_overlap_with_algametrix: false
   full_citation: "Production of Algal Oil (SuperPro Designer Economic Evaluation Report), Intelligen Inc."
   doi: null
@@ -482,6 +498,8 @@ studies:
   todos: []
 
 - study_id: superpro_omega3
+  short_citation: "Intelligen Inc., 2021"
+  scenario_label: "SuperPro omega-3 report"
   author_overlap_with_algametrix: false
   full_citation: "Omega-3 via Microalgal Fermentation (SuperPro Designer), Intelligen Inc."
   doi: null
@@ -521,6 +539,8 @@ studies:
   todos: []
 
 - study_id: phycocyanin
+  short_citation: "van der Walt et al., 2025"
+  scenario_label: "Phycocyanin"
   author_overlap_with_algametrix: false
   full_citation: "van der Walt et al. 2025, Journal of Applied Phycology"
   doi: 10.1007/s10811-025-03443-x
@@ -575,6 +595,8 @@ studies:
        whichever source actually publishes them."
 
 - study_id: astaxanthin
+  short_citation: "Panis & Carreon, 2016"
+  scenario_label: "Astaxanthin"
   author_overlap_with_algametrix: false
   full_citation: "Panis & Carreon 2016, Algal Research"
   doi: 10.1016/j.algal.2016.05.001
@@ -633,6 +655,8 @@ studies:
        the numbers before this record is cited."
 
 - study_id: frontiers2026_spirulina
+  short_citation: "Ahmed et al., 2026"
+  scenario_label: "Organic Spirulina, Italy"
   full_citation: "Ahmed AEEMS et al. (2026). Organic Spirulina production, Italy.
     Frontiers in Sustainable Food Systems 10:1763476."
   doi: 10.3389/fsufs.2026.1763476
@@ -685,6 +709,8 @@ studies:
        from the source's contribution analysis, or state the residual it leaves."
 
 - study_id: gwp_iceland_spirulina
+  short_citation: "Tzachor et al., 2022"
+  scenario_label: "Spirulina, geothermal PBR"
   full_citation: "Tzachor A, Smidt-Jensen A, Ramel A, Geirsdottir M (2022).
     Environmental impacts of large-scale Spirulina (Arthrospira platensis) production in
     Hellisheidi geothermal park Iceland: life cycle assessment. Marine Biotechnology
@@ -750,6 +776,8 @@ studies:
   todos: []
 
 - study_id: spiralg2019
+  short_citation: "Braud et al., 2025"
+  scenario_label: "SpiralG pilot, 2019 inventory"
   full_citation: "Braud et al. 2025, Bioresource Technology Reports 29:102027 (SpiralG pilot, 2019 inventory)"
   doi: 10.1016/j.biteb.2025.102027
   publication_year: 2025
@@ -789,6 +817,8 @@ studies:
   todos: []
 
 - study_id: mckuin_schizo
+  short_citation: "McKuin et al., 2022"
+  scenario_label: "Schizochytrium, whole cell"
   # Verified against Crossref 2026-08-04. The article number was previously recorded as
   # 00083, which is a different McKuin paper (Nannochloropsis sp. and fishmeal, Elementa
   # 11(1):00083, 2023, doi 10.1525/elementa.2022.00083). The Schizochytrium study this
@@ -832,6 +862,8 @@ studies:
   todos: []
 
 - study_id: padi2023_spirulina
+  short_citation: "Padi et al., 2023"
+  scenario_label: "Spirulina DSFP, greenhouse ORP"
   author_overlap_with_algametrix: false
   full_citation: "Padi et al. 2023, Algal Research 74:103190 (Spirulina DSFP, greenhouse ORP)"
   doi: 10.1016/j.algal.2023.103190
@@ -888,6 +920,8 @@ studies:
 # =====================================================================
 
 - study_id: norsker2011_pond
+  short_citation: "Norsker et al., 2011"
+  scenario_label: "Open raceway pond"
   author_overlap_with_algametrix: false
   full_citation: "Norsker et al. 2011, Biotechnology Advances 29:24-27"
   doi: 10.1016/j.biotechadv.2010.08.005
@@ -919,6 +953,8 @@ studies:
        docs/STUDY_SELECTION.md)."
 
 - study_id: norsker2011_tubular
+  short_citation: "Norsker et al., 2011"
+  scenario_label: "Tubular PBR"
   author_overlap_with_algametrix: false
   full_citation: "Norsker et al. 2011, Biotechnology Advances 29:24-27"
   doi: 10.1016/j.biotechadv.2010.08.005
@@ -945,6 +981,8 @@ studies:
     - "Endpoint classified as production_cost from the dataset label 'cost'."
 
 - study_id: norsker2011_flatpanel
+  short_citation: "Norsker et al., 2011"
+  scenario_label: "Flat-panel PBR"
   author_overlap_with_algametrix: false
   full_citation: "Norsker et al. 2011, Biotechnology Advances 29:24-27"
   doi: 10.1016/j.biotechadv.2010.08.005
@@ -971,6 +1009,8 @@ studies:
     - "Endpoint classified as production_cost from the dataset label 'cost'."
 
 - study_id: acien2012_real
+  short_citation: "Acién et al., 2012"
+  scenario_label: "Real plant, as operated"
   author_overlap_with_algametrix: false
   full_citation: "Acien et al. 2012, Biotechnology Advances 30:1344-1353"
   doi: 10.1016/j.biotechadv.2012.02.005
@@ -998,6 +1038,8 @@ studies:
     - "Endpoint classified as production_cost from the dataset label 'cost'."
 
 - study_id: acien2012_scaled
+  short_citation: "Acién et al., 2012"
+  scenario_label: "200 t/yr projection"
   author_overlap_with_algametrix: false
   full_citation: "Acien et al. 2012, Biotechnology Advances 30:1344-1353"
   doi: 10.1016/j.biotechadv.2012.02.005
@@ -1027,6 +1069,8 @@ studies:
     - "A projected cost and the measured cost from the same facility both enter the cohort."
 
 - study_id: nrel_davis2016
+  short_citation: "Davis et al., 2016 (NREL)"
+  scenario_label: "Open pond, nth plant"
   author_overlap_with_algametrix: false
   full_citation: "Davis et al. 2016, NREL/TP-5100-64772"
   doi: 10.2172/1239893
@@ -1060,6 +1104,8 @@ studies:
        production-cost endpoint and re-enter the primary spread."
 
 - study_id: ruiz2016
+  short_citation: "Ruiz et al., 2016"
+  scenario_label: "PBR biorefinery"
   author_overlap_with_algametrix: false
   full_citation: "Ruiz et al. 2016, Energy & Environmental Science 9:3036-3043"
   doi: 10.1039/C6EE01493C
@@ -1089,6 +1135,8 @@ studies:
        recorded. This materially affects comparability."
 
 - study_id: oostlander2020_tub
+  short_citation: "Oostlander et al., 2020"
+  scenario_label: "Tubular PBR, hatchery"
   author_overlap_with_algametrix: false
   full_citation: "Oostlander et al. 2020, Aquaculture 525:735310"
   doi: 10.1016/j.aquaculture.2020.735310
@@ -1115,6 +1163,8 @@ studies:
     - "Endpoint classified as production_cost from the dataset label 'cost'."
 
 - study_id: oostlander2020_bc
+  short_citation: "Oostlander et al., 2020"
+  scenario_label: "Bubble-column PBR, hatchery"
   author_overlap_with_algametrix: false
   full_citation: "Oostlander et al. 2020, Aquaculture 525:735310"
   doi: 10.1016/j.aquaculture.2020.735310
@@ -1141,6 +1191,8 @@ studies:
     - "Endpoint classified as production_cost from the dataset label 'cost'."
 
 - study_id: oostlander2020_scaled
+  short_citation: "Oostlander et al., 2020"
+  scenario_label: "Tubular PBR, 1500 m2"
   author_overlap_with_algametrix: false
   full_citation: "Oostlander et al. 2020, Aquaculture 525:735310"
   doi: 10.1016/j.aquaculture.2020.735310
@@ -1170,6 +1222,8 @@ studies:
     - "Three scenarios from one publication enter the cohort as three records."
 
 - study_id: ruiz2022_hetero
+  short_citation: "Ruiz et al., 2022"
+  scenario_label: "Heterotrophic"
   author_overlap_with_algametrix: false
   full_citation: "Ruiz et al. 2022, Algal Research 64:102698"
   doi: 10.1016/j.algal.2022.102698
@@ -1196,6 +1250,8 @@ studies:
     - "Endpoint classified as production_cost from the dataset label 'cost'."
 
 - study_id: russo2022_foodwaste_b
+  short_citation: "Russo et al., 2022"
+  scenario_label: "Food waste, scenario B"
   author_overlap_with_algametrix: true
   full_citation: "Russo et al. 2022, Bioresource Technology Reports 18:100997"
   doi: 10.1016/j.biteb.2022.100997
@@ -1223,6 +1279,8 @@ studies:
     - "Self-citation: the authors of AlgaMetrix are authors of this source."
 
 - study_id: russo2022_foodwaste_c
+  short_citation: "Russo et al., 2022"
+  scenario_label: "Food waste, scenario C"
   author_overlap_with_algametrix: true
   full_citation: "Russo et al. 2022, Bioresource Technology Reports 18:100997"
   doi: 10.1016/j.biteb.2022.100997
@@ -1252,6 +1310,8 @@ studies:
 # --- Tier A: published GWP points -------------------------------------
 
 - study_id: gwp_spirulina_artisanal
+  short_citation: "Science of the Total Environment, 2024"
+  scenario_label: "Artisanal Spirulina"
   full_citation: "Science of the Total Environment 2024 (artisanal Spirulina), PII S0195925524001665"
   doi: null
   publication_year: 2024
@@ -1275,6 +1335,8 @@ studies:
     - "No DOI recorded; only a publisher PII. Resolve to a DOI."
 
 - study_id: gwp_spirulina_france
+  short_citation: "Journal of Cleaner Production, 2021"
+  scenario_label: "Eco-design, France"
   full_citation: "Journal of Cleaner Production 2021 (eco-design of Spirulina production), PII S0959652621009604"
   doi: null
   publication_year: 2021
@@ -1305,6 +1367,8 @@ studies:
        descriptive statistics, and apply the same rule to every range-reporting study."
 
 - study_id: gwp_maiolo_tetra_s1
+  short_citation: "Maiolo et al., 2020"
+  scenario_label: "Tetraselmis, flue gas"
   full_citation: "Maiolo et al. 2020, International Journal of LCA 25:1455-1471 (Tetraselmis, flue gas)"
   doi: 10.1007/s11367-020-01759-z
   publication_year: 2020
@@ -1331,6 +1395,8 @@ studies:
     and no scenario builder for it exists in the repository.
 
 - study_id: gwp_maiolo_tetra_s2
+  short_citation: "Maiolo et al., 2020"
+  scenario_label: "Tetraselmis, pure CO2"
   full_citation: "Maiolo et al. 2020, International Journal of LCA 25:1455-1471 (Tetraselmis, pure CO2)"
   doi: 10.1007/s11367-020-01759-z
   publication_year: 2020
@@ -1352,6 +1418,8 @@ studies:
   gwp_reconstruction_status: not_applicable
 
 - study_id: gwp_pond_biofuel
+  short_citation: "Biochemical Engineering Journal, 2024"
+  scenario_label: "Open pond, biofuel"
   full_citation: "Biochemical Engineering Journal 2024 (microalgae biofuel), PII S1369703X24003589"
   doi: null
   publication_year: 2024
@@ -1377,6 +1445,8 @@ studies:
     - "No DOI recorded. Decide whether partial-boundary studies belong in the GWP spread."
 
 - study_id: gwp_pbr_biofuel
+  short_citation: "Biochemical Engineering Journal, 2024"
+  scenario_label: "Tubular PBR, biofuel"
   full_citation: "Biochemical Engineering Journal 2024 (microalgae biofuel), PII S1369703X24003589"
   doi: null
   publication_year: 2024
@@ -1399,6 +1469,8 @@ studies:
     - "System boundary differs from the rest of the cohort."
 
 - study_id: gwp_pbr_tubular_pilot
+  short_citation: "Energy Procedia, 2018"
+  scenario_label: "Tubular PBR pilot"
   full_citation: "Energy Procedia 2018 (PBR carbon footprint), PII S1876610218308518"
   doi: null
   publication_year: 2018
@@ -1422,6 +1494,8 @@ studies:
     - "No DOI recorded."
 
 - study_id: gwp_pbr_lightguided
+  short_citation: "Algal Research, 2026"
+  scenario_label: "Light-guided PBR"
   full_citation: "Algal Research 2026 (light-guiding cultivation), PII S2211926426001463"
   doi: null
   publication_year: 2026
@@ -1444,6 +1518,8 @@ studies:
     - "No DOI recorded."
 
 - study_id: gwp_pbr_industrial
+  short_citation: "Gueguen et al., 2024"
+  scenario_label: "Vertical-stacked PBR"
   full_citation: "Gueguen et al. 2024, Sustainable Production and Consumption, PII S2352554124001736"
   doi: null
   publication_year: 2024
@@ -1467,6 +1543,8 @@ studies:
        therefore the headline ratio: verify it directly against the source."
 
 - study_id: gwp_spiralg2022
+  short_citation: "Braud et al., 2025"
+  scenario_label: "SpiralG pilot, 2022 inventory"
   full_citation: "Braud et al. 2025, Bioresource Technology Reports 29:102027 (SpiralG, 2022 inventory)"
   doi: 10.1016/j.biteb.2025.102027
   publication_year: 2025
@@ -1492,6 +1570,8 @@ studies:
     - "Two inventory years from one pilot enter the cohort as two independent points."
 
 - study_id: gwp_mckuin_nanno
+  short_citation: "McKuin et al., 2023"
+  scenario_label: "Nannochloropsis meal"
   # Verified against Crossref 2026-08-04. The volume and year were previously recorded
   # as Elementa 10 (2022), which belongs to the companion Schizochytrium study
   # (`mckuin_schizo`, 10(1):00098). This DOI is the Nannochloropsis paper: 11(1):00083, 2023.
@@ -1521,6 +1601,8 @@ studies:
        denominator of the published max/min ratio."
 
 - study_id: gwp_pechsiri_orp
+  short_citation: "Pechsiri et al., 2023"
+  scenario_label: "Scenedesmus, open raceway pond"
   full_citation: "Pechsiri et al. 2023, Science of the Total Environment 854:158445 (Scenedesmus, ORP)"
   doi: 10.1016/j.scitotenv.2022.158445
   publication_year: 2023
@@ -1542,6 +1624,8 @@ studies:
   gwp_reconstruction_status: not_applicable
 
 - study_id: gwp_pechsiri_tlc
+  short_citation: "Pechsiri et al., 2023"
+  scenario_label: "Scenedesmus, thin-layer cascade"
   full_citation: "Pechsiri et al. 2023, Science of the Total Environment 854:158445 (thin-layer cascade)"
   doi: 10.1016/j.scitotenv.2022.158445
   publication_year: 2023
@@ -1563,6 +1647,8 @@ studies:
   gwp_reconstruction_status: not_applicable
 
 - study_id: gwp_pechsiri_vst
+  short_citation: "Pechsiri et al., 2023"
+  scenario_label: "Scenedesmus, tubular PBR"
   full_citation: "Pechsiri et al. 2023, Science of the Total Environment 854:158445 (tubular PBR)"
   doi: 10.1016/j.scitotenv.2022.158445
   publication_year: 2023
