@@ -26,8 +26,11 @@ date-released: "2026-08-12"
 # Concept DOI: resolves to the most recent archived release.
 doi: 10.5281/zenodo.21764183
 identifiers:
-  # No snapshot DOI is listed for 1.1.0: none exists until the GitHub release is
-  # cut and Zenodo mints one. Add it here at that point, never before.
+  # A snapshot DOI is added only once Zenodo has minted it, which happens when
+  # the GitHub release is published. Never write one here in advance.
+  - type: doi
+    value: 10.5281/zenodo.21901542
+    description: "Archived snapshot of version 1.1.0"
   - type: doi
     value: 10.5281/zenodo.21797014
     description: "Archived snapshot of version 1.0.2"
