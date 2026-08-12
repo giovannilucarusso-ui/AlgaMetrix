@@ -20,7 +20,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from .inventory import Inventory
-from .models import Scenario
+from .models import Scenario, WasteBurdenConvention
 
 
 def capital_recovery_factor(rate: float, lifetime: float) -> float:
@@ -84,6 +84,12 @@ class TEAResult:
     payback_years: float
     npv: float
     irr: float | None
+    # EUR/yr of conventional treatment this plant displaces, >= 0 and non-zero
+    # only where the scenario declares system expansion. Deliberately outside
+    # ``annual_opex``: no money changes hands for it. It lowers the net
+    # production cost and the profit, and is reported here so the choice can be
+    # undone - the economic counterpart of the LCA's avoided-treatment line.
+    avoided_treatment_credit: float = 0.0
     capex_breakdown: dict = field(default_factory=dict)
     opex_breakdown: dict = field(default_factory=dict)
     opex_categories: dict = field(default_factory=dict)
@@ -206,13 +212,29 @@ def run_tea(scenario: Scenario, inv: Inventory) -> TEAResult:
         revenues = scenario.product_price * annual_kg + scenario.coproduct_revenue_per_year
         credits = scenario.coproduct_revenue_per_year
 
+    # The treatment this plant performs instead of somebody else, where the
+    # scenario declares system expansion. It is deliberately NOT in the annual
+    # operating cost: no money changes hands for it, and a production cost that
+    # quietly nets off a service the plant was never paid for is not a
+    # production cost. It lowers the net cost and the profit, on its own line,
+    # exactly where the co-product credits already sit - and under the same
+    # convention that governs the LCA credit, so the two analyses cannot end up
+    # describing different systems.
+    wf = scenario.waste_feed
+    avoided_treatment_credit = 0.0
+    if (inv.waste_feed_per_kg > 0
+            and wf.convention == WasteBurdenConvention.AVOIDED_TREATMENT):
+        avoided_treatment_credit = (
+            inv.waste_feed_per_kg * wf.avoided_treatment_cost_per_unit * annual_kg)
+
     # Energy/heat-recovery and waste-valorisation savings lower the net operating cost.
-    credits += scenario.credits_per_year
+    credits += scenario.credits_per_year + avoided_treatment_credit
     net_opex = annual_opex - credits
     net_production_cost = net_opex / annual_kg if annual_kg > 0 else float("inf")
 
     # ---- PROFITABILITY --------------------------------------------------
-    gross_profit = revenues - annual_opex + scenario.credits_per_year
+    gross_profit = (revenues - annual_opex + scenario.credits_per_year
+                    + avoided_treatment_credit)
     taxes = eco.tax_rate * max(gross_profit, 0.0)
     net_profit = gross_profit - taxes
     annual_cash_flow = net_profit + depreciation  # add back non-cash depreciation
@@ -239,6 +261,7 @@ def run_tea(scenario: Scenario, inv: Inventory) -> TEAResult:
         utilities_cost=utilities_cost,
         production_cost_eur_per_kg=production_cost,
         net_production_cost_eur_per_kg=net_production_cost,
+        avoided_treatment_credit=avoided_treatment_credit,
         revenues=revenues,
         gross_profit=gross_profit,
         taxes=taxes,

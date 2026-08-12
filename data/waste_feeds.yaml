@@ -19,8 +19,12 @@
 # strict cut-off with the stream available at the fence line.
 #
 # `avoided_treatment_*` values apply only under
-# `convention: avoided_treatment` and are entered POSITIVE: the burden avoided,
-# which the LCA subtracts and reports on its own line.
+# `convention: avoided_treatment` and are entered POSITIVE: the burden and the
+# cost avoided, which the LCA and the TEA respectively subtract and report on
+# their own lines. `avoided_treatment_cost_per_unit` is what treating this
+# stream conventionally would have cost SOMEBODY - it is not money this plant
+# receives, so it never enters the operating cost, only the net production cost
+# and the profit. The money actually invoiced is `price_per_unit`.
 #
 # Concentrations vary enormously with site and season. These are literature
 # central values for screening, not permits: replace them with an analysis of
@@ -47,6 +51,7 @@ waste_feeds:
     convention: cut_off
     avoided_treatment_gwp_per_unit: 0.35   # kg CO2-eq/m3 of conventional tertiary treatment
     avoided_treatment_ced_per_unit: 2.5    # MJ/m3
+    avoided_treatment_cost_per_unit: 0.30  # EUR/m3 of tertiary treatment displaced
     notes: >-
       Typical primary-effluent strength for a European municipal works: TN
       30-60 mg/L, TP 5-10 mg/L (Nishshanka et al. 2023; Sanchez-Zurano et al.
@@ -143,6 +148,7 @@ waste_feeds:
     convention: cut_off
     avoided_treatment_gwp_per_unit: 0.6
     avoided_treatment_ced_per_unit: 6.0
+    avoided_treatment_cost_per_unit: 1.20  # EUR/m3 of industrial effluent treatment
     notes: >-
       Process water from potato starch manufacture, 3-6 kg N/m3 with soluble
       sugars and organic acids. Priced at zero because the realistic siting is

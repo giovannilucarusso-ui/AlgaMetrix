@@ -60,10 +60,24 @@ Waste is not automatically cheap. Sugar-beet vinasse is a traded fertiliser and 
 its price is positive; a stream can easily cost more than the fertiliser it saves, and the model
 is able to say so.
 
-A wider credit for displacing a treatment plant — as opposed to the fee actually invoiced —
-belongs in `Scenario.credits_per_year`, not here.
+### The treatment service is separate money
 
-## 4. The LCA convention is declared, not assumed
+A works may be paid €0.15/m³ to accept effluent while displacing €0.30/m³ of conventional
+treatment. Only the first is invoiced. `avoided_treatment_cost_per_unit` carries the second, and
+the two never merge:
+
+| | enters the AOC? | enters the production cost? | enters net cost & profit? |
+|---|:---:|:---:|:---:|
+| `price_per_unit` (gate fee) | yes | yes | yes |
+| `avoided_treatment_cost_per_unit` | **no** | **no** | yes |
+
+The credit stays out of the annual operating cost because no money changes hands for it. A
+production cost that quietly nets off a service the plant was never paid for is not a production
+cost — nobody could reproduce it from an invoice — so it sits with the co-product credits, in
+`net_production_cost_eur_per_kg` and in the profit, and is reported on `TEAResult`
+as `avoided_treatment_credit` so it can be taken back off.
+
+## 4. One convention, both analyses
 
 `WasteBurdenConvention`, on the feed:
 
@@ -72,14 +86,20 @@ belongs in `Scenario.credits_per_year`, not here.
   `ced_per_unit`, and the pumping electricity). This keeps a cradle-to-gate result comparable
   with studies that buy fertiliser.
 - **`avoided_treatment`** — system expansion. The stream would have been treated and discharged,
-  so the treatment displaced is credited. This makes the result **a difference between two
-  systems** rather than the footprint of one.
+  so the treatment displaced is credited — **its emissions in the LCA and its cost in the TEA**.
+  This makes the result **a difference between two systems** rather than the footprint of one.
 
-The credit is reported on its own line (`Avoided treatment (system expansion)` in the GWP
-breakdown, `avoided_treatment_kg_co2eq_per_kg` on the result) and is kept **outside the gross**,
-exactly as the biogenic-carbon credit is — so a reader who disagrees with the convention can add
-it back and get the number without it. Under `cut_off` the credit is not applied however large
-the `avoided_treatment_*` figures on the stream happen to be.
+`convention` governs *both* analyses, deliberately. Crediting the displaced treatment in the LCA
+while ignoring it in the economics would have the two describe different systems, which is the
+failure this engine exists to prevent: one boundary, one inventory, two contractions of it. The
+same is true in reverse, and `tests/test_waste_feed.py` requires a catalogued stream to declare
+the avoided burden and the avoided cost together or neither.
+
+Both credits are reported on their own lines — `Avoided treatment (system expansion)` in the GWP
+breakdown, `avoided_treatment_kg_co2eq_per_kg` and `avoided_treatment_credit` on the two results
+— and both are kept **outside the gross**, exactly as the biogenic-carbon credit is, so a reader
+who disagrees with the convention can add them back. Under `cut_off` neither is applied, however
+large the `avoided_treatment_*` figures on the stream happen to be.
 
 It can drive the net GWP below zero. That is a legitimate system-expansion outcome and it is
 labelled as one; it is not a claim that growing algae removes carbon.
@@ -112,6 +132,12 @@ labelled as one; it is not a claim that growing algae removes carbon.
 | CED | 47.20 MJ/kg | 43.59 MJ/kg |
 | Effluent received | — | 2.47 m³/kg |
 | Phosphorus discharged | — | 0.0037 kg/kg |
+
+Switching the same case to `avoided_treatment` moves it further, and moves both results at once:
+the net production cost falls from 5.53 to 4.79 €/kg on a credit of €440k/yr, while the GWP goes
+to −0.687 kg CO₂-eq/kg. The gross production cost does not move at all. A net GWP below zero is a
+legitimate system-expansion outcome and is labelled as one; it is not a claim that growing algae
+removes carbon.
 
 Nitrogen leaves the GWP contribution list entirely — it was the largest term after energy. The
 cost falls much less than the footprint does, because fertiliser was never the cost driver;

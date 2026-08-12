@@ -194,6 +194,7 @@ def _waste_feed(d: dict) -> WasteFeed:
         convention=WasteBurdenConvention(d.get("convention", "cut_off")),
         avoided_treatment_gwp_per_unit=float(d.get("avoided_treatment_gwp_per_unit", 0.0)),
         avoided_treatment_ced_per_unit=float(d.get("avoided_treatment_ced_per_unit", 0.0)),
+        avoided_treatment_cost_per_unit=float(d.get("avoided_treatment_cost_per_unit", 0.0)),
         notes=d.get("notes", ""),
     )
 

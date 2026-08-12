@@ -236,6 +236,14 @@ def verify(scenario: Scenario) -> VerificationReport:
             invariants.append(InvariantCheck(
                 f"Admissible: {label} purchased >= 0",
                 purchased >= -TOL, f"{purchased:.6g} kg/kg"))
+        # Avoided burdens are entered as the burden avoided and subtracted by the
+        # engine; a negative entry would silently add one instead.
+        for label, value in (("GWP", wf.avoided_treatment_gwp_per_unit),
+                             ("CED", wf.avoided_treatment_ced_per_unit),
+                             ("cost", wf.avoided_treatment_cost_per_unit)):
+            invariants.append(InvariantCheck(
+                f"Admissible: avoided-treatment {label} entered positive",
+                value >= 0.0, f"{value:.6g} per {wf.unit}"))
 
     # The elemental carbon constraint the old "Carbon:" identity did not test:
     # a heterotroph cannot incorporate more carbon than its substrate carried.

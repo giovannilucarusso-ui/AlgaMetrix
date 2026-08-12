@@ -499,11 +499,25 @@ class MainWindow(QMainWindow):
         self.cmb_waste_conv.setToolTip(
             "cut_off: the waste enters burden-free and you carry only what you do "
             "yourself. avoided_treatment: system expansion, crediting the treatment "
-            "you displace — which makes the result a difference between two systems, "
-            "so it is always reported on its own line."
+            "you displace — both its emissions and its cost, since one boundary has "
+            "to serve both analyses. Either way the credit is reported on its own "
+            "line and kept out of the gross, so it can be taken back off."
         )
         self.cmb_waste_conv.currentTextChanged.connect(self._on_waste_change)
-        f.addRow(tr("LCA convention"), self.cmb_waste_conv)
+        f.addRow(tr("System boundary"), self.cmb_waste_conv)
+
+        self.spn_waste_avoided = QDoubleSpinBox()
+        self.spn_waste_avoided.setRange(0.0, 1000.0)
+        self.spn_waste_avoided.setDecimals(3)
+        self.spn_waste_avoided.setSingleStep(0.05)
+        self.spn_waste_avoided.setToolTip(
+            "What treating this stream conventionally would have cost somebody, per "
+            "unit. This is NOT money you receive — that is the price above — so it "
+            "never enters the operating cost or the production cost. It lowers the "
+            "net cost and the profit, and only under avoided_treatment."
+        )
+        self.spn_waste_avoided.valueChanged.connect(self._on_waste_change)
+        f.addRow(tr("Treatment displaced (€/unit)"), self.spn_waste_avoided)
 
         self.lbl_waste = QLabel("")
         self.lbl_waste.setObjectName("subtle")
@@ -893,7 +907,9 @@ class MainWindow(QMainWindow):
         if preset is None:
             return
         for widget, value in ((self.spn_waste_price, preset.price_per_unit),
-                              (self.spn_waste_cov, preset.coverage * 100.0)):
+                              (self.spn_waste_cov, preset.coverage * 100.0),
+                              (self.spn_waste_avoided,
+                               preset.avoided_treatment_cost_per_unit)):
             widget.blockSignals(True)
             widget.setValue(value)
             widget.blockSignals(False)
@@ -928,6 +944,7 @@ class MainWindow(QMainWindow):
         feed.coverage = self.spn_waste_cov.value() / 100.0
         feed.price_per_unit = self.spn_waste_price.value()
         feed.convention = WasteBurdenConvention(self.cmb_waste_conv.currentText())
+        feed.avoided_treatment_cost_per_unit = self.spn_waste_avoided.value()
         return feed
 
     def _on_waste_change(self, *_):
@@ -978,6 +995,13 @@ class MainWindow(QMainWindow):
             if surplus > 0:
                 txt += f" (+{surplus:.4g} kg/kg discharged)"
             parts.append(txt)
+        credit = results.tea.avoided_treatment_credit
+        if credit:
+            # Named for what it is. It is not revenue and it is not in the
+            # production cost, and a user who reads it as either would be
+            # reporting a number their invoices cannot support.
+            parts.append(f"treatment displaced €{credit:,.0f}/yr "
+                         f"(net cost and profit only, not the production cost)")
         self.lbl_waste.setText(" · ".join(parts))
 
     def apply_scenario(self, scn: Scenario):
@@ -1018,8 +1042,11 @@ class MainWindow(QMainWindow):
             combo.blockSignals(True)
             combo.setCurrentText(value)
             combo.blockSignals(False)
-        for widget, value in ((self.spn_waste_cov, self.waste_feed.coverage * 100.0),
-                              (self.spn_waste_price, self.waste_feed.price_per_unit)):
+        for widget, value in (
+                (self.spn_waste_cov, self.waste_feed.coverage * 100.0),
+                (self.spn_waste_price, self.waste_feed.price_per_unit),
+                (self.spn_waste_avoided,
+                 self.waste_feed.avoided_treatment_cost_per_unit)):
             widget.blockSignals(True)
             widget.setValue(value)
             widget.blockSignals(False)

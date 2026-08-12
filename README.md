@@ -40,10 +40,12 @@ For a user-defined production scenario it computes, from a single mass/energy ba
   **gate fee** is entered as a negative price, which is how a works treating municipal effluent earns.
   One stream has one composition, so the quantity is dosed against a single demand and whatever it
   carries of the others follows: a nitrogen-dosed effluent that is phosphorus-rich **over-delivers
-  phosphorus, and that surplus is reported and discharged**, never quietly absorbed. The LCA
-  convention is explicit — **cut-off** (the default: the waste enters burden-free and you carry only
-  transport and pumping) or **avoided treatment** (system expansion, credited on its own line so a
-  reader can take it back off).
+  phosphorus, and that surplus is reported and discharged**, never quietly absorbed. The system
+  boundary is explicit and governs **both** analyses — **cut-off** (the default: the waste enters
+  burden-free and you carry only transport and pumping) or **avoided treatment** (system expansion,
+  crediting the treatment you displace: its emissions in the LCA *and* its cost in the TEA, each on
+  its own line and outside the gross, so a reader can take them back off). The treatment credit is
+  kept out of the operating cost, because no money changes hands for it — unlike the gate fee.
 - **Life-cycle assessment** — cradle-to-gate **Global Warming Potential (kg CO₂-eq)**, **Cumulative
   Energy Demand (MJ)**, **water use (m³)**, **land use (m²·a)**, **marine & freshwater eutrophication**
   and **acidification** per kg of biomass, with GWP contribution analysis.

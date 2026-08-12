@@ -151,11 +151,22 @@ class WasteFeed:
     #: Zero under a strict cut-off with the stream available at the fence line.
     gwp_per_unit: float = 0.0            # kg CO2-eq per unit
     ced_per_unit: float = 0.0            # MJ per unit
+    #: Governs **both** analyses. Crediting the displaced treatment in the LCA
+    #: but not in the economics would have the two describe different systems,
+    #: which is the failure this engine exists to prevent: one boundary, one
+    #: inventory, two contractions of it.
     convention: WasteBurdenConvention = WasteBurdenConvention.CUT_OFF
     #: Applied only under ``AVOIDED_TREATMENT`` and reported on its own line.
-    #: Enter as a positive number: the burden avoided, which the LCA subtracts.
+    #: Enter as positive numbers: the burden and the cost avoided, which the LCA
+    #: and the TEA respectively subtract.
     avoided_treatment_gwp_per_unit: float = 0.0
     avoided_treatment_ced_per_unit: float = 0.0
+    #: EUR per unit of what treating this stream conventionally would have cost
+    #: somebody. Distinct from ``price_per_unit``, which is the fee actually
+    #: invoiced: a works may be paid EUR 0.15/m3 while displacing EUR 0.30/m3 of
+    #: treatment, and only the first is money that changes hands. It therefore
+    #: never enters the annual operating cost, only the net cost and the profit.
+    avoided_treatment_cost_per_unit: float = 0.0
     notes: str = ""                      # provenance / citation for a preset
 
 

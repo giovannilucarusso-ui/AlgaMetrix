@@ -166,6 +166,57 @@ def test_an_expensive_stream_can_cost_more_than_the_fertiliser_it_saves(photo):
     assert run_tea(dear, build_inventory(dear)).production_cost_eur_per_kg > base_cost
 
 
+def test_the_treatment_credit_stays_out_of_the_operating_cost(photo):
+    """No money changes hands for it, so it cannot lower the production cost.
+
+    The gate fee is invoiced and belongs in the AOC. The treatment displaced is
+    a service the plant was never paid for: crediting it against the production
+    cost would report a cost nobody could reproduce from an invoice.
+    """
+    scn = replace(photo, waste_feed=_feed(
+        convention=WasteBurdenConvention.AVOIDED_TREATMENT,
+        avoided_treatment_cost_per_unit=0.30))
+    inv = build_inventory(scn)
+    tea = run_tea(scn, inv)
+    plain = run_tea(replace(photo, waste_feed=_feed()), build_inventory(scn))
+
+    expected = inv.waste_feed_per_kg * 0.30 * inv.annual_biomass_kg
+    assert tea.avoided_treatment_credit == pytest.approx(expected)
+    # Gross AOC and gross production cost are untouched by the credit...
+    assert tea.annual_opex == pytest.approx(plain.annual_opex)
+    assert tea.production_cost_eur_per_kg == pytest.approx(
+        plain.production_cost_eur_per_kg)
+    # ...while the net cost and the profit both carry it.
+    assert tea.net_production_cost_eur_per_kg < plain.net_production_cost_eur_per_kg
+    assert tea.gross_profit == pytest.approx(plain.gross_profit + expected)
+
+
+def test_cut_off_grants_no_treatment_credit_either(photo):
+    """One convention governs both analyses; neither leaks under cut-off."""
+    scn = replace(photo, waste_feed=_feed(
+        convention=WasteBurdenConvention.CUT_OFF,
+        avoided_treatment_cost_per_unit=99.0))
+    tea = run_tea(scn, build_inventory(scn))
+    assert tea.avoided_treatment_credit == 0.0
+
+
+def test_the_gate_fee_and_the_treatment_credit_are_different_money(photo):
+    """A works can be paid 0.15/m3 while displacing 0.30/m3 of treatment.
+
+    Conflating the two would either invent revenue that is not invoiced or hide
+    a service that is real; they move different numbers and must stay apart.
+    """
+    scn = replace(photo, waste_feed=_feed(
+        price_per_unit=-0.15,
+        convention=WasteBurdenConvention.AVOIDED_TREATMENT,
+        avoided_treatment_cost_per_unit=0.30))
+    inv = build_inventory(scn)
+    tea = run_tea(scn, inv)
+    fee = inv.waste_feed_per_kg * -0.15 * inv.annual_biomass_kg
+    assert tea.opex_breakdown["Test effluent"] == pytest.approx(fee)      # invoiced
+    assert tea.avoided_treatment_credit == pytest.approx(-2.0 * fee)     # not invoiced
+
+
 # =====================================================================
 # Burden
 # =====================================================================
@@ -313,3 +364,19 @@ def test_an_avoided_treatment_figure_is_never_entered_negative(lib):
     for name, feed in lib.waste_feeds.items():
         assert feed.avoided_treatment_gwp_per_unit >= 0, name
         assert feed.avoided_treatment_ced_per_unit >= 0, name
+        assert feed.avoided_treatment_cost_per_unit >= 0, name
+
+
+def test_a_stream_that_displaces_treatment_says_so_in_both_currencies(lib):
+    """A credit in one analysis and not the other would split the boundary.
+
+    The two figures are independent numbers, but a stream that displaces a
+    treatment displaces both its emissions and its cost. Declaring one without
+    the other is the asymmetry that lets a TEA and an LCA drift into describing
+    different systems.
+    """
+    for name, feed in lib.waste_feeds.items():
+        has_burden = feed.avoided_treatment_gwp_per_unit > 0
+        has_cost = feed.avoided_treatment_cost_per_unit > 0
+        assert has_burden == has_cost, (
+            f"{name}: avoided-treatment GWP and cost must be declared together")

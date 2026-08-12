@@ -33,7 +33,13 @@ from dataclasses import dataclass
 from typing import Callable
 
 from ..inventory import CO2_PER_C, build_inventory
-from ..models import Basis, CarbonAccounting, CarbonSource, TrophicMode
+from ..models import (
+    Basis,
+    CarbonAccounting,
+    CarbonSource,
+    TrophicMode,
+    WasteBurdenConvention,
+)
 
 
 @dataclass(frozen=True)
@@ -459,17 +465,33 @@ def _equations_profitability() -> list[Equation]:
     return [
         Equation(
             "tea.profit",
-            r"\Pi_\mathrm{gross} = R - \mathrm{AOC} + R_\mathrm{cr},\qquad "
+            r"\Pi_\mathrm{gross} = R - \mathrm{AOC} + R_\mathrm{cr} + R_\mathrm{av},\qquad "
             r"T = \tau\max(\Pi_\mathrm{gross},0),\qquad "
             r"\Pi_\mathrm{net} = \Pi_\mathrm{gross} - T",
             "Gross profit, tax and net profit. Tax is charged on positive gross profit "
-            "only and losses are not carried forward.",
+            "only and losses are not carried forward. $R_\\mathrm{av}$ is the treatment "
+            "displaced by a waste-derived feed, and is zero unless the scenario declares "
+            "system expansion.",
             "tea.run_tea",
             stated=lambda s, inv, tea, lca: (
-                tea.revenues - tea.annual_opex + s.credits_per_year
-                - s.economics.tax_rate * max(
-                    tea.revenues - tea.annual_opex + s.credits_per_year, 0.0)),
+                _stated_gross_profit(s, tea, inv)
+                - s.economics.tax_rate * max(_stated_gross_profit(s, tea, inv), 0.0)),
             engine=lambda s, inv, tea, lca: tea.net_profit,
+        ),
+        Equation(
+            "tea.avoided",
+            r"R_\mathrm{av} = \mathbb{1}[\text{system expansion}]\;"
+            r"q_\mathrm{ws}\,p_\mathrm{av}\,m_\mathrm{prod}",
+            "The conventional treatment a waste-derived feed displaces, valued at "
+            "$p_\\mathrm{av}$ per unit of stream. It is not in the annual operating "
+            "cost, because no money changes hands for it: it lowers the net production "
+            "cost and the profit only. Distinct from the gate fee, which is invoiced "
+            "and does enter the operating cost. The same convention governs the LCA "
+            "credit, so the two analyses cannot come to describe different systems.",
+            "tea.run_tea",
+            stated=lambda s, inv, tea, lca: _stated_avoided_treatment_credit(s, tea, inv),
+            engine=lambda s, inv, tea, lca: tea.avoided_treatment_credit,
+            applies=lambda s, inv: s.waste_feed.enabled,
         ),
         Equation(
             "tea.cashflow",
@@ -606,6 +628,25 @@ def _stated_annual_kg(s) -> float:
     else:
         gross = sysm.productivity * (s.scale * 1000.0) * sysm.operating_days / 1000.0
     return gross * min(max(s.harvesting.recovery, 1e-6), 1.0)
+
+
+def _stated_avoided_treatment_credit(s, tea, inv) -> float:
+    """EUR/yr of treatment displaced, restated from the scenario.
+
+    Zero unless the feed is enabled *and* the scenario declares system
+    expansion: under cut-off the figure on the stream is inert, which is the
+    property that makes the convention a real choice rather than a label.
+    """
+    wf = s.waste_feed
+    if not wf.enabled or wf.convention != WasteBurdenConvention.AVOIDED_TREATMENT:
+        return 0.0
+    return (_stated_waste_quantity(s) * wf.avoided_treatment_cost_per_unit
+            * inv.annual_biomass_kg)
+
+
+def _stated_gross_profit(s, tea, inv) -> float:
+    return (tea.revenues - tea.annual_opex + s.credits_per_year
+            + _stated_avoided_treatment_credit(s, tea, inv))
 
 
 def _stated_waste_quantity(s) -> float:
