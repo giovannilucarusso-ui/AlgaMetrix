@@ -72,6 +72,8 @@
     "[ruiz2016] Biorefinery context: whether the biomass cost is net of co-product credits is not recorded. This materially affects comparability.",
     "[russo2022_aury] Record the source's cost breakdown so this study can reach component_resolved normalization quality.",
     "[scp_protein] If a citable primary source for a 5.5-6.1 EUR/kg single-cell-protein envelope is found, restore the record with that citation and re-run the cohorts.",
+    "[superpro_biostimulant] The engine cannot price a nutrient stream that arrives as waste, nor credit a treatment service. Until it can, this record is a literature value and not a reconstruction.",
+    "[superpro_dunaliella] Reconstruct as a scenario once the engine can fractionate one biomass into five priced streams: today it allocates across co-products but does not model a sequential solvent and ion-exchange train, which is what sets the beta-carotene yield here.",
     "[tredici2016] Extract the paper's cost breakdown (CAPEX/labour/energy/nutrients) to enable component-wise price-year normalization.",
     "[tredici2016] Record economic endpoint definition and system boundary from the source.",
     "[vazquez2022] Extract cost breakdown for component-wise normalization.",

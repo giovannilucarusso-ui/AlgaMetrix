@@ -11,7 +11,7 @@ LITERATURE STATISTICS BY ENDPOINT TYPE (not pooled)
 ------------------------------------------------------------------------------
   minimum_biomass_selling_price    n= 1  nrel_davis2016
   minimum_product_selling_price    n= 1  padi2023_spirulina
-  production_cost                  n=23  acien2012_real, acien2012_scaled, astaxanthin, norsker2011_flatpanel, norsker2011_pond, norsker2011_tubular, oostlander2020_bc, oostlander2020_scaled, oostlander2020_tub, phycocyanin, ruiz2016, ruiz2022_hetero, russo2022_aury, russo2022_foodwaste_b, russo2022_foodwaste_c, scp_protein, superpro_algaloil, superpro_omega3, tredici2016, vazquez2022, vazquez2022b_nas, vazquez2022b_nas_10ha, vazquez2022b_tiso_pht
+  production_cost                  n=25  acien2012_real, acien2012_scaled, astaxanthin, norsker2011_flatpanel, norsker2011_pond, norsker2011_tubular, oostlander2020_bc, oostlander2020_scaled, oostlander2020_tub, phycocyanin, ruiz2016, ruiz2022_hetero, russo2022_aury, russo2022_foodwaste_b, russo2022_foodwaste_c, scp_protein, superpro_algaloil, superpro_biostimulant, superpro_dunaliella, superpro_omega3, tredici2016, vazquez2022, vazquez2022b_nas, vazquez2022b_nas_10ha, vazquez2022b_tiso_pht
 
 PER-STUDY CLASSIFICATION
 ------------------------------------------------------------------------------
@@ -53,6 +53,8 @@ PER-STUDY CLASSIFICATION
   scp_protein                EUR/kg dry biomass           production_cost                NO       no primary source: an aggregate open-literature envelope with no citation, so it cannot carry provenance. It was a member of the matched reconstructable cohort and set that cohort's minimum, which meant the headline divergence rested in part on an uncited number. Retained as a benchmark envelope for the shipped raceway template, removed from every study population.
   spiralg2019                unknown                      unknown                        NO       no economic value reported
   superpro_algaloil          USD/kg algal oil             production_cost                NO       functional unit is '1 kg algal oil', not '1 kg dry biomass'
+  superpro_biostimulant      USD/kg biostimulant solution production_cost                NO       functional unit is '1 kg biostimulant solution (3.90% w/w peptides)', not '1 kg dry biomass'
+  superpro_dunaliella        USD/kg beta-carotene         production_cost                NO       functional unit is '1 kg beta-carotene', not '1 kg dry biomass'
   superpro_omega3            USD/kg omega-3 oil           production_cost                NO       functional unit is '1 kg omega-3 oil', not '1 kg dry biomass'
   tredici2016                EUR/kg dry biomass           production_cost                yes      
   vazquez2022                EUR/kg dry biomass           production_cost                yes      
@@ -118,6 +120,6 @@ ENDPOINT-DEFINITION COMPLETENESS OF THE COHORT
 
 SUMMARY
 ------------------------------------------------------------------------------
-  studies with an economic value : 43
+  studies with an economic value : 45
   eligible for the primary spread: 18
-  excluded                       : 25
+  excluded                       : 27

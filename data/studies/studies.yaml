@@ -550,6 +550,143 @@ studies:
     - "Calibrated, not blind."
   todos: []
 
+- study_id: superpro_dunaliella
+  short_citation: "Misailidis et al., 2022"
+  scenario_label: "SuperPro Dunaliella biorefinery"
+  author_overlap_with_algametrix: false
+  full_citation: "Misailidis N, Mustafa A, Da Gama Ferreira R, Petrides D (2022). MicroAlgal
+    (MicroAlgae) Biorefinery Utilizing Dunaliella salina - Process Modeling and Techno-Economic
+    Assessment (TEA) using SuperPro Designer. Intelligen Inc."
+  doi: 10.13140/RG.2.2.11426.71365
+  publication_year: 2022
+  data_location_in_source: "Table 6, Executive Summary (2022 prices), p. 21; yields on recovered
+    algae dry solids in Table 1, p. 15; co-product prices and revenues in Table 5, p. 21"
+  eligibility_status: included
+  eligibility_reason: "Pigment TEA whose entire co-product slate is published with yields and
+    prices, which almost no pigment study does. Not comparable to the biomass cohort - its
+    functional unit is a kilogram of beta-carotene - and screened out of it by functional unit."
+  study_type: tea
+  organism: Dunaliella salina
+  cultivation_system: open solar pond
+  trophic_mode: phototrophic
+  technology_scale: "169,935 kg beta-carotene/yr"
+  plant_maturity: projected
+  geographical_context: null
+  functional_unit: 1 kg beta-carotene
+  system_boundary: "seawater and salts intake, natural-gas CHP supplying power, steam and the
+    pond CO2, open solar ponds, harvesting, homogenisation, solvent fractionation and
+    purification; five saleable material co-products plus exported power, steam and hot water"
+  economic_endpoint_type: production_cost
+  reported_value: 358.57
+  reported_unit: USD/kg beta-carotene
+  reported_currency: USD
+  reported_price_year: 2022
+  currency_basis: null
+  nominal_or_real: null
+  includes_depreciation: true
+  includes_return_on_capital: false
+  includes_coproduct_credit: false
+  coproduct_treatment: none
+  allocation_method: none
+  environmental_endpoint_type: none
+  published_gwp_available: false
+  reconstructability_tier: A
+  validation_mode: none
+  reconstruction_status: not_applicable
+  published_inventory_available: true
+  published_capex_available: true
+  published_opex_available: true
+  notes: "Executive summary: total capital investment USD 154.11 M, annual operating cost
+    USD 60.934 M, total revenues USD 80.39 M, ROI 18.34%, IRR 11.60%, payback 5.45 yr, NPV
+    USD 74.344 M at 7%. Operating cost splits 45% facility-dependent, 21% raw materials, 16%
+    labour. Co-products on recovered algae dry solids: proteins 23.64% at USD 4/kg, glycerol
+    25.45% at USD 0.5/kg, free fatty acids 7.57% at USD 2/kg, polar lipids 6.36% at USD 7/kg;
+    beta-carotene is 4.80% and carries 74% of revenue at USD 350/kg."
+  assumptions_required:
+    - "Endpoint read from the source: SuperPro unit production cost, annual operating cost over
+       the beta-carotene rate. Facility-dependent cost carries depreciation, so the figure is a
+       cash-cost-plus-depreciation endpoint and not a minimum selling price."
+    - "The source reports Net Unit Production Cost equal to Unit Production Cost, so the
+       co-product revenues in Table 5 are listed and not credited against the cost. Recorded as
+       coproduct_treatment: none rather than revenue_credit for that reason."
+    - "Dry-algae throughput near 3,540 t/yr follows from dividing the published beta-carotene
+       rate by the published 4.80% yield on recovered algae dry solids. It is a derivation of
+       this dataset, not a figure the source prints, and is not used as a reported value."
+  todos:
+    - "Reconstruct as a scenario once the engine can fractionate one biomass into five priced
+       streams: today it allocates across co-products but does not model a sequential solvent
+       and ion-exchange train, which is what sets the beta-carotene yield here."
+
+- study_id: superpro_biostimulant
+  short_citation: "Gkousgkounis et al., 2026"
+  scenario_label: "SuperPro biostimulant on wastewater"
+  author_overlap_with_algametrix: false
+  full_citation: "Gkousgkounis D, Parisis V, Misailidis N, Da Gama Ferreira R, Petrides D (2026).
+    Microalgal Biostimulant Production from Municipal Wastewater - Process Modeling and
+    Evaluation using SuperPro Designer. Intelligen Inc."
+  doi: 10.13140/RG.2.2.11499.71202
+  publication_year: 2026
+  data_location_in_source: "Table 13, Executive Summary (2026 prices), p. 19; product definition
+    on p. 14; bulk materials in Table 7, p. 15; utilities in Table 12, p. 18"
+  eligibility_status: included
+  eligibility_reason: "The lowest-cost microalgal process in the set by two orders of magnitude,
+    and the only one whose nutrients arrive in a waste stream. Its functional unit is a kilogram
+    of dilute product solution, so it is screened out of the biomass cohort."
+  study_type: tea
+  organism: null
+  cultivation_system: open raceway pond
+  trophic_mode: mixotrophic
+  technology_scale: "87,732 t/yr biostimulant solution from 19.44 Mm3/yr municipal wastewater"
+  plant_maturity: projected
+  geographical_context: "Mediterranean climate assumed for evaporation (1.32 m3/m2/yr)"
+  functional_unit: 1 kg biostimulant solution (3.90% w/w peptides)
+  system_boundary: "municipal wastewater received at the gate, primary and secondary treatment,
+    algal tertiary treatment in open raceway ponds on flue-gas CO2, flocculation, clarification
+    and centrifugation, enzymatic hydrolysis to a liquid peptide product; treated water is
+    discharged and carries no credit"
+  economic_endpoint_type: production_cost
+  reported_value: 0.94
+  reported_unit: USD/kg biostimulant solution
+  reported_currency: USD
+  reported_price_year: 2026
+  currency_basis: null
+  nominal_or_real: null
+  includes_depreciation: true
+  includes_return_on_capital: false
+  includes_coproduct_credit: false
+  coproduct_treatment: none
+  allocation_method: none
+  environmental_endpoint_type: none
+  published_gwp_available: false
+  reconstructability_tier: A
+  validation_mode: none
+  reconstruction_status: not_applicable
+  published_inventory_available: true
+  published_capex_available: true
+  published_opex_available: true
+  notes: "Executive summary: total capital investment USD 300.976 M, direct fixed capital
+    USD 283.856 M, annual operating cost USD 82.436 M, revenues USD 105.279 M at USD 1.20/kg,
+    ROI 14.65%, IRR 8.06%, payback 6.83 yr, NPV USD 19.228 M at 7%, break-even selling price
+    USD 1.13/kg. Operating cost splits 68% facility-dependent, 17% raw materials, 6% waste
+    treatment, 5% utilities, 5% labour, and 99.4% of the raw-material line is one enzyme
+    cocktail at USD 20/kg. Cultivation: 0.3 m ponds, 6 d retention, 16.5 g/m2/d, 400 mg/L,
+    CO2 from 3.5% flue gas with 51% assimilation, 6,480 operating hours per year. Equipment
+    and capital tables are in 2025 prices while the executive summary is in 2026 prices."
+  assumptions_required:
+    - "Endpoint read from the source: SuperPro unit production cost per kilogram of the
+       Biostimulant stream, which is a solution at 3.90% w/w peptides and roughly 40% peptide
+       purity on a dry basis. It is not a cost per kilogram of dry biomass and must not be read
+       against the biomass cohort."
+    - "Dry algal biomass near 6,807 t/yr follows from the published enzyme consumption
+       (680,688 kg/yr) and the published enzyme-to-biomass ratio of 0.1. It is a derivation of
+       this dataset, not a figure the source prints, and is not used as a reported value."
+    - "Nutrients are supplied by the wastewater and are unpriced in the source. The plant is
+       simultaneously a treatment works, and the treated effluent is discharged without an
+       avoided-cost credit, so the cost carries the whole treatment train."
+  todos:
+    - "The engine cannot price a nutrient stream that arrives as waste, nor credit a treatment
+       service. Until it can, this record is a literature value and not a reconstruction."
+
 - study_id: phycocyanin
   short_citation: "van der Walt et al., 2025"
   scenario_label: "Phycocyanin"

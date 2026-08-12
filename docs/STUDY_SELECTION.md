@@ -213,34 +213,39 @@ invariants) was ported from the same branch and is now a stage of
 It runs over every executable reconstruction and the library-default archetype,
 and the pipeline aborts if any conserved quantity fails to close.
 
-### 9b. Sources identified but not yet admitted
+### 9b. Two Intelligen studies admitted on 2026-08-12
 
-Two further Intelligen SuperPro Designer studies were identified on 2026-08-12 and are
-recorded here rather than entered as records. A record is a claim about a number, and
-neither number could be read from its own source.
+Two further SuperPro Designer studies were identified on 2026-08-12. They were held out of the
+dataset for as long as only their vendor summary page could be read: that page gives the
+biostimulant case as 87,000 t/yr at a USD 1.2/kg selling price, from which a unit cost near
+USD 0.92/kg follows by division — and a value the compiler divided out while the source's own
+tables went unread is exactly the failure that withdrew two records on 2026-08-07 (§ *Excluded
+records* in [VALIDATION.md](VALIDATION.md)). Both reports were then supplied in full, and both
+print the endpoint directly, so both are now records:
 
-**Misailidis N, Mustafa A, Da Gama Ferreira R, Petrides D (2022), *MicroAlgal Biorefinery
-Utilizing Dunaliella salina*,
-[10.13140/RG.2.2.11426.71365](https://doi.org/10.13140/RG.2.2.11426.71365).** The process is
-documented — open solar ponds fed with CO₂ from a CHP gas-turbine exhaust, harvesting and cell
-disruption, heptane extraction, membrane fractionation into β-carotene, free fatty acids, polar
-lipids, glycerol and protein — but no economic figure is publicly retrievable. A process without
-its cost table is a scenario to build, not evidence to check a reconstruction against.
+| Record | Source | Endpoint, as printed |
+|---|---|---|
+| `superpro_dunaliella` | Misailidis N, Mustafa A, Da Gama Ferreira R, Petrides D (2022), [10.13140/RG.2.2.11426.71365](https://doi.org/10.13140/RG.2.2.11426.71365) | USD 358.57 per kg β-carotene, 2022 prices (Table 6, p. 21) |
+| `superpro_biostimulant` | Gkousgkounis D, Parisis V, Misailidis N, Da Gama Ferreira R, Petrides D (2026), [10.13140/RG.2.2.11499.71202](https://doi.org/10.13140/RG.2.2.11499.71202) | USD 0.94 per kg biostimulant solution, 2026 prices (Table 13, p. 19) |
 
-**Gkousgkounis D, Parisis V, Misailidis N, Da Gama Ferreira R, Petrides D (2026), *Microalgal
-Biostimulant Production from Municipal Wastewater*,
-[10.13140/RG.2.2.11499.71202](https://doi.org/10.13140/RG.2.2.11499.71202).** The vendor's example
-index publishes headline figures — 87,000 t/yr, capital cost USD 289 M, annual operating cost
-USD 79.9 M, selling price USD 1.2/kg, NPV USD 32.3 M, ROI 15.33%. A unit production cost near
-USD 0.92/kg follows by dividing two of them, and that is precisely why it is not entered: the
-dataset does not admit a value its own compiler derived while the source's tables went unread.
-Two records were withdrawn on 2026-08-07 for exactly this failure (§ *Excluded records* in
-[VALIDATION.md](VALIDATION.md)), and the rule is worth more than the row.
+The published figures differ from the vendor page in both cases — USD 301 M rather than 289 M of
+capital, USD 82.4 M rather than 79.9 M of operating cost, USD 0.94/kg rather than the 0.92 the
+division gave. The gap is small and the direction is unimportant; what matters is that waiting
+cost nothing and guessing would have entered three wrong numbers.
 
-Both become admissible as soon as the reports themselves are read. The biostimulant case would
-then be the lowest-value record in the set by an order of magnitude, which is where the cohort is
-thinnest — and it would also need nutrients supplied by municipal wastewater, which the engine
-cannot price today.
+**Neither enters the primary cost cohort, and neither is screened out by hand.** The biostimulant
+is priced per kilogram of a *solution* at 3.90% w/w peptides, and the Dunaliella case per kilogram
+of β-carotene; `endpoints.classify` rejects both on functional unit, as it already does for the
+algal-oil and omega-3 cases. What they widen is the range of processes the dataset can speak
+about — from a pigment at USD 359/kg down to a waste-fed product at USD 0.94/kg — not the spread
+of biomass production costs.
+
+Both are Tier A: the engine cannot execute either today. The Dunaliella case splits one biomass
+into five priced streams through a sequential solvent and ion-exchange train, and the engine
+allocates across co-products without modelling the train that sets the yields. The biostimulant
+case takes its nitrogen and phosphorus from municipal wastewater and sells no by-product but
+discharges treated water, and the engine can neither price a nutrient that arrives as waste nor
+credit a treatment service. Both limits are recorded as `todos` on the records themselves.
 
 ## 10. Quality control
 
