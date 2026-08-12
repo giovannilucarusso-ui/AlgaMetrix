@@ -213,6 +213,35 @@ invariants) was ported from the same branch and is now a stage of
 It runs over every executable reconstruction and the library-default archetype,
 and the pipeline aborts if any conserved quantity fails to close.
 
+### 9b. Sources identified but not yet admitted
+
+Two further Intelligen SuperPro Designer studies were identified on 2026-08-12 and are
+recorded here rather than entered as records. A record is a claim about a number, and
+neither number could be read from its own source.
+
+**Misailidis N, Mustafa A, Da Gama Ferreira R, Petrides D (2022), *MicroAlgal Biorefinery
+Utilizing Dunaliella salina*,
+[10.13140/RG.2.2.11426.71365](https://doi.org/10.13140/RG.2.2.11426.71365).** The process is
+documented — open solar ponds fed with CO₂ from a CHP gas-turbine exhaust, harvesting and cell
+disruption, heptane extraction, membrane fractionation into β-carotene, free fatty acids, polar
+lipids, glycerol and protein — but no economic figure is publicly retrievable. A process without
+its cost table is a scenario to build, not evidence to check a reconstruction against.
+
+**Gkousgkounis D, Parisis V, Misailidis N, Da Gama Ferreira R, Petrides D (2026), *Microalgal
+Biostimulant Production from Municipal Wastewater*,
+[10.13140/RG.2.2.11499.71202](https://doi.org/10.13140/RG.2.2.11499.71202).** The vendor's example
+index publishes headline figures — 87,000 t/yr, capital cost USD 289 M, annual operating cost
+USD 79.9 M, selling price USD 1.2/kg, NPV USD 32.3 M, ROI 15.33%. A unit production cost near
+USD 0.92/kg follows by dividing two of them, and that is precisely why it is not entered: the
+dataset does not admit a value its own compiler derived while the source's tables went unread.
+Two records were withdrawn on 2026-08-07 for exactly this failure (§ *Excluded records* in
+[VALIDATION.md](VALIDATION.md)), and the rule is worth more than the row.
+
+Both become admissible as soon as the reports themselves are read. The biostimulant case would
+then be the lowest-value record in the set by an order of magnitude, which is where the cohort is
+thinnest — and it would also need nutrients supplied by municipal wastewater, which the engine
+cannot price today.
+
 ## 10. Quality control
 
 * Controlled vocabularies are closed and validated at load time

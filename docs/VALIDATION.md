@@ -70,10 +70,20 @@ Russo et al. 2022 is a **self-citation** (`author_overlap_with_algametrix: true`
 
 | Case | Script | Model | Source | Basis | Deviation |
 |---|---|---|---|---|:---:|
-| Algal-oil biorefinery (Intelligen) | `phototrophic_algal_oil.py` | 1.673–1.711 | 1.70 | USD 2015 | −2% to +1% |
-| Omega-3 fermentation (Intelligen) | `omega3_fermentation.py` | 16.35–17.55 | 16.57 | USD 2021 | −1% to +6% |
+| Algal oil in raceway ponds (Carmichael & Petrides 2020) | `phototrophic_algal_oil.py` | 1.673–1.711 | 1.70 | USD 2015 | −2% to +1% |
+| Omega-3 fermentation (Flevaris et al. 2021) | `omega3_fermentation.py` | 16.35–17.55 | 16.57 | USD 2021 | −1% to +6% |
 
 **Range: −2% to +6%.** Both are mixed price sets, hence the intervals.
+
+Both are Intelligen's own published SuperPro Designer studies and both are retrievable without a
+licence: [10.13140/RG.2.2.12639.48805](https://doi.org/10.13140/RG.2.2.12639.48805) for the algal
+oil case and [10.13140/RG.2.2.32102.34885](https://doi.org/10.13140/RG.2.2.32102.34885) for the
+omega-3 case. A reader can therefore check what the engine was calibrated against. Until these
+rows carried a DOI they named a report rather than a document, and a calibration target nobody
+else can open is not evidence.
+
+The algal-oil study is dated 2020 while the economic evaluation it exports is in 2015 prices. The
+basis column follows the prices, not the publication date.
 
 ## 3. Plausibility checks against published envelopes
 

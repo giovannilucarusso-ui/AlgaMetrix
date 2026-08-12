@@ -85,7 +85,8 @@ _USD_2022_RUSSO = PriceBasis(
 _USD_2021_OMEGA3 = PriceBasis(
     currency="USD", price_year=2021, kind="mixed_price_set",
     provenance=("labour and product prices from the Intelligen omega-3 case, USD 2021 "
-                "(data/reference_superpro_omega3.csv header)"),
+                "(data/reference_superpro_omega3.csv header; "
+                "doi 10.13140/RG.2.2.32102.34885)"),
     library_priced=("electricity_price", "heat_price", "co2_price", "nitrogen_price",
                     "phosphorus_price", "water_price", "substrate_price", "land_price",
                     "harvest_capex_per_kgyr", "drying_capex_per_kgyr"),
@@ -95,7 +96,8 @@ _USD_2015_ALGALOIL = PriceBasis(
     currency="USD", price_year=2015, kind="mixed_price_set",
     provenance=("electricity, nitrogen, water, CO2, land, labour and the harvest/drying "
                 "capital factors from the Intelligen algal-oil case, USD 2015 "
-                "(data/reference_superpro_phototrophic.csv header)"),
+                "(data/reference_superpro_phototrophic.csv header; "
+                "doi 10.13140/RG.2.2.12639.48805)"),
     library_priced=("heat_price", "bicarbonate_price", "phosphorus_price",
                     "substrate_price"),
 )

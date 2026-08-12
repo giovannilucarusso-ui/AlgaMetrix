@@ -1,5 +1,7 @@
 # SuperPro reference — phototrophic algal-oil biorefinery.
 # Source: AlgalOil_v9b9 Economic Evaluation Report (SuperPro Designer, 2015 prices). Values in USD.
+# Published study: Carmichael D, Petrides D (2020), doi 10.13140/RG.2.2.12639.48805 — the report is
+# dated 2020, the economic evaluation it exports is in 2015 prices, and this file follows the prices.
 # Large-scale ponds -> harvesting -> hexane extraction -> algal oil; protein co-product; AD energy recovery.
 # The calibrated examples/phototrophic_algal_oil.py reproduces this within ~1% on unit cost and ~9% on
 # capital investment; OPEX is ~16% high because the plant's anaerobic-digestion energy recovery

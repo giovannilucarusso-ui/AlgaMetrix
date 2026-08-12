@@ -457,12 +457,20 @@ studies:
        found, restore the record with that citation and re-run the cohorts."
 
 - study_id: superpro_algaloil
-  short_citation: "Intelligen Inc., 2015"
+  short_citation: "Carmichael & Petrides, 2020"
   scenario_label: "SuperPro algal-oil report"
   author_overlap_with_algametrix: false
-  full_citation: "Production of Algal Oil (SuperPro Designer Economic Evaluation Report), Intelligen Inc."
-  doi: null
-  publication_year: 2015
+  full_citation: "Carmichael D, Petrides D (2020). Production of Algal Oil (Algae Biofuels)
+    using microalgae in raceway ponds - Process Modeling and Techno-Economic Assessment (TEA)
+    using SuperPro Designer. Intelligen Inc."
+  doi: 10.13140/RG.2.2.12639.48805
+  publication_year: 2020
+  # The document is dated 2020; the economic evaluation it exports carries 2015
+  # prices, stated in the header of data/reference_superpro_phototrophic.csv.
+  # reported_price_year follows the prices and not the publication date, which is
+  # why the two disagree here and agree in every other record.
+  notes: "Vendor reference case. Publicly retrievable through the DOI, so the calibration
+    target is checkable by a reader without a SuperPro Designer licence."
   data_location_in_source: "data/reference_superpro_phototrophic.csv"
   eligibility_status: included
   eligibility_reason: "Vendor reference case used to calibrate the engine against a commercial simulator."
@@ -498,12 +506,16 @@ studies:
   todos: []
 
 - study_id: superpro_omega3
-  short_citation: "Intelligen Inc., 2021"
+  short_citation: "Flevaris et al., 2021"
   scenario_label: "SuperPro omega-3 report"
   author_overlap_with_algametrix: false
-  full_citation: "Omega-3 via Microalgal Fermentation (SuperPro Designer), Intelligen Inc."
-  doi: null
+  full_citation: "Flevaris K, Roussos A, Misailidis N, Da Gama R, Petrides D (2021). Omega-3
+    Fatty Acids Production via Microalgal Fermentation - Process Modeling and Techno-Economic
+    Assessment (TEA) using SuperPro Designer. Intelligen Inc."
+  doi: 10.13140/RG.2.2.32102.34885
   publication_year: 2021
+  notes: "Vendor reference case. Publicly retrievable through the DOI, so the calibration
+    target is checkable by a reader without a SuperPro Designer licence."
   data_location_in_source: "data/reference_superpro_omega3.csv"
   eligibility_status: included
   eligibility_reason: "Vendor reference case used to calibrate the engine against a commercial simulator."
