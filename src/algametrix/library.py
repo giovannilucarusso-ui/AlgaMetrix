@@ -27,6 +27,8 @@ from .models import (
     Organism,
     TrophicMode,
     Utility,
+    WasteBurdenConvention,
+    WasteFeed,
 )
 
 # Where the built-in YAML library lives, in each of the three ways it is shipped:
@@ -53,6 +55,7 @@ class Library:
     harvesting: dict[str, Harvesting]
     drying: dict[str, Drying]
     extraction: dict[str, Extraction]
+    waste_feeds: dict[str, WasteFeed]
     economics: Economics
     lcia: LCIAFactors
 
@@ -168,6 +171,33 @@ def _extraction(d: dict) -> Extraction:
     )
 
 
+def _waste_feed(d: dict) -> WasteFeed:
+    """Build a catalogued waste-derived feed (always enabled=True).
+
+    Like the extraction presets, a catalogue entry is a thing you have chosen to
+    use; the disabled default lives on :class:`~algametrix.models.WasteFeed`.
+    """
+    return WasteFeed(
+        enabled=True,
+        name=d["name"],
+        kind=d.get("kind", "wastewater"),
+        unit=d.get("unit", "m3"),
+        nitrogen_per_unit=float(d.get("nitrogen_per_unit", 0.0)),
+        phosphorus_per_unit=float(d.get("phosphorus_per_unit", 0.0)),
+        substrate_per_unit=float(d.get("substrate_per_unit", 0.0)),
+        dosed_on=d.get("dosed_on", "nitrogen"),
+        coverage=float(d.get("coverage", 1.0)),
+        price_per_unit=float(d.get("price_per_unit", 0.0)),
+        elec_kwh_per_unit=float(d.get("elec_kwh_per_unit", 0.0)),
+        gwp_per_unit=float(d.get("gwp_per_unit", 0.0)),
+        ced_per_unit=float(d.get("ced_per_unit", 0.0)),
+        convention=WasteBurdenConvention(d.get("convention", "cut_off")),
+        avoided_treatment_gwp_per_unit=float(d.get("avoided_treatment_gwp_per_unit", 0.0)),
+        avoided_treatment_ced_per_unit=float(d.get("avoided_treatment_ced_per_unit", 0.0)),
+        notes=d.get("notes", ""),
+    )
+
+
 def _economics(d: dict) -> Economics:
     return Economics(**{k: float(v) for k, v in d.items()})
 
@@ -194,12 +224,18 @@ def load_library(data_dir: Path | str | None = None) -> Library:
     drying = [_drying(x) for x in params["drying"]]
     extraction = [_extraction(x) for x in params.get("downstream", [])]
 
+    # Optional file: a checkout without it still loads, with an empty catalogue.
+    feeds_path = base / "waste_feeds.yaml"
+    feeds_doc = _load_yaml(feeds_path) if feeds_path.is_file() else {}
+    waste_feeds = [_waste_feed(x) for x in (feeds_doc or {}).get("waste_feeds", [])]
+
     return Library(
         organisms={o.name: o for o in organisms},
         systems={s.name: s for s in systems},
         harvesting={h.name: h for h in harvesting},
         drying={d.name: d for d in drying},
         extraction={e.name: e for e in extraction},
+        waste_feeds={w.name: w for w in waste_feeds},
         economics=_economics(params["economics"]),
         lcia=_lcia(params["lcia"]),
     )

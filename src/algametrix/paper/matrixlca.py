@@ -63,7 +63,14 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from ..models import Basis, CarbonAccounting, CarbonSource, Scenario, TrophicMode
+from ..models import (
+    Basis,
+    CarbonAccounting,
+    CarbonSource,
+    Scenario,
+    TrophicMode,
+    WasteBurdenConvention,
+)
 
 # Molar-mass ratios. Restated here rather than imported, so that a change in
 # algametrix.inventory does not silently propagate into its own benchmark.
@@ -83,6 +90,10 @@ ELEMENTARY_FLOWS = (
     "Upstream N-eq (kg N-eq)",
     "Upstream P-eq (kg P-eq)",
     "Acidifying emissions (kg SO2-eq)",
+    # Kept apart from "GHG to air" for the same reason biogenic uptake is: it is
+    # a burden another system no longer carries, not one this one causes, so it
+    # must be outside the gross and visible on its own.
+    "Avoided treatment (kg CO2-eq)",
 )
 
 #: Impact categories, named exactly as :mod:`algametrix.lca` names them.
@@ -182,6 +193,10 @@ def build_system(scenario: Scenario) -> MatrixSystem:
                   "organic substrate (kg)", "process water (m3)"]
     if ext.enabled:
         background.append(f"{ext.solvent_name} (kg)")
+    wf = scenario.waste_feed
+    waste_name = f"waste feed: {wf.name or 'stream'} ({wf.unit})" if wf.enabled else None
+    if waste_name:
+        background.append(waste_name)
     mat_names = [f"material: {m.name} (kg)" for m in scenario.materials]
     util_names = [f"utility: {u.name} ({u.unit})" for u in scenario.utilities]
     background += mat_names + util_names
@@ -214,9 +229,30 @@ def build_system(scenario: Scenario) -> MatrixSystem:
         use("electricity (kWh)", i_cult, cult_heat / 3.6)
     else:
         use("heat (MJ)", i_cult, cult_heat)
-    use("nitrogen (kg N)", i_cult, org.nitrogen / uptake)
-    use("phosphorus (kg P)", i_cult, org.phosphorus / uptake)
+    # Demands per kg of GROSS biomass. A waste-derived feed displaces part of
+    # each purchase; the matrix scales all of it to the product through the
+    # harvesting transfer coefficient, exactly as it does for every other flow.
+    n_demand = org.nitrogen / uptake
+    p_demand = org.phosphorus / uptake
+    s_demand = 0.0 if photo else 1.0 / max(sys_.substrate_yield, 1e-6)
+    waste_qty = 0.0
+    if wf.enabled:
+        dosed = {"nitrogen": (n_demand, wf.nitrogen_per_unit),
+                 "phosphorus": (p_demand, wf.phosphorus_per_unit),
+                 "substrate": (s_demand, wf.substrate_per_unit)}.get(wf.dosed_on, (0.0, 0.0))
+        demand_d, conc_d = dosed
+        if conc_d > 0 and demand_d > 0:
+            waste_qty = min(max(wf.coverage, 0.0), 1.0) * demand_d / conc_d
+    n_buy = n_demand - min(waste_qty * max(wf.nitrogen_per_unit, 0.0), n_demand)
+    p_buy = p_demand - min(waste_qty * max(wf.phosphorus_per_unit, 0.0), p_demand)
+    s_buy = s_demand - min(waste_qty * max(wf.substrate_per_unit, 0.0), s_demand)
+
+    use("nitrogen (kg N)", i_cult, n_buy)
+    use("phosphorus (kg P)", i_cult, p_buy)
     use("process water (m3)", i_cult, sys_.water_m3_per_kg)
+    if waste_name and waste_qty:
+        use(waste_name, i_cult, waste_qty)
+        use("electricity (kWh)", i_cult, waste_qty * wf.elec_kwh_per_unit)
     if photo:
         util = min(max(sys_.co2_utilization, _MIN_CARBON_UTILIZATION), 1.0)
         if sys_.carbon_source == CarbonSource.BICARBONATE:
@@ -224,7 +260,7 @@ def build_system(scenario: Scenario) -> MatrixSystem:
         else:
             use("CO2 supply (kg)", i_cult, org.carbon * _CO2_PER_C / util)
     else:
-        use("organic substrate (kg)", i_cult, 1.0 / max(sys_.substrate_yield, 1e-6))
+        use("organic substrate (kg)", i_cult, s_buy)
 
     # harvesting, per kg of gross biomass processed
     use("electricity (kWh)", i_harv, harv.elec_kwh_per_kg)
@@ -279,6 +315,11 @@ def build_system(scenario: Scenario) -> MatrixSystem:
     if ext.enabled:
         bg_factors[f"{ext.solvent_name} (kg)"] = (
             ext.solvent_gwp, ext.solvent_ced, 0.0, f_.solvent_acid)
+    if waste_name:
+        # Only the handling burden characterises as a GHG emission. The credit
+        # is a separate elementary flow below, so that the matrix's gross means
+        # the same thing the engine's does.
+        bg_factors[waste_name] = (wf.gwp_per_unit, wf.ced_per_unit, 0.0, 0.0)
     for m, nm in zip(scenario.materials, mat_names):
         bg_factors[nm] = (m.gwp, m.ced, 0.0, 0.0)
     for u, nm in zip(scenario.utilities, util_names):
@@ -294,11 +335,22 @@ def build_system(scenario: Scenario) -> MatrixSystem:
     emit(up_p, idx["phosphorus (kg P)"], f_.phosphorus_eutroph_p)
     emit(up_p, idx["electricity (kWh)"], f_.elec_eutroph_p)
 
-    # un-assimilated nutrients leave the cultivation stage
+    # un-assimilated nutrients leave the cultivation stage, and so does whatever
+    # the waste stream over-delivered: the culture cannot take it up, so it is
+    # discharged whichever bucket it arrived in
+    n_surplus = max(waste_qty * max(wf.nitrogen_per_unit, 0.0) - n_demand, 0.0)
+    p_surplus = max(waste_qty * max(wf.phosphorus_per_unit, 0.0) - p_demand, 0.0)
     emit(ELEMENTARY_FLOWS[5], i_cult,
-         (org.nitrogen / uptake) * (1.0 - uptake) * f_.n_to_water_frac)
+         (n_demand * (1.0 - uptake) + n_surplus) * f_.n_to_water_frac)
     emit(ELEMENTARY_FLOWS[6], i_cult,
-         (org.phosphorus / uptake) * (1.0 - uptake) * f_.p_to_water_frac)
+         (p_demand * (1.0 - uptake) + p_surplus) * f_.p_to_water_frac)
+
+    # the treatment this process displaces, where the scenario declares system
+    # expansion: entered positive on its own flow and characterised negatively,
+    # so it leaves the gross alone and can be taken back off
+    if waste_name and wf.convention == WasteBurdenConvention.AVOIDED_TREATMENT:
+        emit(ELEMENTARY_FLOWS[10], idx[waste_name], wf.avoided_treatment_gwp_per_unit)
+        emit(energy, idx[waste_name], -wf.avoided_treatment_ced_per_unit)
 
     # land occupation is a plant-level quantity referred to the annual output
     annual = annual_production_kg(scenario)
@@ -323,6 +375,7 @@ def build_system(scenario: Scenario) -> MatrixSystem:
     C = np.zeros((len(IMPACT_CATEGORIES), len(ELEMENTARY_FLOWS)))
     C[0, e[ghg]] = 1.0
     C[0, e[ELEMENTARY_FLOWS[1]]] = -1.0        # uptake enters the GWP negatively
+    C[0, e[ELEMENTARY_FLOWS[10]]] = -1.0       # so does the avoided treatment
     C[1, e[energy]] = 1.0
     C[2, e[water]] = 1.0
     C[3, e[land]] = 1.0
@@ -358,10 +411,13 @@ def run_matrix_lca(scenario: Scenario) -> MatrixLCAResult:
 
     impacts = dict(zip(IMPACT_CATEGORIES, h))
     uptake = float(g[1])
+    avoided = float(g[10])
     gwp_net = float(impacts[IMPACT_CATEGORIES[0]])
     return MatrixLCAResult(
         impacts=impacts,
-        gwp_gross=gwp_net + uptake,
+        # Both credits come back off to give the gross, which therefore means
+        # what it means in algametrix.lca: everything before any credit.
+        gwp_gross=gwp_net + uptake + avoided,
         gwp_net=gwp_net,
         biogenic_adjustment=-uptake,
         system=sysm,

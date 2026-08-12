@@ -148,15 +148,48 @@ def verify(scenario: Scenario) -> VerificationReport:
     balances.append(IdentityCheck(
         "Identity: N supplied x uptake == biomass N",
         inv.nitrogen_per_kg * uptake, org.nitrogen * gpp))
+    # Everything entering the culture leaves it assimilated or emitted. A waste
+    # stream dosed on another nutrient can carry N beyond the demand, so the
+    # left-hand side is the demand plus that surplus; with no waste feed the
+    # surplus is zero and this is the identity it has always been.
     balances.append(IdentityCheck(
-        "Identity: N supplied == assimilated + emitted",
-        inv.nitrogen_per_kg, inv.nitrogen_per_kg * uptake + inv.nitrogen_emitted_per_kg))
+        "Identity: N entering == assimilated + emitted",
+        inv.nitrogen_per_kg + inv.nitrogen_surplus_per_kg,
+        inv.nitrogen_per_kg * uptake + inv.nitrogen_emitted_per_kg))
     balances.append(IdentityCheck(
         "Identity: P supplied x uptake == biomass P",
         inv.phosphorus_per_kg * uptake, org.phosphorus * gpp))
     balances.append(IdentityCheck(
-        "Identity: P supplied == assimilated + emitted",
-        inv.phosphorus_per_kg, inv.phosphorus_per_kg * uptake + inv.phosphorus_emitted_per_kg))
+        "Identity: P entering == assimilated + emitted",
+        inv.phosphorus_per_kg + inv.phosphorus_surplus_per_kg,
+        inv.phosphorus_per_kg * uptake + inv.phosphorus_emitted_per_kg))
+
+    # --- where the nutrients were bought ------------------------------------
+    # The split is an accounting of one quantity, so it must close exactly.
+    if scenario.waste_feed.enabled:
+        wf = scenario.waste_feed
+        for label, demand, purchased, from_waste, per_unit in (
+            ("N", inv.nitrogen_per_kg, inv.nitrogen_purchased_per_kg,
+             inv.nitrogen_from_waste_per_kg, wf.nitrogen_per_unit),
+            ("P", inv.phosphorus_per_kg, inv.phosphorus_purchased_per_kg,
+             inv.phosphorus_from_waste_per_kg, wf.phosphorus_per_unit),
+            ("substrate", inv.substrate_per_kg, inv.substrate_purchased_per_kg,
+             inv.substrate_from_waste_per_kg, wf.substrate_per_unit),
+        ):
+            balances.append(IdentityCheck(
+                f"Identity: {label} demand == purchased + from waste",
+                demand, purchased + from_waste))
+        # And the stream delivers exactly what its composition says it does:
+        # what the culture uses plus what runs past it.
+        for label, from_waste, surplus, per_unit in (
+            ("N", inv.nitrogen_from_waste_per_kg, inv.nitrogen_surplus_per_kg,
+             wf.nitrogen_per_unit),
+            ("P", inv.phosphorus_from_waste_per_kg, inv.phosphorus_surplus_per_kg,
+             wf.phosphorus_per_unit),
+        ):
+            balances.append(IdentityCheck(
+                f"Identity: waste stream x {label} per unit == used + surplus",
+                inv.waste_feed_per_kg * max(per_unit, 0.0), from_waste + surplus))
 
     invariants: list[InvariantCheck] = []
 
@@ -177,6 +210,32 @@ def verify(scenario: Scenario) -> VerificationReport:
         invariants.append(InvariantCheck(
             "Admissible: carbon utilization in (0, 1]",
             0.0 < sys.co2_utilization <= 1.0 + TOL, f"{sys.co2_utilization:.4g}"))
+
+    # --- waste-derived feed --------------------------------------------------
+    if scenario.waste_feed.enabled:
+        wf = scenario.waste_feed
+        invariants.append(InvariantCheck(
+            "Admissible: waste-feed coverage in [0, 1]",
+            0.0 <= wf.coverage <= 1.0 + TOL, f"{wf.coverage:.4g}"))
+        invariants.append(InvariantCheck(
+            "Admissible: waste feed dosed on a demand the engine computes",
+            wf.dosed_on in ("nitrogen", "phosphorus", "substrate"), repr(wf.dosed_on)))
+        # A feed that delivers nothing is a configuration error, not a result:
+        # it would silently leave every purchase where it was.
+        delivers = wf.nitrogen_per_unit or wf.phosphorus_per_unit or wf.substrate_per_unit
+        invariants.append(InvariantCheck(
+            "Admissible: waste feed carries at least one of N, P, substrate",
+            bool(delivers),
+            f"N {wf.nitrogen_per_unit:g}, P {wf.phosphorus_per_unit:g}, "
+            f"substrate {wf.substrate_per_unit:g} per {wf.unit}"))
+        # No line may be bought in negative quantity: the split caps what the
+        # stream covers at the demand, and this is what says so out loud.
+        for label, purchased in (("N", inv.nitrogen_purchased_per_kg),
+                                 ("P", inv.phosphorus_purchased_per_kg),
+                                 ("substrate", inv.substrate_purchased_per_kg)):
+            invariants.append(InvariantCheck(
+                f"Admissible: {label} purchased >= 0",
+                purchased >= -TOL, f"{purchased:.6g} kg/kg"))
 
     # The elemental carbon constraint the old "Carbon:" identity did not test:
     # a heterotroph cannot incorporate more carbon than its substrate carried.
@@ -206,7 +265,8 @@ def verify(scenario: Scenario) -> VerificationReport:
     if not scenario.batch_mode:
         inv2 = build_inventory(replace(scenario, scale=scenario.scale * 2.0))
         fields = ("elec_kwh_per_kg", "co2_supply_per_kg", "bicarbonate_supply_per_kg",
-                  "nitrogen_per_kg", "phosphorus_per_kg", "water_m3_per_kg", "substrate_per_kg")
+                  "nitrogen_per_kg", "phosphorus_per_kg", "water_m3_per_kg", "substrate_per_kg",
+                  "waste_feed_per_kg", "nitrogen_purchased_per_kg")
         ok = all(
             abs(getattr(inv, f) - getattr(inv2, f)) <= TOL * max(abs(getattr(inv, f)), 1e-12)
             for f in fields

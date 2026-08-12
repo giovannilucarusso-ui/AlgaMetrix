@@ -70,6 +70,95 @@ class CarbonAccounting(str, Enum):
     CUSTOM = "custom"
 
 
+class WasteBurdenConvention(str, Enum):
+    """How a waste-derived feed's upstream burden is treated.
+
+    A culture fed on somebody else's effluent gets its nitrogen without a Haber-
+    Bosch plant behind it, and that is worth a great deal to the result — which
+    is exactly why the rule producing it has to be stated rather than assumed.
+    The two conventions below answer different questions and are not
+    interchangeable, so the choice is recorded on the scenario and reported with
+    the result.
+
+    ``CUT_OFF``
+        The waste enters burden-free: its producer carries everything up to the
+        point of discard, and this system carries only what it does itself —
+        transport, pumping, screening. The conservative default, and the one
+        that keeps a cradle-to-gate result comparable with studies that buy
+        fertiliser.
+    ``AVOIDED_TREATMENT``
+        System expansion. The stream would otherwise have been treated and
+        discharged, so the treatment this process displaces is credited. It
+        makes the result a *difference between two systems* rather than the
+        footprint of one, and the credit is always reported on its own line —
+        never folded into the feed's own burden.
+    """
+
+    CUT_OFF = "cut_off"
+    AVOIDED_TREATMENT = "avoided_treatment"
+
+
+@dataclass
+class WasteFeed:
+    """A waste stream covering part of the culture's nutrient or carbon demand.
+
+    Municipal and industrial effluents, and food-industry side-streams such as
+    whey permeate, vinasse or potato fruit juice, arrive with nitrogen,
+    phosphorus and often biodegradable organic carbon already in them. What they
+    replace is the *purchase* of those inputs, not the demand for them: the
+    biomass still needs the same nitrogen, and :mod:`inventory` splits the
+    demand into the part the stream delivers and the part still bought.
+
+    **One stream has one composition.** The quantity dosed is set by a single
+    nutrient — ``dosed_on`` — and whatever the same quantity happens to carry of
+    the others follows from it. A stream dosed on nitrogen that is rich in
+    phosphorus over-delivers phosphorus, and that surplus is reported as an
+    emission rather than quietly discarded, because in a real pond it is
+    discharged. Choosing coverage of two nutrients independently would describe
+    a stream nobody can buy.
+
+    All ``*_per_unit`` quantities are per ``unit`` of the stream: per m3 for an
+    effluent, per kg for a slurry or a solid by-product.
+    """
+
+    enabled: bool = False
+    name: str = ""
+    #: ``wastewater`` (municipal or industrial effluent) or ``food_byproduct``
+    #: (a side-stream of food processing). Labelling only: the physics is the
+    #: composition below, and the accounting is ``convention``.
+    kind: str = "wastewater"
+    unit: str = "m3"                     # m3 (liquid) | kg (slurry or solid)
+    nitrogen_per_unit: float = 0.0       # kg N per unit of stream
+    phosphorus_per_unit: float = 0.0     # kg P per unit
+    #: Biodegradable organic carbon expressed as kg of the substrate the
+    #: heterotrophic yield is defined on, so it enters the balance through the
+    #: same ``substrate_yield`` as purchased feedstock and needs no second yield.
+    substrate_per_unit: float = 0.0      # kg substrate-equivalent per unit
+    #: Which demand fixes the quantity dosed: ``nitrogen`` | ``phosphorus`` |
+    #: ``substrate``.
+    dosed_on: str = "nitrogen"
+    #: Fraction of *that* demand the stream is dosed to cover (0-1). The rest is
+    #: bought. Below 1 for a stream that cannot be supplied year-round, or whose
+    #: contaminant load caps how much of the culture it may make up.
+    coverage: float = 1.0
+    #: EUR per unit. **Negative means a gate fee**: the plant is paid to accept
+    #: the stream, which is how a works treating municipal effluent earns. A
+    #: wider credit for displacing a treatment plant belongs in
+    #: ``Scenario.credits_per_year``, not here.
+    price_per_unit: float = 0.0
+    elec_kwh_per_unit: float = 0.0       # pumping, screening, mixing
+    #: Handling burden the *receiving* system causes — transport, pre-treatment.
+    #: Zero under a strict cut-off with the stream available at the fence line.
+    gwp_per_unit: float = 0.0            # kg CO2-eq per unit
+    ced_per_unit: float = 0.0            # MJ per unit
+    convention: WasteBurdenConvention = WasteBurdenConvention.CUT_OFF
+    #: Applied only under ``AVOIDED_TREATMENT`` and reported on its own line.
+    #: Enter as a positive number: the burden avoided, which the LCA subtracts.
+    avoided_treatment_gwp_per_unit: float = 0.0
+    avoided_treatment_ced_per_unit: float = 0.0
+    notes: str = ""                      # provenance / citation for a preset
+
+
 @dataclass
 class Organism:
     """A strain and its composition. Elemental fractions drive the nutrient balance."""
@@ -302,6 +391,8 @@ class Scenario:
     # Profitability inputs (0 => not sold, production-cost analysis only).
     product_price: float = 0.0                # EUR/kg of product (whole-biomass mode)
     coproduct_revenue_per_year: float = 0.0   # EUR/yr from co-products / by-products
+    # Optional waste-derived nutrient / carbon feed (effluent, food by-product).
+    waste_feed: WasteFeed = field(default_factory=WasteFeed)
     # Optional downstream extraction and multi-product output with allocation.
     extraction: Extraction = field(default_factory=Extraction)
     products: list[Product] = field(default_factory=list)

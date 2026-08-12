@@ -1,0 +1,151 @@
+# Waste-derived nutrient and carbon feeds.
+#
+# Streams a culture can be grown on instead of buying fertiliser or sugar. Each
+# entry describes ONE stream with ONE composition: the quantity dosed is set by
+# `dosed_on`, and whatever the same quantity carries of the other nutrients
+# follows from it. See algametrix.models.WasteFeed.
+#
+# Units. `unit: m3` for effluents, `unit: kg` for concentrated or solid
+# side-streams. Every *_per_unit value is per that unit.
+#
+# `substrate_per_unit` is expressed as kilograms of the substrate the
+# heterotrophic mass yield is defined on (glucose-equivalent), so it enters the
+# balance through the system's own `substrate_yield` rather than a second yield
+# nobody can check.
+#
+# Prices are EUR per unit and NEGATIVE means a gate fee: the plant is paid to
+# accept the stream. `gwp_per_unit` / `ced_per_unit` are what the RECEIVING
+# system causes - transport, pumping, pre-treatment - and are zero under a
+# strict cut-off with the stream available at the fence line.
+#
+# `avoided_treatment_*` values apply only under
+# `convention: avoided_treatment` and are entered POSITIVE: the burden avoided,
+# which the LCA subtracts and reports on its own line.
+#
+# Concentrations vary enormously with site and season. These are literature
+# central values for screening, not permits: replace them with an analysis of
+# the actual stream before quoting a result.
+
+waste_feeds:
+
+  # =====================================================================
+  # Municipal and urban effluents
+  # =====================================================================
+
+  - name: Municipal wastewater (primary effluent)
+    kind: wastewater
+    unit: m3
+    nitrogen_per_unit: 0.040        # kg N/m3 = 40 mg/L TN
+    phosphorus_per_unit: 0.007      # kg P/m3 = 7 mg/L TP
+    substrate_per_unit: 0.0         # organic carbon present but not credited: see notes
+    dosed_on: nitrogen
+    coverage: 1.0
+    price_per_unit: -0.15           # gate fee received, EUR/m3
+    elec_kwh_per_unit: 0.05         # screening + lift pumping only
+    gwp_per_unit: 0.0
+    ced_per_unit: 0.0
+    convention: cut_off
+    avoided_treatment_gwp_per_unit: 0.35   # kg CO2-eq/m3 of conventional tertiary treatment
+    avoided_treatment_ced_per_unit: 2.5    # MJ/m3
+    notes: >-
+      Typical primary-effluent strength for a European municipal works: TN
+      30-60 mg/L, TP 5-10 mg/L (Nishshanka et al. 2023; Sanchez-Zurano et al.
+      2021). Gate fee is the order of a tertiary-treatment charge and is a
+      placeholder: it is a contract, not a property of the water. Organic
+      carbon is deliberately left at zero because a phototrophic tertiary stage
+      does not run on it - set it only for a mixotrophic or heterotrophic
+      system that actually consumes the COD.
+
+  - name: Anaerobic digestate (liquid fraction)
+    kind: wastewater
+    unit: m3
+    nitrogen_per_unit: 2.5          # kg N/m3, largely NH4-N
+    phosphorus_per_unit: 0.35       # kg P/m3
+    substrate_per_unit: 0.0
+    dosed_on: nitrogen
+    coverage: 1.0
+    price_per_unit: -1.0            # digestate disposal is a cost to its producer
+    elec_kwh_per_unit: 0.6          # solid-liquid separation + dilution pumping
+    gwp_per_unit: 2.0               # transport and separation of a bulky stream
+    ced_per_unit: 25.0
+    convention: cut_off
+    avoided_treatment_gwp_per_unit: 0.0
+    avoided_treatment_ced_per_unit: 0.0
+    notes: >-
+      Liquid fraction after solid-liquid separation, 1.5-4 kg N/m3 and 0.2-0.5
+      kg P/m3 (Alavianghavanini et al. 2025). Two orders of magnitude stronger
+      than municipal effluent, so it must be diluted; the dilution water is not
+      modelled here and belongs in the system's own water demand. Ammonia
+      inhibition caps how much of the medium it may make up - lower `coverage`
+      rather than assuming the whole nitrogen demand can come from it.
+
+  # =====================================================================
+  # Food-industry side-streams
+  # =====================================================================
+
+  - name: Cheese whey permeate
+    kind: food_byproduct
+    unit: m3
+    nitrogen_per_unit: 0.35         # kg N/m3 (residual protein + NPN)
+    phosphorus_per_unit: 0.35       # kg P/m3
+    substrate_per_unit: 45.0        # kg lactose/m3, as glucose-equivalent substrate
+    dosed_on: substrate
+    coverage: 1.0
+    price_per_unit: 2.0             # EUR/m3, collection and refrigerated transport
+    elec_kwh_per_unit: 0.4
+    gwp_per_unit: 3.5               # refrigerated road transport of a dilute stream
+    ced_per_unit: 50.0
+    convention: cut_off
+    avoided_treatment_gwp_per_unit: 0.0
+    avoided_treatment_ced_per_unit: 0.0
+    notes: >-
+      Permeate from ultrafiltration of cheese whey: 44-52 g/L lactose, 0.3-0.4
+      g/L phosphorus, low residual protein. A carbon feed first and a nutrient
+      feed second, so it is dosed on substrate and its nitrogen is a bonus that
+      rarely covers the demand. Lactose needs a strain that can use it, or
+      hydrolysis to glucose and galactose - neither is modelled, so treat the
+      substrate figure as an upper bound.
+
+  - name: Sugar-beet vinasse
+    kind: food_byproduct
+    unit: m3
+    nitrogen_per_unit: 20.0         # kg N/m3, concentrated stillage
+    phosphorus_per_unit: 0.5
+    substrate_per_unit: 150.0       # kg organic matter/m3, as glucose-equivalent
+    dosed_on: nitrogen
+    coverage: 0.5
+    price_per_unit: 12.0            # EUR/m3, a traded fertiliser and feed material
+    elec_kwh_per_unit: 0.3
+    gwp_per_unit: 8.0
+    ced_per_unit: 120.0
+    convention: cut_off
+    avoided_treatment_gwp_per_unit: 0.0
+    avoided_treatment_ced_per_unit: 0.0
+    notes: >-
+      Concentrated distillery/beet stillage, 15-25 kg N/m3 and high potassium.
+      Not a free waste - it is sold as a liquid fertiliser and animal feed, so
+      the price is positive and a gate fee would be wrong. Default coverage is
+      0.5 because its colour blocks light in a phototrophic pond well before
+      the nitrogen demand is met.
+
+  - name: Potato fruit juice
+    kind: food_byproduct
+    unit: m3
+    nitrogen_per_unit: 4.5          # kg N/m3, protein-rich process water
+    phosphorus_per_unit: 0.6
+    substrate_per_unit: 20.0        # kg soluble organics/m3, as glucose-equivalent
+    dosed_on: nitrogen
+    coverage: 1.0
+    price_per_unit: 0.0             # free at the fence line of a starch plant
+    elec_kwh_per_unit: 0.3
+    gwp_per_unit: 0.5               # short piped transfer, on-site
+    ced_per_unit: 8.0
+    convention: cut_off
+    avoided_treatment_gwp_per_unit: 0.6
+    avoided_treatment_ced_per_unit: 6.0
+    notes: >-
+      Process water from potato starch manufacture, 3-6 kg N/m3 with soluble
+      sugars and organic acids. Priced at zero because the realistic siting is
+      next to the starch plant; add transport before moving it. The starch
+      producer treats it today, so the avoided-treatment figures are non-zero
+      and available if the scenario declares system expansion.

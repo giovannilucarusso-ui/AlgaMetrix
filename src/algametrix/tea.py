@@ -130,15 +130,27 @@ def run_tea(scenario: Scenario, inv: Inventory) -> TEAResult:
 
     # ---- OPERATING COST -------------------------------------------------
     # Raw materials: physics-derived flows + explicit media / chemicals.
+    # Nutrients and substrate are priced on what is *bought*: a waste-derived
+    # feed does not make the culture need less nitrogen, it makes the plant buy
+    # less of it. With no waste feed the purchased quantity equals the demand
+    # and these lines are what they always were.
     derived_materials = {
         "CO2": inv.co2_supply_per_kg * eco.co2_price,
         "Bicarbonate (NaHCO3)": inv.bicarbonate_supply_per_kg * eco.bicarbonate_price,
-        "Nitrogen": inv.nitrogen_per_kg * eco.nitrogen_price,
-        "Phosphorus": inv.phosphorus_per_kg * eco.phosphorus_price,
+        "Nitrogen": inv.nitrogen_purchased_per_kg * eco.nitrogen_price,
+        "Phosphorus": inv.phosphorus_purchased_per_kg * eco.phosphorus_price,
         "Water": inv.water_m3_per_kg * eco.water_price,
-        "Substrate": inv.substrate_per_kg * eco.substrate_price,
+        "Substrate": inv.substrate_purchased_per_kg * eco.substrate_price,
         "Solvent": inv.solvent_net_per_kg * scenario.extraction.solvent_price,
     }
+    if inv.waste_feed_per_kg > 0:
+        # Its own line, and it may be negative: a plant accepting municipal
+        # effluent is paid a gate fee. Kept in raw materials rather than netted
+        # against the nutrient lines, so the reader sees both the fertiliser not
+        # bought and the money the stream brings or costs.
+        wf = scenario.waste_feed
+        derived_materials[wf.name or "Waste feed"] = (
+            inv.waste_feed_per_kg * wf.price_per_unit)
     extra_materials = {m.name: m.amount_per_kg * m.price for m in scenario.materials}
     material_unit_costs = {**derived_materials, **extra_materials}  # EUR/kg product
     raw_materials_cost = sum(material_unit_costs.values()) * annual_kg

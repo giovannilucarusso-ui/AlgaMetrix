@@ -7,11 +7,12 @@ validation it corresponds to.
 
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass, replace
 from typing import Callable
 
 from .library import Library, load_library
-from .models import Basis, Extraction, Material, Product, Scenario
+from .models import Basis, Extraction, Material, Product, Scenario, WasteFeed
 from .products import main_product, product_yield
 
 # Product goals used by the wizard to group templates and preset the downstream.
@@ -148,6 +149,31 @@ def _algal_oil(lib: Library) -> Scenario:
                     credits_per_year=16_000_000.0)
 
 
+def _wastewater_biomass(lib: Library) -> Scenario:
+    """Chlorella grown on municipal effluent, as a tertiary treatment stage.
+
+    The point of the case is what it does to the two results at once. The
+    nitrogen and phosphorus stop being bought, which removes the fertiliser
+    burden that dominates a raceway's GWP; the pond gains the electricity of
+    pumping several cubic metres of effluent per kilogram of biomass; and the
+    plant is paid a gate fee to accept the stream. Whether that adds up to a
+    cheaper kilogram is the question the scenario exists to ask, not an answer
+    it assumes.
+
+    Dosed on nitrogen and left under the cut-off convention. Municipal effluent
+    is phosphorus-rich relative to what the culture takes up, so it over-delivers
+    phosphorus, and the surplus is discharged and reported.
+    """
+    feed = lib.waste_feeds.get("Municipal wastewater (primary effluent)")
+    system = replace(lib.systems["Open raceway pond"], productivity=16.5)
+    return Scenario(organism=lib.organisms["Chlorella vulgaris"], system=system,
+                    harvesting=lib.harvesting["Settling + centrifugation"],
+                    drying=lib.drying["Spray drying"],
+                    economics=lib.economics, lcia=lib.lcia, scale=200_000.0,
+                    waste_feed=copy.deepcopy(feed) if feed else WasteFeed(),
+                    product_price=1.2)
+
+
 def _phycocyanin(lib: Library) -> Scenario:
     ext = Extraction(enabled=True, name="Extraction + chromatographic purification",
                      disruption_elec_kwh_per_kg=1.0, elec_kwh_per_kg=2.0, heat_mj_per_kg=3.0,
@@ -215,6 +241,11 @@ TEMPLATES: list[Template] = [
     Template("Algal-oil biorefinery (phototrophic)", "oil",
              "Large open ponds, extraction to oil + protein co-product.",
              "SuperPro EER, unit cost +1%", _algal_oil),
+    Template("Biomass on municipal wastewater (raceway)", "biomass",
+             "Chlorella as a tertiary treatment stage: nutrients from the effluent, "
+             "gate fee received, cut-off convention.",
+             "Intelligen biostimulant case, 2.4-2.9 m3 effluent per kg biomass",
+             _wastewater_biomass),
     Template("C-phycocyanin (Spirulina)", "pigment",
              "Blue pigment extraction and purification from Spirulina.",
              "van der Walt 2025, EUR 283-544/kg", _phycocyanin),

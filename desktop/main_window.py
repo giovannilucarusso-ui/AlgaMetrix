@@ -49,6 +49,8 @@ from algametrix.models import (
     Material,
     Product,
     Scenario,
+    WasteBurdenConvention,
+    WasteFeed,
 )
 from algametrix.scenario import minimum_selling_price, run_scenario
 from algametrix.sensitivity import OUTPUTS, PARAMETERS, run_sweep
@@ -154,6 +156,7 @@ class MainWindow(QMainWindow):
         self.custom_materials: list[Material] = []
         self.extraction = Extraction(enabled=False)
         self.products: list[Product] = []
+        self.waste_feed = WasteFeed()
 
         self._spins: dict[tuple[str, str], QDoubleSpinBox] = {}
         self._checks: dict[tuple[str, str], QCheckBox] = {}
@@ -433,6 +436,80 @@ class MainWindow(QMainWindow):
         self.cmb_alloc.currentTextChanged.connect(self._on_extraction_change)
         f.addRow(tr("Allocation method"), self.cmb_alloc)
         v.addWidget(g_ext)
+
+        # --- Waste-derived nutrients ---------------------------------
+        g_waste = QGroupBox(tr("Waste-derived nutrients & carbon"))
+        f = QFormLayout(g_waste)
+        self.chk_waste = QCheckBox("Feed the culture on a waste stream")
+        self.chk_waste.setToolTip(
+            "Cover part of the nitrogen, phosphorus or carbon demand with an "
+            "effluent or a food-industry side-stream instead of buying it. The "
+            "biomass still needs the same nutrients: what changes is the purchase, "
+            "the burden of making fertiliser, and the money the stream brings or costs."
+        )
+        self.chk_waste.toggled.connect(self._on_waste_toggled)
+        f.addRow(tr(""), self.chk_waste)
+
+        self.cmb_waste = QComboBox()
+        self.cmb_waste.addItems(list(self.lib.waste_feeds))
+        self.cmb_waste.setToolTip(
+            "Municipal effluent, anaerobic digestate, or a food-industry side-stream "
+            "(whey permeate, vinasse, potato fruit juice). Concentrations are "
+            "literature central values: replace them with an analysis of your stream."
+        )
+        self.cmb_waste.currentTextChanged.connect(self._on_waste_preset)
+        f.addRow(tr("Stream"), self.cmb_waste)
+
+        self.cmb_waste_dosed = QComboBox()
+        self.cmb_waste_dosed.addItems(["nitrogen", "phosphorus", "substrate"])
+        self.cmb_waste_dosed.setToolTip(
+            "Which demand fixes how much of the stream is dosed. One stream has one "
+            "composition, so what it delivers of the other two follows from this "
+            "choice — and any excess is discharged, not stored."
+        )
+        self.cmb_waste_dosed.currentTextChanged.connect(self._on_waste_change)
+        f.addRow(tr("Dosed on"), self.cmb_waste_dosed)
+
+        self.spn_waste_cov = QDoubleSpinBox()
+        self.spn_waste_cov.setRange(0.0, 100.0)
+        self.spn_waste_cov.setDecimals(0)
+        self.spn_waste_cov.setSuffix(" %")
+        self.spn_waste_cov.setValue(100.0)
+        self.spn_waste_cov.setToolTip(
+            "Share of that demand the stream is dosed to cover. Below 100% for a "
+            "stream that is not available year-round, or whose colour or ammonia "
+            "load caps how much of the culture it may make up."
+        )
+        self.spn_waste_cov.valueChanged.connect(self._on_waste_change)
+        f.addRow(tr("Coverage"), self.spn_waste_cov)
+
+        self.spn_waste_price = QDoubleSpinBox()
+        self.spn_waste_price.setRange(-1000.0, 1000.0)
+        self.spn_waste_price.setDecimals(3)
+        self.spn_waste_price.setSingleStep(0.05)
+        self.spn_waste_price.setToolTip(
+            "Price per m³ or per kg of stream. NEGATIVE means a gate fee: you are "
+            "paid to accept it, which is how a works treating municipal effluent earns."
+        )
+        self.spn_waste_price.valueChanged.connect(self._on_waste_change)
+        f.addRow(tr("Price (€/unit, negative = gate fee)"), self.spn_waste_price)
+
+        self.cmb_waste_conv = QComboBox()
+        self.cmb_waste_conv.addItems(["cut_off", "avoided_treatment"])
+        self.cmb_waste_conv.setToolTip(
+            "cut_off: the waste enters burden-free and you carry only what you do "
+            "yourself. avoided_treatment: system expansion, crediting the treatment "
+            "you displace — which makes the result a difference between two systems, "
+            "so it is always reported on its own line."
+        )
+        self.cmb_waste_conv.currentTextChanged.connect(self._on_waste_change)
+        f.addRow(tr("LCA convention"), self.cmb_waste_conv)
+
+        self.lbl_waste = QLabel("")
+        self.lbl_waste.setObjectName("subtle")
+        self.lbl_waste.setWordWrap(True)
+        f.addRow(self.lbl_waste)
+        v.addWidget(g_waste)
 
         # --- Batch scheduling ----------------------------------------
         g_batch = QGroupBox(tr("Batch scheduling"))
@@ -810,6 +887,99 @@ class MainWindow(QMainWindow):
         self.extraction, self.products = self._build_extraction()
         self.recompute()
 
+    def _seed_waste_fields(self, name: str):
+        """Copy a catalogue entry into the editable fields. It does not lock them."""
+        preset = self.lib.waste_feeds.get(name)
+        if preset is None:
+            return
+        for widget, value in ((self.spn_waste_price, preset.price_per_unit),
+                              (self.spn_waste_cov, preset.coverage * 100.0)):
+            widget.blockSignals(True)
+            widget.setValue(value)
+            widget.blockSignals(False)
+        for combo, value in ((self.cmb_waste_dosed, preset.dosed_on),
+                             (self.cmb_waste_conv, preset.convention.value)):
+            combo.blockSignals(True)
+            combo.setCurrentText(value)
+            combo.blockSignals(False)
+
+    def _on_waste_preset(self, name: str):
+        self._seed_waste_fields(name)
+        self._on_waste_change()
+
+    def _on_waste_toggled(self, on: bool):
+        """Switching the feed on seeds it from the selected entry.
+
+        Without this the first tick would silently run the catalogue's stream at
+        whatever the untouched spin boxes happened to hold - a gate fee of zero,
+        most visibly - and the user would be looking at a stream that is not the
+        one they picked.
+        """
+        if on:
+            self._seed_waste_fields(self.cmb_waste.currentText())
+        self._on_waste_change()
+
+    def _build_waste_feed(self) -> WasteFeed:
+        """The selected preset with the fields the user may override applied."""
+        preset = self.lib.waste_feeds.get(self.cmb_waste.currentText())
+        feed = copy.deepcopy(preset) if preset is not None else WasteFeed()
+        feed.enabled = self.chk_waste.isChecked()
+        feed.dosed_on = self.cmb_waste_dosed.currentText()
+        feed.coverage = self.spn_waste_cov.value() / 100.0
+        feed.price_per_unit = self.spn_waste_price.value()
+        feed.convention = WasteBurdenConvention(self.cmb_waste_conv.currentText())
+        return feed
+
+    def _on_waste_change(self, *_):
+        if self._loading:
+            return
+        self.waste_feed = self._build_waste_feed()
+        self.recompute()
+
+    def _update_waste_label(self):
+        """Say what the stream actually delivers, including what it over-delivers.
+
+        The surplus is the part a user does not expect: a stream dosed on
+        nitrogen brings whatever phosphorus it happens to carry, and the excess
+        is discharged. Showing it here means the trade-off is visible at the
+        point of choosing, not only in the eutrophication row.
+        """
+        results = getattr(self, "results", None)
+        if not self.waste_feed.enabled or results is None:
+            self.lbl_waste.setText("Disabled: every nutrient is bought.")
+            return
+        inv = results.inventory
+        wf = self.waste_feed
+        if inv.waste_feed_per_kg <= 0:
+            # A stream dosed on a demand this scenario does not have — whey
+            # permeate, dosed on substrate, fed to a phototrophic pond — is a
+            # valid setting that does nothing. Saying so beats a row of zeros.
+            demand = {"nitrogen": inv.nitrogen_per_kg,
+                      "phosphorus": inv.phosphorus_per_kg,
+                      "substrate": inv.substrate_per_kg}.get(wf.dosed_on, 0.0)
+            why = (f"this scenario has no {wf.dosed_on} demand"
+                   if demand <= 0 else f"the stream carries no {wf.dosed_on}")
+            self.lbl_waste.setText(
+                f"Nothing is received: dosed on {wf.dosed_on}, but {why}. "
+                f"Everything is still bought.")
+            return
+        parts = [f"{inv.waste_feed_per_kg:,.2f} {wf.unit}/kg of product"]
+        for label, covered, demand, surplus in (
+            ("N", inv.nitrogen_from_waste_per_kg, inv.nitrogen_per_kg,
+             inv.nitrogen_surplus_per_kg),
+            ("P", inv.phosphorus_from_waste_per_kg, inv.phosphorus_per_kg,
+             inv.phosphorus_surplus_per_kg),
+            ("substrate", inv.substrate_from_waste_per_kg, inv.substrate_per_kg, 0.0),
+        ):
+            if demand <= 0:
+                continue
+            share = 100.0 * covered / demand
+            txt = f"{label} {share:.0f}% covered"
+            if surplus > 0:
+                txt += f" (+{surplus:.4g} kg/kg discharged)"
+            parts.append(txt)
+        self.lbl_waste.setText(" · ".join(parts))
+
     def apply_scenario(self, scn: Scenario):
         """Load a Scenario object (e.g. from the setup wizard) into the UI state."""
         self._loading = True
@@ -822,6 +992,7 @@ class MainWindow(QMainWindow):
         self.lcia = copy.deepcopy(scn.lcia)
         self.scale = scn.scale
         self.extraction = copy.deepcopy(scn.extraction)
+        self.waste_feed = copy.deepcopy(scn.waste_feed)
         self.products = [copy.deepcopy(p) for p in scn.products]
         self.batch_mode = scn.batch_mode
         self.batch_size_kg = scn.batch_size_kg or 1000.0
@@ -839,6 +1010,19 @@ class MainWindow(QMainWindow):
         for obj in ("organism", "system", "harvesting", "drying", "economics", "lcia"):
             self._refresh(obj)
         self.chk_extraction.setChecked(self.extraction.enabled)
+        self.chk_waste.setChecked(self.waste_feed.enabled)
+        if self.waste_feed.name in self.lib.waste_feeds:
+            self._sync_combo(self.cmb_waste, self.waste_feed.name)
+        for combo, value in ((self.cmb_waste_dosed, self.waste_feed.dosed_on),
+                             (self.cmb_waste_conv, self.waste_feed.convention.value)):
+            combo.blockSignals(True)
+            combo.setCurrentText(value)
+            combo.blockSignals(False)
+        for widget, value in ((self.spn_waste_cov, self.waste_feed.coverage * 100.0),
+                              (self.spn_waste_price, self.waste_feed.price_per_unit)):
+            widget.blockSignals(True)
+            widget.setValue(value)
+            widget.blockSignals(False)
         self.chk_batch.setChecked(self.batch_mode)
         if any(p.is_main and "protein" in p.name.lower() for p in self.products):
             self.cmb_downstream.setCurrentIndex(1)
@@ -1058,6 +1242,7 @@ class MainWindow(QMainWindow):
             product_price=self.product_price,
             coproduct_revenue_per_year=self.coproduct_revenue,
             extraction=self.extraction,
+            waste_feed=self.waste_feed,
             products=products,
             batch_mode=self.batch_mode,
             batch_size_kg=self.batch_size_kg,
@@ -1067,6 +1252,10 @@ class MainWindow(QMainWindow):
     def recompute(self):
         self.results = run_scenario(self.build_scenario())
         r = self.results
+        # The stream volume follows from the nutrient demand, so it moves when
+        # the organism, the system or the recovery does - not only when the
+        # waste-feed controls are touched.
+        self._update_waste_label()
         unit = "m²" if self.system.basis == Basis.AREA else "m³"
         self.subtitle.setText(
             f"{self.organism.name}  ·  {self.system.name}  ·  {self.scale:,.0f} {unit}"

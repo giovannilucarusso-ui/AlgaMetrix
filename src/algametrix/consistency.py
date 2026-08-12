@@ -137,6 +137,8 @@ def _list_probes(scn: Scenario) -> list[FlowProbe]:
     probes: list[FlowProbe] = [
         FlowProbe("Electricity", "kWh", sp, gp, *_lcia("elec_gwp")),
         FlowProbe("Heat", "MJ", *_eco("heat_price"), *_lcia("heat_gwp")),
+        # The purchased quantity, which is what both sides multiply. With no
+        # waste feed it is the whole demand and the probe is unchanged.
         FlowProbe("Nitrogen", "kg N", *_eco("nitrogen_price"), *_lcia("nitrogen_gwp")),
         FlowProbe("Phosphorus", "kg P", *_eco("phosphorus_price"), *_lcia("phosphorus_gwp")),
         FlowProbe("CO2 supply", "kg CO2", *_eco("co2_price"), *_lcia("co2_supply_gwp")),
@@ -149,6 +151,16 @@ def _list_probes(scn: Scenario) -> list[FlowProbe]:
     if scn.extraction.enabled:
         probes.append(FlowProbe("Extraction solvent", "kg",
                                 *_ext("solvent_price"), *_ext("solvent_gwp")))
+    if scn.waste_feed.enabled:
+        # The received stream is a shared flow like any other: the cost side
+        # multiplies it by a price that may be a gate fee, the impact side by a
+        # handling burden. Both must recover the same quantity.
+        probes.append(FlowProbe(
+            "Waste feed", scn.waste_feed.unit,
+            lambda s, v: setattr(s.waste_feed, "price_per_unit", v),
+            lambda s: float(s.waste_feed.price_per_unit),
+            lambda s, v: setattr(s.waste_feed, "gwp_per_unit", v),
+            lambda s: float(s.waste_feed.gwp_per_unit)))
     # Explicit recipe line items: media, chemicals, extra utilities.
     for i, m in enumerate(scn.materials):
         probes.append(FlowProbe(
@@ -267,16 +279,20 @@ def check_scenario(scenario: Scenario, name: str = "scenario") -> ConsistencyRep
     overhead = 1.0 + float(scenario.economics.overhead_frac)
 
     #: Inventory field holding each flow, for the third (reference) reading.
+    # Nitrogen, phosphorus and substrate reference the *purchased* quantity: it
+    # is what the price and the fertiliser-production factor both multiply, and
+    # it equals the demand whenever no waste feed is enabled.
     inv_field = {
         "Electricity": "elec_kwh_per_kg",
         "Heat": "heat_mj_per_kg",
-        "Nitrogen": "nitrogen_per_kg",
-        "Phosphorus": "phosphorus_per_kg",
+        "Nitrogen": "nitrogen_purchased_per_kg",
+        "Phosphorus": "phosphorus_purchased_per_kg",
         "CO2 supply": "co2_supply_per_kg",
         "Bicarbonate": "bicarbonate_supply_per_kg",
-        "Substrate": "substrate_per_kg",
+        "Substrate": "substrate_purchased_per_kg",
         "Water": "water_m3_per_kg",
         "Extraction solvent": "solvent_net_per_kg",
+        "Waste feed": "waste_feed_per_kg",
     }
 
     rows: list[FlowConsistency] = []

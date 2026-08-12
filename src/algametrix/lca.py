@@ -20,7 +20,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from .inventory import Inventory
-from .models import CarbonAccounting, CarbonSource, Scenario
+from .models import CarbonAccounting, CarbonSource, Scenario, WasteBurdenConvention
 
 
 @dataclass
@@ -44,6 +44,12 @@ class LCAResult:
     biogenic_adjustment_kg_co2eq_per_kg: float = 0.0   # <= 0; net = gross + adjustment
     carbon_accounting_mode: str = CarbonAccounting.NO_BIOGENIC_CREDIT.value
     carbon_supply_gwp_kg_co2eq_per_kg: float = 0.0     # upstream burden of the C feed
+    # --- waste-derived feed ------------------------------------------------
+    # <= 0, and non-zero only where the scenario declares system expansion.
+    # Reported apart from the biogenic adjustment because the two credit
+    # different things: one a carbon flow, the other a displaced process.
+    avoided_treatment_kg_co2eq_per_kg: float = 0.0
+    waste_burden_convention: str = ""    # empty when no waste feed is enabled
 
     @property
     def gwp_net_kg_co2eq_per_kg(self) -> float:
@@ -61,10 +67,20 @@ def run_lca(scenario: Scenario, inv: Inventory) -> LCAResult:
         "Heat (drying)": inv.heat_mj_per_kg * f.heat_gwp,
         "CO2 supply": inv.co2_supply_per_kg * f.co2_supply_gwp,
         "Bicarbonate (NaHCO3)": inv.bicarbonate_supply_per_kg * f.bicarbonate_gwp,
-        "Nitrogen": inv.nitrogen_per_kg * f.nitrogen_gwp,
-        "Phosphorus": inv.phosphorus_per_kg * f.phosphorus_gwp,
-        "Substrate": inv.substrate_per_kg * f.substrate_gwp,
+        # Purchased, not demanded: the fertiliser factors describe making
+        # fertiliser, and nitrogen arriving in somebody's effluent had no
+        # Haber-Bosch plant behind it. Without a waste feed the two are equal.
+        "Nitrogen": inv.nitrogen_purchased_per_kg * f.nitrogen_gwp,
+        "Phosphorus": inv.phosphorus_purchased_per_kg * f.phosphorus_gwp,
+        "Substrate": inv.substrate_purchased_per_kg * f.substrate_gwp,
     }
+    wf = scenario.waste_feed
+    if inv.waste_feed_per_kg > 0:
+        # What the receiving system does itself: transport, pre-treatment. Under
+        # a strict cut-off with the stream at the fence line this is zero, and
+        # the line simply does not appear.
+        if wf.gwp_per_unit:
+            gwp_contrib[wf.name or "Waste feed"] = inv.waste_feed_per_kg * wf.gwp_per_unit
     # Explicit media / chemicals and utilities carry their own factors.
     for m in scenario.materials:
         if m.gwp:
@@ -93,17 +109,32 @@ def run_lca(scenario: Scenario, inv: Inventory) -> LCAResult:
     if adjustment:
         gwp_contrib["Biogenic CO2 uptake"] = adjustment
 
-    gwp = gwp_gross + adjustment
+    # --- avoided treatment, only where the scenario declares system expansion --
+    # Kept out of the gross and given its own line, for the same reason the
+    # biogenic credit is: it is not a burden this process causes but a burden
+    # another one no longer does, and a reader has to be able to take it back off.
+    avoided_gwp = 0.0
+    if (inv.waste_feed_per_kg > 0
+            and wf.convention == WasteBurdenConvention.AVOIDED_TREATMENT
+            and wf.avoided_treatment_gwp_per_unit):
+        avoided_gwp = -inv.waste_feed_per_kg * wf.avoided_treatment_gwp_per_unit
+        gwp_contrib["Avoided treatment (system expansion)"] = avoided_gwp
+
+    gwp = gwp_gross + adjustment + avoided_gwp
 
     # --- Cumulative Energy Demand ----------------------------------------
     ced = (
         inv.elec_kwh_per_kg * f.elec_ced
         + inv.heat_mj_per_kg * f.heat_ced
-        + inv.nitrogen_per_kg * f.nitrogen_ced
-        + inv.phosphorus_per_kg * f.phosphorus_ced
-        + inv.substrate_per_kg * f.substrate_ced
+        + inv.nitrogen_purchased_per_kg * f.nitrogen_ced
+        + inv.phosphorus_purchased_per_kg * f.phosphorus_ced
+        + inv.substrate_purchased_per_kg * f.substrate_ced
         + inv.bicarbonate_supply_per_kg * f.bicarbonate_ced
     )
+    ced += inv.waste_feed_per_kg * wf.ced_per_unit
+    if (inv.waste_feed_per_kg > 0
+            and wf.convention == WasteBurdenConvention.AVOIDED_TREATMENT):
+        ced -= inv.waste_feed_per_kg * wf.avoided_treatment_ced_per_unit
     ced += sum(m.amount_per_kg * m.ced for m in scenario.materials)
     ced += sum(u.amount_per_kg * u.ced for u in scenario.utilities)
     if ext.enabled:
@@ -115,21 +146,24 @@ def run_lca(scenario: Scenario, inv: Inventory) -> LCAResult:
 
     # --- Eutrophication & acidification -----------------------------------
     solvent = inv.solvent_net_per_kg if scenario.extraction.enabled else 0.0
+    # The direct term stays on everything emitted, surplus from the waste stream
+    # included: nutrient the culture cannot take up reaches the water whatever
+    # brought it there. Only the upstream-production term follows the purchase.
     marine_eutroph = (
         inv.nitrogen_emitted_per_kg * f.n_to_water_frac
-        + inv.nitrogen_per_kg * f.nitrogen_eutroph_n
+        + inv.nitrogen_purchased_per_kg * f.nitrogen_eutroph_n
     )
     fresh_eutroph = (
         inv.phosphorus_emitted_per_kg * f.p_to_water_frac
-        + inv.phosphorus_per_kg * f.phosphorus_eutroph_p
+        + inv.phosphorus_purchased_per_kg * f.phosphorus_eutroph_p
         + inv.elec_kwh_per_kg * f.elec_eutroph_p
     )
     acidification = (
         inv.elec_kwh_per_kg * f.elec_acid
         + inv.heat_mj_per_kg * f.heat_acid
-        + inv.nitrogen_per_kg * f.nitrogen_acid
-        + inv.phosphorus_per_kg * f.phosphorus_acid
-        + inv.substrate_per_kg * f.substrate_acid
+        + inv.nitrogen_purchased_per_kg * f.nitrogen_acid
+        + inv.phosphorus_purchased_per_kg * f.phosphorus_acid
+        + inv.substrate_purchased_per_kg * f.substrate_acid
         + solvent * f.solvent_acid
     )
 
@@ -154,6 +188,8 @@ def run_lca(scenario: Scenario, inv: Inventory) -> LCAResult:
         biogenic_adjustment_kg_co2eq_per_kg=adjustment,
         carbon_accounting_mode=mode.value,
         carbon_supply_gwp_kg_co2eq_per_kg=carbon_supply_gwp,
+        avoided_treatment_kg_co2eq_per_kg=avoided_gwp,
+        waste_burden_convention=(wf.convention.value if inv.waste_feed_per_kg > 0 else ""),
     )
 
 

@@ -45,22 +45,22 @@ HOW A QUANTITY IS RECOVERED
 
 SCENARIO COVERAGE
 ------------------------------------------------------------------------------
-  total                              26
-  phototrophic                       22
+  total                              27
+  phototrophic                       23
   heterotrophic                      4
-  carbon source: CO2                 19
+  carbon source: CO2                 20
   carbon source: NaHCO3              3
-  area basis                         22
+  area basis                         23
   volume basis                       4
   batch                              2
-  continuous                         24
-  with drying                        14
+  continuous                         25
+  with drying                        15
   without drying                     12
   with extraction                    5
   multi-product allocation           5
   with explicit media/utilities      5
 
-  The counts above are over the 26 STRUCTURALLY DISTINCT
+  The counts above are over the 27 STRUCTURALLY DISTINCT
   scenarios. Several suite members build an identical Scenario by a different
   route - a template and the reconstruction that wraps it, an archetype and its
   template - and are counted once, so the size of the evidence base is not
@@ -75,8 +75,8 @@ SCENARIO COVERAGE
 ==============================================================================
 RESULT
 ==============================================================================
-  distinct scenarios checked        : 26
-  flow comparisons                  : 162
+  distinct scenarios checked        : 27
+  flow comparisons                  : 167
   maximum relative TEA-LCA gap      : 1.213e-13
   maximum gap to the inventory field: 1.152e-13
   overall                           : PASS
@@ -317,6 +317,19 @@ Shared-inventory consistency - Template: Whole biomass — food (Chlorella, race
          594,000 vs 594,000 kg/yr (rel 0.0e+00)
     [ok] Land: area capitalised by TEA == area occupied in LCA
          150,000 vs 150,000 m2 (rel 0.0e+00)
+
+Shared-inventory consistency - Template: Biomass on municipal wastewater (raceway): PASS (max relative discrepancy 4.0e-16)
+    flow                   unit          TEA-implied    LCA-implied      inventory  rel. diff
+    [ok] Electricity       kWh             2.8679012      2.8679012      2.8679012    1.5e-16
+    [ok] Heat              MJ              14.210526      14.210526      14.210526    0.0e+00
+    [ok] CO2 supply        kg CO2          2.7141787      2.7141787      2.7141787    3.3e-16
+    [ok] Water             m3             0.55555556     0.55555556     0.55555556    4.0e-16  (direct)
+    [ok] Waste feed        m3              2.4691358      2.4691358      2.4691358    1.8e-16
+    not present in this scenario: Nitrogen, Phosphorus, Bicarbonate, Substrate
+    [ok] Functional unit: TEA cost denominator == LCA reference flow
+         980,100 vs 980,100 kg/yr (rel 0.0e+00)
+    [ok] Land: area capitalised by TEA == area occupied in LCA
+         300,000 vs 300,000 m2 (rel 0.0e+00)
 
 Shared-inventory consistency - Template: Biodiesel (Nannochloropsis): PASS (max relative discrepancy 2.8e-15)
     flow                   unit          TEA-implied    LCA-implied      inventory  rel. diff

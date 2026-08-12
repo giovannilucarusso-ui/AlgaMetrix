@@ -36,9 +36,9 @@ WHAT THIS IS
 ==============================================================================
 RESULT
 ==============================================================================
-  scenarios benchmarked        : 26
-  indicator comparisons        : 234
-  maximum relative difference  : 2.430e-15
+  scenarios benchmarked        : 27
+  indicator comparisons        : 243
+  maximum relative difference  : 2.503e-15
   overall                      : PASS
 
   BRIGHTWAY CROSS-CHECK
@@ -252,6 +252,18 @@ Independent matrix LCA - Template: Whole biomass — food (Chlorella, raceway): 
     [ok] Freshwater eutrophication (kg P-eq)    0.00122364198    0.00122364198    1.8e-16
     [ok] Acidification (kg SO₂-eq)          0.00680634178    0.00680634178    2.5e-16
     [ok] GWP gross (kg CO2-eq)                 2.98715211       2.98715211    1.5e-16
+    [ok] Biogenic adjustment (kg CO2-eq)        -2.035634        -2.035634    2.2e-16
+
+Independent matrix LCA - Template: Biomass on municipal wastewater (raceway): PASS (max relative difference 2.5e-15; 12 processes, cond(A) = 218)
+    indicator                                  sequential           matrix  rel. diff
+    [ok] GWP (kg CO₂-eq)                      0.177444034      0.177444034    2.5e-15
+    [ok] Energy demand (MJ)                     43.587167        43.587167    1.6e-16
+    [ok] Water (m³)                           0.561291358      0.561291358    2.0e-16
+    [ok] Land (m²·a)                          0.306091215      0.306091215    1.8e-16
+    [ok] Marine eutrophication (kg N-eq)    0.00296296296    0.00296296296    2.9e-16
+    [ok] Freshwater eutrophication (kg P-eq)    0.00267425926    0.00267425926    1.1e-15
+    [ok] Acidification (kg SO₂-eq)          0.00615695906    0.00615695906    0.0e+00
+    [ok] GWP gross (kg CO2-eq)                 2.21307804       2.21307804    0.0e+00
     [ok] Biogenic adjustment (kg CO2-eq)        -2.035634        -2.035634    2.2e-16
 
 Independent matrix LCA - Template: Biodiesel (Nannochloropsis): PASS (max relative difference 6.6e-16; 14 processes, cond(A) = 18.5)

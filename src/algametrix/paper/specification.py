@@ -257,6 +257,38 @@ def _equations_inventory() -> list[Equation]:
             core_gloss="Nitrogen and phosphorus supply, and the unassimilated fraction that leaves as a potential water emission.",
         ),
         Equation(
+            "inv.waste",
+            r"q_\mathrm{ws} = \frac{\phi\,q_{d}}{c_{d}},\qquad "
+            r"q_j^{\mathrm{buy}} = q_j - \min(q_\mathrm{ws}\,c_j,\; q_j),\qquad "
+            r"q_j^{\mathrm{sur}} = \max(q_\mathrm{ws}\,c_j - q_j,\; 0)",
+            "Waste-derived feed. The quantity dosed follows from one demand $q_d$ and "
+            "the stream's concentration $c_d$ of it, scaled by the coverage $\\phi$. "
+            "What the same quantity carries of every other nutrient $j$ then follows "
+            "from the stream's own composition: it displaces a purchase up to the "
+            "demand, and anything past that is surplus and is discharged. The demand "
+            "itself never moves - a waste feed changes what is bought, not what the "
+            "biomass needs.",
+            "inventory._waste_split",
+            stated=lambda s, inv, tea, lca: _stated_waste_quantity(s),
+            engine=lambda s, inv, tea, lca: inv.waste_feed_per_kg,
+            applies=lambda s, inv: s.waste_feed.enabled,
+        ),
+        Equation(
+            "inv.nutrients.purchased",
+            r"q_\mathrm{N}^{\mathrm{buy}} = q_\mathrm{N} - \min(q_\mathrm{ws}\,c_\mathrm{N},"
+            r"\; q_\mathrm{N})",
+            "The nitrogen actually bought. Cost and the fertiliser-production burden are "
+            "computed from this and not from $q_\\mathrm{N}$, because nitrogen arriving "
+            "in an effluent had no fertiliser plant behind it. With no waste feed the "
+            "two are the same number.",
+            "inventory.build_inventory",
+            stated=lambda s, inv, tea, lca: max(
+                s.organism.nitrogen * _gpp(s) / _uptake(s)
+                - min(_stated_waste_quantity(s) * s.waste_feed.nitrogen_per_unit,
+                      s.organism.nitrogen * _gpp(s) / _uptake(s)), 0.0),
+            engine=lambda s, inv, tea, lca: inv.nitrogen_purchased_per_kg,
+        ),
+        Equation(
             "inv.water",
             r"q_\mathrm{W} = v_\mathrm{W}\,g",
             "Net water consumption, referred to the gross biomass cultivated.",
@@ -267,11 +299,14 @@ def _equations_inventory() -> list[Equation]:
         Equation(
             "inv.electricity",
             r"q_E = \underbrace{(e_\mathrm{cult} + e_\mathrm{harv})\,g}_{\text{referred to gross biomass}}"
-            r" + \underbrace{e_\mathrm{dry} + e_\mathrm{ext}}_{\text{referred to the product}}",
+            r" + \underbrace{e_\mathrm{dry} + e_\mathrm{ext}}_{\text{referred to the product}}"
+            r" + \underbrace{e_\mathrm{ws}\,q_\mathrm{ws}}_{\text{pumping the waste feed}}",
             "Electricity. Cultivation and harvesting act on the gross biomass and carry "
             "the factor $g$; drying and downstream extraction act on what survives "
             "harvesting and do not. This is why an error in the harvesting recovery "
-            "propagates unevenly across the flows (SI S3).",
+            "propagates unevenly across the flows (SI S3). Pumping and screening a "
+            "waste-derived feed scales with the stream itself and is charged to "
+            "cultivation, which is what it is incurred for.",
             "inventory.build_inventory",
             stated=lambda s, inv, tea, lca: _stated_electricity(s),
             engine=lambda s, inv, tea, lca: inv.elec_kwh_per_kg,
@@ -573,9 +608,37 @@ def _stated_annual_kg(s) -> float:
     return gross * min(max(s.harvesting.recovery, 1e-6), 1.0)
 
 
+def _stated_waste_quantity(s) -> float:
+    """Units of waste stream per kg of product, restated from the scenario.
+
+    Deliberately recomputed from the dosing rule rather than read off the
+    inventory: that is the whole point of this module, and it is what would
+    catch the dosing changing without the printed equation changing with it.
+    """
+    wf = s.waste_feed
+    if not wf.enabled:
+        return 0.0
+    g = _gpp(s)
+    hetero = s.system.mode != TrophicMode.PHOTOTROPHIC
+    demand = {
+        "nitrogen": s.organism.nitrogen * g / _uptake(s),
+        "phosphorus": s.organism.phosphorus * g / _uptake(s),
+        "substrate": g / max(s.system.substrate_yield, 1e-6) if hetero else 0.0,
+    }.get(wf.dosed_on, 0.0)
+    concentration = {
+        "nitrogen": wf.nitrogen_per_unit,
+        "phosphorus": wf.phosphorus_per_unit,
+        "substrate": wf.substrate_per_unit,
+    }.get(wf.dosed_on, 0.0)
+    if concentration <= 0.0 or demand <= 0.0:
+        return 0.0
+    return min(max(wf.coverage, 0.0), 1.0) * demand / concentration
+
+
 def _stated_electricity(s) -> float:
     g = _gpp(s)
     elec = (s.system.elec_kwh_per_kg + s.harvesting.elec_kwh_per_kg) * g
+    elec += _stated_waste_quantity(s) * s.waste_feed.elec_kwh_per_unit
     cult_heat = s.system.cultivation_heat_mj_per_kg * g
     if s.system.cultivation_heat_fuel == "electricity":
         elec += cult_heat / 3.6
@@ -624,13 +687,16 @@ def _stated_dfc(s, inv) -> float:
 
 def _stated_materials(s, inv) -> float:
     eco = s.economics
+    # Nutrients and substrate are priced on the purchased quantity, which equals
+    # the demand unless a waste-derived feed covers part of it.
     per_kg = (inv.co2_supply_per_kg * eco.co2_price
               + inv.bicarbonate_supply_per_kg * eco.bicarbonate_price
-              + inv.nitrogen_per_kg * eco.nitrogen_price
-              + inv.phosphorus_per_kg * eco.phosphorus_price
+              + inv.nitrogen_purchased_per_kg * eco.nitrogen_price
+              + inv.phosphorus_purchased_per_kg * eco.phosphorus_price
               + inv.water_m3_per_kg * eco.water_price
-              + inv.substrate_per_kg * eco.substrate_price
+              + inv.substrate_purchased_per_kg * eco.substrate_price
               + inv.solvent_net_per_kg * s.extraction.solvent_price
+              + inv.waste_feed_per_kg * s.waste_feed.price_per_unit
               + sum(m.amount_per_kg * m.price for m in s.materials))
     return per_kg * inv.annual_biomass_kg
 
@@ -665,9 +731,11 @@ def _stated_gwp_gross(s, inv) -> float:
              + inv.heat_mj_per_kg * f.heat_gwp
              + inv.co2_supply_per_kg * f.co2_supply_gwp
              + inv.bicarbonate_supply_per_kg * f.bicarbonate_gwp
-             + inv.nitrogen_per_kg * f.nitrogen_gwp
-             + inv.phosphorus_per_kg * f.phosphorus_gwp
-             + inv.substrate_per_kg * f.substrate_gwp)
+             + inv.nitrogen_purchased_per_kg * f.nitrogen_gwp
+             + inv.phosphorus_purchased_per_kg * f.phosphorus_gwp
+             + inv.substrate_purchased_per_kg * f.substrate_gwp)
+    if inv.waste_feed_per_kg > 0 and s.waste_feed.gwp_per_unit:
+        total += inv.waste_feed_per_kg * s.waste_feed.gwp_per_unit
     total += sum(m.amount_per_kg * m.gwp for m in s.materials if m.gwp)
     total += sum(u.amount_per_kg * u.gwp for u in s.utilities if u.gwp)
     if s.extraction.enabled and inv.solvent_net_per_kg > 0 and s.extraction.solvent_gwp:

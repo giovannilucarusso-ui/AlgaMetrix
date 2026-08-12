@@ -33,6 +33,17 @@ For a user-defined production scenario it computes, from a single mass/energy ba
   (economic, mass, or SuperPro-style "all cost to the main product"). The **target product** is
   selectable — **oil / lipid** (e.g. omega-3 PUFA) or **protein** — so the same biomass can be evaluated
   for an oil-first or a protein-first biorefinery. The functional unit becomes 1 kg of the main product.
+- **Waste-derived nutrients & carbon** — grow the culture on a waste stream instead of buying its
+  inputs: municipal effluent, anaerobic digestate, or a food-industry side-stream (whey permeate,
+  vinasse, potato fruit juice). The biomass still needs the same nitrogen; what changes is the
+  **purchase**, the **fertiliser-production burden** behind it, and the money the stream brings — a
+  **gate fee** is entered as a negative price, which is how a works treating municipal effluent earns.
+  One stream has one composition, so the quantity is dosed against a single demand and whatever it
+  carries of the others follows: a nitrogen-dosed effluent that is phosphorus-rich **over-delivers
+  phosphorus, and that surplus is reported and discharged**, never quietly absorbed. The LCA
+  convention is explicit — **cut-off** (the default: the waste enters burden-free and you carry only
+  transport and pumping) or **avoided treatment** (system expansion, credited on its own line so a
+  reader can take it back off).
 - **Life-cycle assessment** — cradle-to-gate **Global Warming Potential (kg CO₂-eq)**, **Cumulative
   Energy Demand (MJ)**, **water use (m³)**, **land use (m²·a)**, **marine & freshwater eutrophication**
   and **acidification** per kg of biomass, with GWP contribution analysis.
@@ -142,8 +153,10 @@ See **[docs/VERIFICATION.md](docs/VERIFICATION.md)** for the three self-consiste
 what they do *not* establish, **[docs/VALIDATION.md](docs/VALIDATION.md)** for the validation
 tables, [docs/STUDY_SELECTION.md](docs/STUDY_SELECTION.md) for how the studies were chosen (and
 why this is not a systematic review), [docs/PRICE_BASIS.md](docs/PRICE_BASIS.md) for currency and
-price-year handling, and [docs/CARBON_ACCOUNTING.md](docs/CARBON_ACCOUNTING.md) for the
-biogenic-carbon conventions.
+price-year handling, [docs/CARBON_ACCOUNTING.md](docs/CARBON_ACCOUNTING.md) for the
+biogenic-carbon conventions, and [docs/WASTE_FEEDS.md](docs/WASTE_FEEDS.md) for growing on
+effluents and food-industry side-streams (the dosing rule, gate fees, and the cut-off vs
+avoided-treatment choice).
 
 ## Validating against SuperPro Designer
 
@@ -245,6 +258,7 @@ technical labels (flow names, cost/impact breakdown categories) stay in English 
 
 ```
 data/                     editable YAML: organisms, systems, prices, LCIA factors, SuperPro template
+  waste_feeds.yaml        waste-derived nutrient / carbon streams, each with its source
 src/algametrix/   the engine
   models.py               dataclasses describing a scenario
   library.py              loads the YAML data into objects
@@ -286,6 +300,8 @@ tests/                    unit tests for the engine, the verification and the ev
 - [x] Shared-inventory consistency verification, and an independent matrix LCA benchmark
 - [x] Optional cross-check against [Brightway](https://docs.brightway.dev/) `bw2calc`
       (`scripts/brightway_crosscheck.py`)
+- [x] Waste-derived nutrients and carbon (effluents, digestate, food-industry side-streams),
+      with gate fees and a declared cut-off / avoided-treatment convention
 - [ ] Finer product fractionation (individual pigments/PUFA) and quality-based pricing
 - [ ] ecoinvent background integration (needs a licence; the shipped factors are
       representative editable defaults, not a certified LCA database)

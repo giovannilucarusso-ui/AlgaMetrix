@@ -51,6 +51,26 @@ class Inventory:
     solvent_net_per_kg: float = 0.0   # kg extraction solvent make-up (net of recycle)
     nitrogen_emitted_per_kg: float = 0.0    # kg N not assimilated (potential water emission)
     phosphorus_emitted_per_kg: float = 0.0  # kg P not assimilated
+    # --- waste-derived feed (see models.WasteFeed) -------------------------
+    # Quantity of the waste stream dosed, in its own unit (m3 or kg) per kg of
+    # product. Zero when no waste feed is enabled, which leaves every field
+    # below at zero and the ``*_purchased_per_kg`` fields equal to the demand.
+    waste_feed_per_kg: float = 0.0
+    nitrogen_from_waste_per_kg: float = 0.0    # kg N of the demand met by the stream
+    phosphorus_from_waste_per_kg: float = 0.0
+    substrate_from_waste_per_kg: float = 0.0
+    # What is still bought. These, not the totals, are what the cost and the
+    # fertiliser-production burden are computed from: nutrient arriving in a
+    # waste stream has no fertiliser plant behind it.
+    nitrogen_purchased_per_kg: float = 0.0
+    phosphorus_purchased_per_kg: float = 0.0
+    substrate_purchased_per_kg: float = 0.0
+    # Nutrient the stream carries beyond what the culture can take up, because a
+    # stream dosed on one nutrient delivers the others in whatever ratio it
+    # happens to have. It is discharged, so it is reported here and enters
+    # eutrophication - never silently dropped to make the balance look tidy.
+    nitrogen_surplus_per_kg: float = 0.0
+    phosphorus_surplus_per_kg: float = 0.0
     # --- carbon bookkeeping (biogenic-carbon accounting, see lca.CarbonAccounting) ---
     # Carbon that actually LEAVES THE GATE inside 1 kg of product, expressed as CO2.
     # Differs from ``co2_fixed_per_kg`` by the harvesting recovery: carbon fixed by
@@ -96,6 +116,63 @@ def _water_to_evaporate(solids_in: float, solids_out: float) -> float:
     water_in = (1.0 - solids_in) / solids_in
     water_out = (1.0 - solids_out) / solids_out
     return max(water_in - water_out, 0.0)
+
+
+@dataclass
+class _WasteSplit:
+    """How much of each demand a waste stream covers, and what it over-delivers."""
+
+    quantity: float = 0.0              # units of stream per kg product
+    nitrogen: float = 0.0              # kg N of the demand met by the stream
+    phosphorus: float = 0.0
+    substrate: float = 0.0
+    nitrogen_surplus: float = 0.0      # kg N delivered beyond the demand
+    phosphorus_surplus: float = 0.0
+
+
+def _waste_split(scenario: Scenario, nitrogen: float, phosphorus: float,
+                 substrate: float) -> _WasteSplit:
+    """Dose the waste stream against one demand and see what else it brings.
+
+    The quantity follows from ``dosed_on`` alone. Everything the same quantity
+    carries of the other two is then compared against their demands: what fits
+    displaces a purchase, what does not is surplus.
+
+    One limit is worth naming. Organic carbon beyond the substrate demand — all
+    of it, for a phototrophic culture — is unused load left in the effluent, and
+    it is capped here rather than tracked, because the impact set carries no
+    oxygen-demand indicator to receive it. A stream chosen for its carbon and
+    fed to a phototroph is therefore modelled as delivering only its nitrogen
+    and phosphorus, which is the honest reading of what the culture does with it.
+    """
+    wf = scenario.waste_feed
+    if not wf.enabled:
+        return _WasteSplit()
+
+    demand = {"nitrogen": nitrogen, "phosphorus": phosphorus, "substrate": substrate}
+    per_unit = {"nitrogen": wf.nitrogen_per_unit,
+                "phosphorus": wf.phosphorus_per_unit,
+                "substrate": wf.substrate_per_unit}
+    key = wf.dosed_on if wf.dosed_on in demand else "nitrogen"
+    concentration = max(per_unit[key], 0.0)
+    if concentration <= 0.0 or demand[key] <= 0.0:
+        # Dosed against something the stream does not carry, or that the culture
+        # does not need. Nothing is received, and nothing is silently rerouted
+        # to a different nutrient: the scenario as written buys everything.
+        return _WasteSplit()
+
+    coverage = min(max(wf.coverage, 0.0), 1.0)
+    quantity = coverage * demand[key] / concentration
+    delivered = {k: quantity * max(per_unit[k], 0.0) for k in demand}
+    met = {k: min(delivered[k], demand[k]) for k in demand}
+    return _WasteSplit(
+        quantity=quantity,
+        nitrogen=met["nitrogen"],
+        phosphorus=met["phosphorus"],
+        substrate=met["substrate"],
+        nitrogen_surplus=max(delivered["nitrogen"] - nitrogen, 0.0),
+        phosphorus_surplus=max(delivered["phosphorus"] - phosphorus, 0.0),
+    )
 
 
 def build_inventory(scenario: Scenario) -> Inventory:
@@ -158,11 +235,22 @@ def build_inventory(scenario: Scenario) -> Inventory:
     nitrogen_emitted = nitrogen * (1.0 - uptake)
     phosphorus_emitted = phosphorus * (1.0 - uptake)
 
+    # --- waste-derived feed -----------------------------------------------
+    # A stream of fixed composition displaces part of what would be bought. The
+    # demands above are untouched: the biomass needs the same nitrogen however
+    # it arrives, and only the *purchase* moves.
+    waste = _waste_split(scenario, nitrogen, phosphorus, substrate)
+    nitrogen_emitted += waste.nitrogen_surplus
+    phosphorus_emitted += waste.phosphorus_surplus
+
     # --- water ------------------------------------------------------------
     water = sys.water_m3_per_kg * gross_per_product
 
     # --- electricity by stage --------------------------------------------
     elec_cultivation = sys.elec_kwh_per_kg * gross_per_product
+    # Pumping, screening and mixing the received stream sits with cultivation:
+    # it is incurred to put the feed into the pond.
+    elec_cultivation += waste.quantity * scenario.waste_feed.elec_kwh_per_unit
     elec_harvest = harv.elec_kwh_per_kg * gross_per_product
     elec_drying = dry.elec_kwh_per_kg if dry.enabled else 0.0
 
@@ -231,6 +319,15 @@ def build_inventory(scenario: Scenario) -> Inventory:
         solvent_net_per_kg=solvent_net,
         nitrogen_emitted_per_kg=nitrogen_emitted,
         phosphorus_emitted_per_kg=phosphorus_emitted,
+        waste_feed_per_kg=waste.quantity,
+        nitrogen_from_waste_per_kg=waste.nitrogen,
+        phosphorus_from_waste_per_kg=waste.phosphorus,
+        substrate_from_waste_per_kg=waste.substrate,
+        nitrogen_purchased_per_kg=nitrogen - waste.nitrogen,
+        phosphorus_purchased_per_kg=phosphorus - waste.phosphorus,
+        substrate_purchased_per_kg=substrate - waste.substrate,
+        nitrogen_surplus_per_kg=waste.nitrogen_surplus,
+        phosphorus_surplus_per_kg=waste.phosphorus_surplus,
         biogenic_co2_in_product_per_kg=biogenic_co2_in_product,
         substrate_co2_supplied_per_kg=substrate_co2_supplied,
         inorganic_co2_supplied_per_kg=inorganic_co2_supplied,
