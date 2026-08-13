@@ -342,8 +342,17 @@ def stage_harmonization(run: Run) -> None:
     print("[harmonization] constant-cohort cost harmonization")
     a = harmonization.run_analysis_a(run.dataset, registry=run.registry)
     b = harmonization.run_analysis_b(run.dataset, registry=run.registry, lib=run.lib)
+    # Recomputed rather than fetched with a default. The definition audit carries
+    # the statement that this cohort is homogeneous in its LABEL only, which is
+    # the most important qualification in the file; reaching for it with .get()
+    # meant that running this stage without `endpoints` first - which is what
+    # `--only figures` does through its prerequisite map - rewrote the file with
+    # that paragraph silently missing. A caveat that can disappear because of the
+    # order stages ran in is not a caveat.
+    definition = (run.artifacts.get("definition_audit")
+                  or endpoints.definition_audit(run.dataset.records))
     text = report.harmonization(a, b, harmonization.conclusion(a, b), run.registry,
-                                definition=run.artifacts.get("definition_audit"))
+                                definition=definition)
     _write(RESULTS / "harmonization.txt", text)
     run.artifacts["analysis_a"] = a
     run.artifacts["analysis_b"] = b
@@ -622,6 +631,9 @@ def stage_figures(run: Run) -> None:
     # A figure is never drawn from stale state: any prerequisite stage that has
     # not run in this process is run now, with the same seeds and sample sizes.
     prereq = {
+        # `endpoints` first: `harmonization` reads its definition audit, and a
+        # prerequisite map one level deep would run harmonization without it.
+        "definition_audit": ("endpoints", stage_endpoints),
         "analysis_a": ("harmonization", stage_harmonization),
         "gwp": ("gwp", stage_gwp),
         "carbon": ("carbon", stage_carbon),

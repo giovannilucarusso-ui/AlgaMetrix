@@ -283,10 +283,13 @@ def figure2_validation(rows, blocked, outdir: Path) -> list[Path]:
 # Figure 3 - harmonization
 # ======================================================================
 
-def figure3_harmonization(a, b, pops, outdir: Path) -> list[Path]:
+def figure3_harmonization(a, b, pops, dataset, outdir: Path) -> list[Path]:
+    # Width is allocated per stage label, not per panel: a1 carries two stages
+    # and b carries three of the longest names in the figure, so the old equal-ish
+    # split left b with the least room per label and its names overlapped.
     fig, axes = plt.subplots(1, 3, figsize=(7.4, 4.3),
-                             gridspec_kw={"width_ratios": [0.95, 1.15, 1.05],
-                                          "wspace": 0.50})
+                             gridspec_kw={"width_ratios": [0.86, 1.20, 1.15],
+                                          "wspace": 0.44})
 
     def strip(ax, stages, title, ylabel, color):
         drawn = [(i, sp) for i, (_, sp) in enumerate(stages) if sp.n]
@@ -308,43 +311,72 @@ def figure3_harmonization(a, b, pops, outdir: Path) -> list[Path]:
             ax.text(i, 0.985, f"n={sp.n}\n{ratio}", ha="center", va="top",
                     fontsize=6.6, color=color, transform=ax.get_xaxis_transform())
         ax.set_xticks(range(len(stages)))
-        ax.set_xticklabels([s[0] for s in stages], fontsize=6.1)
+        # Stage names are set on three short lines rather than two long ones.
+        # Eight stage labels share 7.4 inches across three panels, so the binding
+        # constraint is the width of the longest LINE, not of the label: at two
+        # lines "common currency" and "executable," ran into their neighbours.
+        ax.set_xticklabels([s[0] for s in stages], fontsize=5.9, linespacing=1.25)
         ax.set_title(title, loc="left", pad=6, fontsize=8.0)
         ax.set_ylabel(ylabel)
         ax.set_xlim(-0.6, len(stages) - 0.4)
 
     strip(axes[0],
-          [("reported,\ncommon currency", a.stage_common_currency),
-           (f"price-year\nnorm. {a.target_price_year}", a.stage_price_normalized)],
+          [("reported,\ncommon\ncurrency", a.stage_common_currency),
+           (f"price-year\nnormalised\nto {a.target_price_year}", a.stage_price_normalized)],
           "a1  full literature cohort", "production cost (EUR/kg, log)", C_TEA)
+
+    # a2 and b each say what they are and what is missing from them; a1 carried
+    # only its n. A reader who has been told the dataset holds 45 records and
+    # then meets n=18 will ask where the rest went, and the panel that shows the
+    # headline divergence is the worst place to leave that unanswered.
+    # Counted through endpoints.classify - the same call economic_endpoint_audit
+    # makes - so the tally here cannot drift from the audit that justifies it.
+    from . import endpoints
+
+    screened = [(r, endpoints.classify(r)) for r in dataset.records]
+    n_total = len(screened)
+    n_in = sum(1 for _, x in screened if x.eligible)
+    n_no_cost = sum(1 for r, x in screened if not x.eligible and r.reported_value is None)
+    n_unit = sum(1 for _, x in screened
+                 if not x.eligible and "functional unit" in (x.exclusion_reason or ""))
+    axes[0].text(0.5, -0.19,
+                 f"{n_in} of {n_total} dataset records eligible\n"
+                 f"{n_no_cost} report no cost, {n_unit} are priced\n"
+                 f"per kg of product, {n_total - n_in - n_no_cost - n_unit} other",
+                 transform=axes[0].transAxes, ha="center", va="top", fontsize=6.4,
+                 color=C_WARN, style="italic")
 
     if b.n:
         strip(axes[1],
               [("source\nvalue", b.stage_source_value),
-               ("engine,\nsource acct.", b.stage_source_accounting),
-               ("engine,\ncommon acct.", b.stage_common_accounting)],
+               ("engine,\nsource\naccounting", b.stage_source_accounting),
+               ("engine,\ncommon\naccounting", b.stage_common_accounting)],
               "a2  matched Tier-B cohort", "", C_TEA)
     else:
         axes[1].axis("off")
-    axes[1].text(0.5, -0.30,
+    # Anchored just under the stage labels. At -0.30 the note sat an inch below
+    # them, and the white band between the two read as the end of the figure.
+    axes[1].text(0.5, -0.19,
                  f"separate analysis: cohort n={b.n}\nnot a continuation of a1",
                  transform=axes[1].transAxes, ha="center", va="top", fontsize=6.4,
                  color=C_WARN, style="italic")
 
     ax = axes[2]
+    # "bg" spelled out: a reader should not have to infer that it means the LCIA
+    # background, and the room is there once the lines are short.
     gwp_stages = [
         ("published\nliterature", pops.published_spread_net),
-        ("executable,\nnative bg", pops.executable_spread_native_gross),
-        ("executable,\ncommon bg", pops.executable_spread_common_gross),
+        ("executable\nnative\nbackground", pops.executable_spread_native_gross),
+        ("executable\ncommon\nbackground", pops.executable_spread_common_gross),
     ]
     strip(ax, gwp_stages, "b  GWP populations", "GWP (kg CO$_2$-eq/kg, log)", C_LCA)
-    ax.text(0.5, -0.30,
+    ax.text(0.5, -0.19,
             f"GWP-reproduced subset n={pops.n_reproduced}\n"
             f"{len(pops.blocked)} blocked by missing scenarios",
             transform=ax.transAxes, ha="center", va="top", fontsize=6.4, color=C_WARN,
             style="italic")
 
-    fig.tight_layout(rect=(0, 0.06, 1, 1))
+    fig.tight_layout(rect=(0, 0.03, 1, 1))
     return _save(fig, outdir, "fig3_harmonization")
 
 
@@ -539,7 +571,7 @@ def build_all(run, outdir: Path) -> list[Path]:
 
     made += figure3_harmonization(run.artifacts["analysis_a"],
                                   run.artifacts["analysis_b"],
-                                  run.artifacts["gwp"], outdir)
+                                  run.artifacts["gwp"], run.dataset, outdir)
 
     if run.sobol_validation_passed and "sobol_blocks" in run.artifacts:
         from .parameters import MODE_A_SHARED_FOREGROUND
