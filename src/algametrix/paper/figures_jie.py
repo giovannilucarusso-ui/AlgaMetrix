@@ -98,16 +98,25 @@ def figure1_architecture(outdir: Path) -> list[Path]:
     arrow(5.0, 6.62, 5.0, 6.10, C_FOREGROUND)
 
     # --- layer 3: the two interpretation layers ---------------------------
+    # The system boundary appears on both sides, marked as one declaration. It
+    # used to sit in the LCA box alone, which contradicted the sentence directly
+    # above it: a boundary choice is not an LCA input. Declaring system expansion
+    # for a waste-derived feed credits the treatment it displaces in the impacts
+    # AND in the economics, from a single field on the scenario, so a figure that
+    # showed it reaching only one layer described a coupling the engine refuses
+    # to allow.
     box(0.4, 3.15, 4.3, 1.20,
         "TEA LAYER\nprices · CAPEX factors · labour\ninstallation and indirect factors\n"
-        "depreciation · discount rate · tax",
+        "depreciation · discount rate · tax\nsystem boundary *",
         C_TEA, size=6.9)
     box(5.3, 3.15, 4.3, 1.20,
         "LCA LAYER\ncharacterization factors · grid mix\n"
-        "biogenic-carbon convention\nsystem boundary",
+        "biogenic-carbon convention\nsystem boundary *",
         C_LCA, size=6.9)
     arrow(4.1, 4.90, 2.9, 4.35, C_FOREGROUND)
     arrow(5.9, 4.90, 7.1, 4.35, C_FOREGROUND)
+    ax.text(5.0, 2.92, "* one declaration, applied to both layers",
+            ha="center", va="center", fontsize=6.4, style="italic", color=C_NEUTRAL)
 
     # --- layer 4: outputs --------------------------------------------------
     box(0.4, 1.80, 4.3, 0.90,
