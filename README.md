@@ -320,7 +320,7 @@ If AlgaMetrix contributes to work you publish, please cite it. GitHub's *Cite th
 button reads [CITATION.cff](CITATION.cff) and will give you BibTeX or APA directly:
 
 > Russo, G. L. (2026). *AlgaMetrix: open-source techno-economic analysis and life-cycle assessment
-> for microalgae and aquatic protist biomass* (Version 1.1.0) [Computer software]. Zenodo.
+> for microalgae and aquatic protist biomass* (Version 1.2.0) [Computer software]. Zenodo.
 > https://doi.org/10.5281/zenodo.21764183
 
 Each release is archived on Zenodo. **`10.5281/zenodo.21764183` is the concept DOI**: cite it when
