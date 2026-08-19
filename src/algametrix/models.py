@@ -222,8 +222,12 @@ class CultivationSystem:
     cultivation_heat_mj_per_kg: float = 0.0   # thermal MJ per kg dry biomass
     cultivation_heat_fuel: str = "natural_gas"  # natural_gas | electricity
     # Optional recipe travelling with the system.
-    materials: list["Material"] = field(default_factory=list)
-    utilities: list["Utility"] = field(default_factory=list)
+    # Unquoted although Material and Utility are defined further down: with
+    # `from __future__ import annotations` nothing here is evaluated at class
+    # creation, and a quoted forward reference inside a subscript is what
+    # Python 3.10 fails to resolve for anything reading these hints.
+    materials: list[Material] = field(default_factory=list)
+    utilities: list[Utility] = field(default_factory=list)
     product_price: float = 0.0   # typical EUR/kg selling price (seeds the UI)
 
 

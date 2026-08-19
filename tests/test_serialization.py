@@ -40,7 +40,7 @@ from algametrix.serialization import (  # noqa: E402
     scenario_from_dict,
     scenario_to_dict,
 )
-from algametrix.templates import TEMPLATES  # noqa: E402
+from algametrix.templates import TEMPLATES, build_template  # noqa: E402
 
 
 @pytest.fixture(scope="module")
@@ -185,3 +185,33 @@ def test_extraction_defaults_survive_an_empty_object(lib):
     data = scenario_to_dict(scn)
     data["extraction"] = {}
     assert scenario_from_dict(data).extraction == Extraction()
+
+
+def test_forward_referenced_item_types_are_resolved():
+    """The bug Python 3.10 exposed and 3.11+ hid.
+
+    ``models.py`` used to write ``list["Material"]``. On 3.10 the inner string
+    survives :func:`typing.get_type_hints` as a ``ForwardRef``, matched none of
+    the decoder's branches, and every material and utility came back out of a
+    saved file as a plain ``dict`` — with no error, on the oldest Python this
+    project supports.
+    """
+    from typing import ForwardRef
+
+    from algametrix.serialization import _decode
+
+    row = {"name": "Yeast extract", "amount_per_kg": 0.61, "price": 7.5}
+    for annotation in (list[ForwardRef("Material")], list["Material"], list[Material]):
+        out = _decode(annotation, [row])
+        assert isinstance(out[0], Material), annotation
+        assert out[0].amount_per_kg == pytest.approx(0.61)
+
+
+def test_a_system_recipe_survives_the_file_as_objects(lib):
+    """The end the ForwardRef bug was breaking: a fermenter's media recipe."""
+    scn = build_template("Heterotrophic microalgae powder", lib)
+    assert scn.system.materials, "this template is chosen because it has a recipe"
+    back = scenario_from_dict(scenario_to_dict(scn))
+    assert all(isinstance(m, Material) for m in back.system.materials)
+    assert all(isinstance(u, Utility) for u in back.system.utilities)
+    assert_same(scn.system, back.system)

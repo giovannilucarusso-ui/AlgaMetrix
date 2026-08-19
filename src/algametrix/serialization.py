@@ -27,7 +27,7 @@ import json
 from dataclasses import fields, is_dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, get_args, get_origin, get_type_hints
+from typing import Any, ForwardRef, get_args, get_origin, get_type_hints
 
 from . import models
 from .models import Scenario
@@ -63,7 +63,24 @@ def scenario_to_dict(scenario: Scenario) -> dict:
 # --------------------------------------------------------------------------- #
 # Decoding
 # --------------------------------------------------------------------------- #
+def _resolve(tp: Any) -> Any:
+    """Turn a forward reference into the class it names.
+
+    ``models.py`` writes ``list["Material"]``. Python 3.11 and later resolve that
+    inner string through :func:`get_type_hints`; 3.10 leaves it as a
+    ``ForwardRef``, and a ForwardRef matches none of the branches below — so
+    every material and utility came back out of a file as a plain ``dict``,
+    silently, on the oldest Python this project supports.
+    """
+    if isinstance(tp, ForwardRef):
+        tp = tp.__forward_arg__
+    if isinstance(tp, str):
+        return getattr(models, tp, tp)
+    return tp
+
+
 def _decode(tp: Any, value: Any) -> Any:
+    tp = _resolve(tp)
     if get_origin(tp) is list:
         (item_tp,) = get_args(tp) or (Any,)
         return [_decode(item_tp, v) for v in (value or [])]
