@@ -81,6 +81,11 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          # smoke.txt goes out with the build it describes: it is the output of
+          # the start-up test that ran against this exact executable, and a
+          # reader who wants to know whether the thing they downloaded was
+          # checked should not have to dig through a workflow log to find out.
           files: |
             AlgaMetrix-windows.zip
             SHA256SUMS.txt
+            smoke.txt
