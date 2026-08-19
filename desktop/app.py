@@ -70,6 +70,7 @@ def self_test(out_path: str | None = None) -> int:
     hands of whoever downloaded it.
     """
     import os
+    import tempfile
 
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     from PySide6.QtWidgets import QApplication
@@ -84,6 +85,33 @@ def self_test(out_path: str | None = None) -> int:
     ok = (r is not None
           and r.tea.production_cost_eur_per_kg > 0
           and r.inventory.annual_biomass_kg > 0)
+    # Write a report too. It is the one user-facing feature that depends on
+    # modules the released build filters out of the bundle (the Process Designer
+    # canvas goes, its pure model stays), and a packaging mistake there would
+    # otherwise surface as a crash the first time somebody exported a PDF.
+    report_bytes = 0
+    if ok:
+        try:
+            from .report import build_process_report
+
+            fd, pdf = tempfile.mkstemp(suffix=".pdf")
+            os.close(fd)
+            try:
+                build_process_report(pdf, r, window.build_scenario(),
+                                     title="self-test")
+                report_bytes = os.path.getsize(pdf)
+            finally:
+                try:
+                    os.remove(pdf)
+                except OSError:
+                    pass
+        except Exception as exc:  # noqa: BLE001 - the point is to report it
+            report_error = repr(exc)
+        else:
+            report_error = ""
+        ok = ok and report_bytes > 0
+    else:
+        report_error = "not attempted: the default scenario did not compute"
     lines = [
         f"AlgaMetrix {__version__} self-test: {'PASS' if ok else 'FAIL'}",
         f"  organism        : {window.organism.name}",
@@ -98,6 +126,10 @@ def self_test(out_path: str | None = None) -> int:
         ]
     else:
         lines.append("  the default scenario did not compute")
+    lines.append(
+        f"  PDF report      : {report_bytes:,} bytes" if report_bytes
+        else f"  PDF report      : FAILED {report_error}"
+    )
     report = "\n".join(lines)
     if out_path:
         # A windowed build has no console attached, so the report also goes to a

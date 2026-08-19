@@ -103,18 +103,54 @@ things. Pick the line that describes you.
 
 ### 1. I just want to use the Windows app
 
-Download **`AlgaMetrix-windows.zip`** from the
-[latest release](https://github.com/giovannilucarusso-ui/AlgaMetrix/releases/latest),
-unzip it anywhere and run `AlgaMetrix.exe`. No Python, no command line. Each
-release ships a `SHA256SUMS.txt` so you can check what you downloaded:
+No Python, no command line, no administrator rights, no installer. Windows 10 or
+11, 64-bit.
 
-```powershell
-Get-FileHash AlgaMetrix-windows.zip -Algorithm SHA256
-```
+1. Open the [latest release](https://github.com/giovannilucarusso-ui/AlgaMetrix/releases/latest)
+   and, under **Assets**, download **`AlgaMetrix-windows.zip`** (about 117 MB).
+2. **Unblock it before unzipping.** Windows marks files downloaded from the
+   internet, and that mark propagates to all 1245 files inside — right-click the
+   zip → *Properties* → tick **Unblock** at the bottom → *OK*. Skipping this step
+   is the usual reason the application refuses to start.
+3. Right-click the zip → *Extract All…* and choose a folder you own, for example
+   `C:\Users\<you>\AlgaMetrix`. **Not** `C:\Program Files`: that needs
+   administrator rights the application does not ask for. Unzipped it takes
+   about 270 MB.
+4. Open the extracted folder and run **`AlgaMetrix.exe`**. The `_internal`
+   folder next to it holds the Qt runtime and the YAML data library — keep the
+   two together, and do not move the .exe out on its own.
+5. The first time, Windows SmartScreen shows *"Windows protected your PC"*.
+   The build is not code-signed: signing needs a certificate this project does
+   not have. Click **More info** → **Run anyway**. Step 6 is how you check you
+   are trusting the right file rather than taking that dialog's word for it.
+6. Optional but recommended — verify what you downloaded against the
+   `SHA256SUMS.txt` published beside the zip. In PowerShell, in the folder
+   holding the download:
 
-Windows SmartScreen will warn about an unsigned application from an unknown
-publisher — the build is produced by the repository's public CI workflow, and
-the checksum above is what it produced.
+   ```powershell
+   Get-FileHash AlgaMetrix-windows.zip -Algorithm SHA256 | Format-List
+   ```
+
+   The `Hash` it prints must match the line in `SHA256SUMS.txt`. Both were
+   produced by [the public build workflow](.github/workflows/windows-release.yml)
+   from the tagged source, on GitHub's runners, with a log anybody can read.
+
+**First launch** asks for a language (English, Italian, Spanish or French —
+remembered afterwards, changeable under *Help → Language*), then opens the
+7-step setup wizard. "Skip to full tool" goes straight to the main window.
+
+**To create a desktop shortcut**, right-click `AlgaMetrix.exe` → *Show more
+options* → *Send to* → *Desktop (create shortcut)*.
+
+**To uninstall**, delete the folder you extracted. The only thing left anywhere
+else is a small preferences file, `.algae_tea_lca.json` in your user folder,
+which you can delete too. Nothing is written to the registry.
+
+**If it does not start**, the most likely causes, in order: the zip was not
+unblocked (step 2); the .exe was moved away from `_internal` (step 4); or an
+antivirus quarantined it, which happens to unsigned PyInstaller builds. Each
+release also ships `smoke.txt`, the output of the automated start-up test that
+ran against that exact build before it was published.
 
 ### 2. I want the Python engine
 
