@@ -1,0 +1,13 @@
+# Reproducing the evidence layer:  python reproduce.py  [--quick]
+#
+# SciPy supplies the scrambled Sobol' sequences for the global sensitivity
+# analysis. Without it the Sobol' stage and the tests that cover it fail — which
+# is exactly what happened to a reader who installed requirements.txt and ran
+# the documented pipeline, so it is pinned here rather than assumed.
+# No Qt: the reproduction is headless.
+
+numpy>=1.26
+pandas>=2.1
+PyYAML>=6.0
+scipy>=1.11
+matplotlib>=3.8

@@ -10,22 +10,26 @@ import copy
 
 from PySide6.QtWidgets import (
     QButtonGroup,
+    QCheckBox,
     QComboBox,
     QDoubleSpinBox,
     QFormLayout,
     QLabel,
+    QMessageBox,
     QRadioButton,
     QVBoxLayout,
     QWizard,
     QWizardPage,
 )
 
+from algametrix.inputcheck import check_inputs, format_issues
 from algametrix.library import Library
 from algametrix.models import Basis, Scenario
 from algametrix.products import main_product
 from algametrix.templates import (
     TEMPLATES,
     apply_goal,
+    batch_size_from_volume,
     get_template,
     set_scale_from_target,
 )
@@ -191,14 +195,39 @@ class OrganismPage(QWizardPage):
         self._update_sum()
 
     def validatePage(self):
+        """A composition that cannot exist does not get to become a case.
+
+        The page used to accept 400% with a note that it "should be ~100%",
+        which is a remark, not a check: the wizard went on and produced yields
+        taken from a kilogram containing four kilograms of components.
+        """
         org = copy.deepcopy(self.wiz.lib.organisms[self.cmb.currentText()])
         for attr, sb in self._fields().items():
             setattr(org, attr, sb.value())
+        candidate = copy.copy(self.wiz.scenario)
+        candidate.organism = org
+        blocking = [i for i in check_inputs(candidate)
+                    if i.is_error and i.field.startswith("organism")]
+        if blocking:
+            # On the page as well as in the box: a Next button that silently does
+            # nothing is its own kind of bug.
+            self.lbl_sum.setText(" ".join(i.message for i in blocking))
+            self.lbl_sum.setStyleSheet("color: #8b1a17;")
+            QMessageBox.warning(self, tr("Composition is not possible"),
+                                format_issues(blocking))
+            return False
+        self.lbl_sum.setStyleSheet("")
         self.wiz.scenario.organism = org
         return True
 
 
 class CultivationPage(QWizardPage):
+    """System, scale and schedule — with the batch tied to the vessel that holds it."""
+
+    #: Where the size box starts when the basis changes and the old number means
+    #: something else entirely.
+    DEFAULT_SIZE = {Basis.AREA: 100_000.0, Basis.VOLUME: 500.0}
+
     def __init__(self, wiz):
         super().__init__()
         self.wiz = wiz
@@ -220,41 +249,147 @@ class CultivationPage(QWizardPage):
         f.addRow(self.lbl_size, self.spn_size)
         self.cmb_batch = QComboBox(); self.cmb_batch.addItems([tr("Continuous"), tr("Batch")])
         f.addRow(tr("Operation"), self.cmb_batch)
+
+        # The three numbers that make a batch a batch. Without them "batch size"
+        # is a free parameter and the reactor volume is decoration.
+        self.spn_titer = QDoubleSpinBox(); self.spn_titer.setRange(0.1, 500.0); self.spn_titer.setDecimals(1)
+        self.spn_titer.setToolTip(tr(
+            "Dry biomass concentration at harvest. In g/L and kg/m³ this is the "
+            "same number, so one batch holds volume × working volume × titer."))
+        self.lbl_titer = QLabel(tr("Final titer (g/L)"))
+        f.addRow(self.lbl_titer, self.spn_titer)
+        self.spn_working = QDoubleSpinBox(); self.spn_working.setRange(0.05, 1.0)
+        self.spn_working.setDecimals(2); self.spn_working.setSingleStep(0.05)
+        self.spn_working.setToolTip(tr(
+            "Fraction of the nominal reactor volume the culture occupies; "
+            "headspace, foam and impeller clearance take the rest."))
+        self.lbl_working = QLabel(tr("Working volume (fraction)"))
+        f.addRow(self.lbl_working, self.spn_working)
+        self.spn_cycle = QDoubleSpinBox(); self.spn_cycle.setRange(1.0, 2000.0)
+        self.spn_cycle.setDecimals(1); self.spn_cycle.setValue(48.0)
+        self.lbl_cycle = QLabel(tr("Batch cycle time (h, incl. turnaround)"))
+        f.addRow(self.lbl_cycle, self.spn_cycle)
+
+        self.lbl_derived = QLabel(""); self.lbl_derived.setObjectName("subtle")
+        self.lbl_derived.setWordWrap(True)
+        f.addRow("", self.lbl_derived)
+
         self.cmb_mode.currentIndexChanged.connect(self._toggle)
         self.cmb_sys.currentTextChanged.connect(self._sys_changed)
+        self.cmb_batch.currentIndexChanged.connect(self._toggle)
+        for w in (self.spn_size, self.spn_titer, self.spn_working, self.spn_cycle,
+                  self.spn_target):
+            w.valueChanged.connect(self._update_derived)
+
+    # -- state ------------------------------------------------------------
+    def _system(self):
+        return self.wiz.lib.systems.get(self.cmb_sys.currentText())
+
+    def _is_batch(self) -> bool:
+        return self.cmb_batch.currentIndex() == 1
 
     def _toggle(self):
-        target = self.cmb_mode.currentIndex() == 0
-        self.form.setRowVisible(self.spn_target, target)
-        self.form.setRowVisible(self.spn_size, not target)
+        by_target = self.cmb_mode.currentIndex() == 0
+        sysm = self._system()
+        volume = sysm is not None and sysm.basis == Basis.VOLUME
+        self.form.setRowVisible(self.spn_target, by_target)
+        self.form.setRowVisible(self.spn_size, not by_target)
+        # Titer and working volume only mean something for a vessel, and only a
+        # batch schedule reads them.
+        for widget in (self.spn_titer, self.spn_working):
+            self.form.setRowVisible(widget, volume and self._is_batch())
+        self.form.setRowVisible(self.spn_cycle, self._is_batch())
+        self._update_derived()
 
     def _sys_changed(self, name):
         s = self.wiz.lib.systems.get(name)
-        if s:
-            self.lbl_size.setText(tr("Reactor volume (m³)") if s.basis == Basis.VOLUME else tr("Cultivation size (m²)"))
-            self.cmb_batch.setCurrentIndex(1 if s.mode.value == "heterotrophic" else 0)
+        if not s:
+            return
+        self.lbl_size.setText(tr("Reactor volume (m³)") if s.basis == Basis.VOLUME
+                              else tr("Cultivation size (m²)"))
+        self.cmb_batch.setCurrentIndex(1 if s.mode.value == "heterotrophic" else 0)
+        self.spn_titer.setValue(s.biomass_conc)
+        self.spn_working.setValue(s.working_volume)
+        # A basis change makes the old number mean something else: 100,000 m² of
+        # pond is not 100,000 m³ of fermenter. Never carry it across.
+        if s.basis != getattr(self, "_basis", None):
+            self._basis = s.basis
+            self.spn_size.setValue(self.DEFAULT_SIZE[s.basis])
+        self._toggle()
+
+    def _update_derived(self):
+        sysm = self._system()
+        if sysm is None:
+            return
+        by_target = self.cmb_mode.currentIndex() == 0
+        batches = sysm.operating_days * 24.0 / max(self.spn_cycle.value(), 1e-9)
+        if self._is_batch() and sysm.basis == Basis.VOLUME:
+            if by_target:
+                self.lbl_derived.setText(tr(
+                    "The reactor volume follows from the batch: at {t:.0f} g/L and "
+                    "{w:.0%} working volume, the vessel is sized to hold one batch "
+                    "of the {n:.0f} batches a year this schedule allows."
+                ).format(t=self.spn_titer.value(), w=self.spn_working.value(), n=batches))
+            else:
+                sized = copy.deepcopy(sysm)
+                sized.biomass_conc = self.spn_titer.value()
+                sized.working_volume = self.spn_working.value()
+                per_batch = batch_size_from_volume(sized, self.spn_size.value())
+                gross = per_batch * batches
+                self.lbl_derived.setText(tr(
+                    "{v:,.0f} m³ × {w:.0%} × {t:.0f} g/L = {b:,.0f} kg of gross dry "
+                    "biomass per batch; {n:.0f} batches a year → {y:,.0f} t/yr gross."
+                ).format(v=self.spn_size.value(), w=self.spn_working.value(),
+                         t=self.spn_titer.value(), b=per_batch, n=batches, y=gross / 1000.0))
+        elif self._is_batch():
+            self.lbl_derived.setText(tr(
+                "Batch operation on an area-based system: the annual output is the "
+                "batch size × {n:.0f} batches a year, and the cultivation area does "
+                "not enter it."
+            ).format(n=batches))
+        else:
+            self.lbl_derived.setText(tr(
+                "Continuous: output = scale × productivity × {d:.0f} operating days."
+            ).format(d=sysm.operating_days))
 
     def initializePage(self):
-        s = self.wiz.scenario.system
-        i = self.cmb_sys.findText(s.name)
+        scn = self.wiz.scenario
+        i = self.cmb_sys.findText(scn.system.name)
+        self._basis = scn.system.basis
         if i >= 0:
+            self.cmb_sys.blockSignals(True)
             self.cmb_sys.setCurrentIndex(i)
-        self.spn_size.setValue(self.wiz.scenario.scale)
-        self.cmb_batch.setCurrentIndex(1 if self.wiz.scenario.batch_mode else 0)
-        self._sys_changed(s.name); self._toggle()
+            self.cmb_sys.blockSignals(False)
+        self.spn_size.setValue(scn.scale)
+        self.spn_titer.setValue(scn.system.biomass_conc)
+        self.spn_working.setValue(scn.system.working_volume)
+        self.cmb_batch.setCurrentIndex(1 if scn.batch_mode else 0)
+        if scn.batch_cycle_time_h > 0:
+            self.spn_cycle.setValue(scn.batch_cycle_time_h)
+        self.lbl_size.setText(tr("Reactor volume (m³)") if scn.system.basis == Basis.VOLUME
+                              else tr("Cultivation size (m²)"))
+        self._toggle()
 
     def validatePage(self):
         scn = self.wiz.scenario
         scn.system = copy.deepcopy(self.wiz.lib.systems[self.cmb_sys.currentText()])
+        scn.system.biomass_conc = self.spn_titer.value()
+        scn.system.working_volume = self.spn_working.value()
         scn.materials = list(scn.system.materials)
         scn.utilities = list(scn.system.utilities)
-        scn.batch_mode = self.cmb_batch.currentIndex() == 1
-        if scn.batch_mode and scn.batch_cycle_time_h <= 0:
-            scn.batch_cycle_time_h, scn.batch_size_kg = 48.0, 1000.0
+        scn.batch_mode = self._is_batch()
+        if scn.batch_mode:
+            scn.batch_cycle_time_h = self.spn_cycle.value()
         if self.cmb_mode.currentIndex() == 0:
             set_scale_from_target(scn, self.spn_target.value())
         else:
             scn.scale = self.spn_size.value()
+            if scn.batch_mode and scn.system.basis == Basis.VOLUME:
+                # One batch is what the vessel holds. Sizing by volume therefore
+                # sets the batch, not the other way round.
+                scn.batch_size_kg = batch_size_from_volume(scn.system, scn.scale)
+        if scn.batch_mode and scn.batch_size_kg <= 0:
+            scn.batch_size_kg = 1000.0
         return True
 
 
@@ -360,10 +495,24 @@ class ReviewPage(QWizardPage):
         v = QVBoxLayout(self)
         self.lbl = QLabel(); self.lbl.setWordWrap(True)
         v.addWidget(self.lbl)
+        self._blocking: list = []
+
+    def isComplete(self) -> bool:
+        """Finish stays disabled while the case is not physically admissible."""
+        return not self._blocking
 
     def initializePage(self):
         from algametrix.scenario import run_scenario
         scn = self.wiz.scenario
+        self._blocking = [i for i in check_inputs(scn) if i.is_error]
+        if self._blocking:
+            self.lbl.setText(
+                tr("This scenario cannot be computed. Go back and fix:") + "\n\n"
+                + format_issues(self._blocking)
+            )
+            self.completeChanged.emit()
+            return
+        self.completeChanged.emit()
         r = run_scenario(scn)
         mp = r.main_product
         cost = mp.production_cost_eur_per_kg if mp else r.tea.production_cost_eur_per_kg

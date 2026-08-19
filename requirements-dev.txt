@@ -1,0 +1,8 @@
+# Everything needed to develop AlgaMetrix: run the full test suite (engine,
+# desktop and wizard tests included) and build the Windows executable.
+
+-r requirements.txt
+-r requirements-paper.txt
+
+pytest>=8.0
+pyinstaller>=6.0

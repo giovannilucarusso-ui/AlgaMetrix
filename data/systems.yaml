@@ -132,7 +132,8 @@
   basis: volume
   productivity: 7.0         # g/L/d EFFECTIVE annual (instantaneous ~15-30; lower for batch cycles/turnaround)
   operating_days: 300.0
-  biomass_conc: 100.0       # g/L at harvest
+  biomass_conc: 100.0       # g/L at harvest (final titer)
+  working_volume: 0.75      # fraction of nominal volume the culture occupies
   elec_kwh_per_kg: 2.5      # aeration + agitation; harvest+drying add ~1.3 more
   co2_utilization: 0.0
   nutrient_uptake: 0.95

@@ -1,6 +1,7 @@
 """Launch the AlgaMetrix desktop app.
 
     python run_desktop.py
+    python run_desktop.py --self-test    # build the default case and exit
 """
 
 from __future__ import annotations

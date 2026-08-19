@@ -89,3 +89,20 @@ QMenuBar {{ background: {_CARD}; border-bottom: 1px solid #cdd8e3; }}
 QMenuBar::item:selected {{ background: #e3edf6; }}
 QStatusBar {{ background: {_CARD}; border-top: 1px solid #cdd8e3; color: {_DIM}; }}
 """
+
+# A refused scenario has to look refused. Red while it blocks the run, amber
+# while it is only worth a second look.
+STYLESHEET += """
+QLabel#issueBanner {
+    border-radius: 6px;
+    padding: 8px 10px;
+    background: #fff4e5;
+    border: 1px solid #e0a458;
+    color: #7a4b00;
+}
+QLabel#issueBanner[blocking="true"] {
+    background: #fdecea;
+    border: 1px solid #d9534f;
+    color: #8b1a17;
+}
+"""

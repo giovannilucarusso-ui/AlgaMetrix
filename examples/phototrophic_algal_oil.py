@@ -73,7 +73,10 @@ def main() -> None:
     r = run_scenario(scenario)
     mp = r.main_product
     print("Phototrophic algal-oil biorefinery (Case 2, best-effort)")
-    print(f"  Dry biomass          : {r.inventory.annual_biomass_kg/1e6:,.2f} Mt/yr")
+    # kg / 1e6 is kilotonnes: 1 kt = 1e6 kg. Printed as Mt, this case read as
+    # 215 million tonnes of algal biomass a year, about a thousand times the
+    # world's entire production.
+    print(f"  Dry biomass          : {r.inventory.annual_biomass_kg/1e6:,.2f} kt/yr")
     print(f"  Algal oil output     : {mp.annual_kg/1000:,.0f} t/yr  (SuperPro ~65,487)")
     print(f"  Total investment     : $ {r.tea.total_investment/1e6:,.0f} M  (SuperPro 306)")
     print(f"  Annual operating cost : $ {r.tea.annual_opex/1e6:,.0f} M/yr (SuperPro 111)")

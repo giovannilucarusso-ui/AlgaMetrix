@@ -200,14 +200,20 @@ def run_tea(scenario: Scenario, inv: Inventory) -> TEAResult:
     production_cost = annual_opex / annual_kg if annual_kg > 0 else float("inf")
 
     # Revenues: from the product list if defined, else whole-biomass selling price.
+    # ``coproduct_revenue_per_year`` is money from by-products that are *not* in
+    # the product list - sold residue, spent media, recovered heat - so it is
+    # added in both modes. Dropping it whenever a product list existed made the
+    # field silently inert in exactly the cases where a biorefinery is most
+    # likely to have one.
     if scenario.products:
         from .products import main_product, product_masses
 
         masses = product_masses(scenario, inv)
-        revenues = sum(masses[p.name] * p.price for p in scenario.products)
+        revenues = (sum(masses[p.name] * p.price for p in scenario.products)
+                    + scenario.coproduct_revenue_per_year)
         mp = main_product(scenario)
         main_revenue = masses[mp.name] * mp.price if mp else 0.0
-        credits = revenues - main_revenue  # co-products treated as credits
+        credits = revenues - main_revenue  # everything but the main product
     else:
         revenues = scenario.product_price * annual_kg + scenario.coproduct_revenue_per_year
         credits = scenario.coproduct_revenue_per_year

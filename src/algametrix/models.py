@@ -207,6 +207,12 @@ class CultivationSystem:
     substrate_yield: float     # kg biomass / kg substrate (heterotrophic)
     capex_per_unit: float      # EUR per m2 (area) or per m3 (volume)
     land_m2_per_unit: float    # m2 land per m2 pond or per m3 reactor
+    #: Fraction of the nominal reactor volume the culture occupies (headspace,
+    #: foam and impeller clearance take the rest). Used by the batch sizing, which
+    #: ties one batch to the reactor that holds it:
+    #: ``batch_size_kg = scale x working_volume x biomass_conc``, with g/L and
+    #: kg/m3 numerically equal. Continuous operation does not read it.
+    working_volume: float = 0.8
     notes: str = ""
     # Inorganic-carbon feed for phototrophic systems (CO2 gas vs NaHCO3 solution).
     carbon_source: CarbonSource = CarbonSource.CO2

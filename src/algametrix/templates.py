@@ -12,7 +12,15 @@ from dataclasses import dataclass, replace
 from typing import Callable
 
 from .library import Library, load_library
-from .models import Basis, Extraction, Material, Product, Scenario, WasteFeed
+from .models import (
+    Basis,
+    CultivationSystem,
+    Extraction,
+    Material,
+    Product,
+    Scenario,
+    WasteFeed,
+)
 from .products import main_product, product_yield
 
 # Product goals used by the wizard to group templates and preset the downstream.
@@ -53,8 +61,32 @@ def apply_goal(scn: Scenario, goal: str) -> None:
                         Product("Residual", "custom", yield_override=0.6, price=0.05)]
 
 
+def batch_size_from_volume(sys: CultivationSystem, volume_m3: float) -> float:
+    """kg of gross dry biomass one batch yields from ``volume_m3`` of reactor.
+
+    The link a batch schedule needs and did not have: the culture fills
+    ``working_volume`` of the vessel and is harvested at ``biomass_conc``. In
+    g/L and kg/m3 that concentration is the same number, so one batch holds
+    ``volume x working volume x titer`` kilograms and nothing else.
+    """
+    return volume_m3 * max(sys.working_volume, 0.0) * max(sys.biomass_conc, 0.0)
+
+
+def volume_from_batch_size(sys: CultivationSystem, batch_size_kg: float) -> float:
+    """The reactor volume a batch of ``batch_size_kg`` needs. Inverse of the above."""
+    per_m3 = max(sys.working_volume, 1e-9) * max(sys.biomass_conc, 1e-9)
+    return batch_size_kg / per_m3
+
+
 def set_scale_from_target(scn: Scenario, target_t_yr: float) -> None:
-    """Size the plant so it makes ``target_t_yr`` of the main product (or biomass)."""
+    """Size the plant so it makes ``target_t_yr`` of the main product (or biomass).
+
+    In batch operation the annual output is ``batch size x batches per year`` and
+    does not depend on the reactor volume at all — so sizing by target used to
+    set the batch and leave the volume wherever it happened to be, which is how a
+    100 t/yr fermentation ended up in a 100,000 m3 vessel costing EUR 287 M. The
+    volume is now derived from the batch it has to hold.
+    """
     mp = main_product(scn)
     yld = max(product_yield(scn, mp) if mp else 1.0, 1e-6)
     biomass_kg = target_t_yr * 1000.0 / yld
@@ -63,6 +95,8 @@ def set_scale_from_target(scn: Scenario, target_t_yr: float) -> None:
     if scn.batch_mode and scn.batch_cycle_time_h > 0:
         batches = sys.operating_days * 24.0 / scn.batch_cycle_time_h
         scn.batch_size_kg = gross / max(batches, 1e-6)
+        if sys.basis == Basis.VOLUME:
+            scn.scale = volume_from_batch_size(sys, scn.batch_size_kg)
     elif sys.basis == Basis.AREA:
         scn.scale = gross / max(sys.productivity * sys.operating_days / 1000.0, 1e-9)
     else:
@@ -75,7 +109,16 @@ class Template:
     goal: str
     description: str
     validation: str                       # what it was validated against
-    build: Callable[[Library], Scenario]
+    builder: Callable[[Library], Scenario]
+
+    def build(self, lib: Library | None = None) -> Scenario:
+        """A fresh, independent scenario.
+
+        Deep-copied on the way out: several builders hand the library's own
+        organism or economics straight to the scenario, so two cases built from
+        one library would otherwise share those objects and edit each other.
+        """
+        return copy.deepcopy(self.builder(lib or load_library()))
 
 
 def _biomass_food(lib: Library) -> Scenario:
@@ -270,4 +313,4 @@ def build_template(name: str, lib: Library | None = None) -> Scenario:
     tpl = get_template(name)
     if tpl is None:
         raise KeyError(name)
-    return tpl.build(lib or load_library())
+    return tpl.build(lib)

@@ -148,7 +148,19 @@ def saltelli_matrices(
     effect of the group *including* every interaction inside it. The estimator
     itself is unchanged; only which columns move together differs.
     """
-    from scipy.stats import qmc
+    try:
+        from scipy.stats import qmc
+    except ModuleNotFoundError as exc:  # pragma: no cover - depends on the env
+        # The engine does not need SciPy; only this sampler does. Say which
+        # install command supplies it rather than let a bare ModuleNotFoundError
+        # stand in for the answer.
+        raise ModuleNotFoundError(
+            "the global sensitivity analysis needs SciPy for its scrambled "
+            "Sobol' sequences. Install it with:\n"
+            "    pip install -r requirements-paper.txt\n"
+            "or:\n"
+            '    pip install "algametrix[paper]"'
+        ) from exc
 
     if n_base & (n_base - 1):
         raise ValueError(

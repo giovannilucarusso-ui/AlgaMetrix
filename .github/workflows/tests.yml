@@ -25,12 +25,12 @@ jobs:
       - name: Install the engine and its test dependencies
         run: |
           python -m pip install --upgrade pip
-          # Engine only: the desktop UI (PySide6) is not needed to run the
-          # tests and pulls a large wheel. openpyxl is required by the
-          # spreadsheet-export test, matplotlib by the PDF-report module that
-          # tests/test_report.py imports, and scipy by the Sobol' sampler in the
-          # evidence layer (the `paper` extra).
-          python -m pip install numpy pandas PyYAML openpyxl matplotlib scipy pytest
+          # Engine only: the desktop UI (PySide6) is not needed by these tests
+          # and pulls a large wheel, so the desktop and wizard tests skip
+          # themselves here and run in the `desktop` job below. openpyxl is
+          # required by the spreadsheet-export test and scipy by the Sobol'
+          # sampler in the evidence layer.
+          pip install -r requirements-paper.txt openpyxl pytest
 
       - name: Run the test suite
         # Includes the shared-inventory consistency check and the independent
@@ -93,15 +93,63 @@ jobs:
           print('gwp ', r.lca.gwp_kg_co2eq_per_kg)
           "
 
-      - name: The console entry point must resolve
+      - name: The console entry point must run, and say what it needs
         working-directory: /tmp
-        # `desktop.app` imports PySide6, which this job deliberately does not
-        # install, so check that the module the entry point names is present
-        # rather than importing it.
+        # Actually execute the installed command. Without the desktop extra it
+        # must exit non-zero with an instruction the reader can follow - not a
+        # ModuleNotFoundError traceback, and not a check that merely proves the
+        # module is importable, which is what this step used to do and why the
+        # broken command shipped.
         run: |
-          python -c "
-          import importlib.util as u
-          import desktop, desktop.flowsheet
-          assert u.find_spec('desktop.app') is not None, 'desktop.app was not installed'
-          print('entry point target desktop.app:main is installed')
-          "
+          set +e
+          output=$(algametrix 2>&1)
+          status=$?
+          set -e
+          echo "$output"
+          test $status -ne 0 || { echo "the command should have failed without PySide6"; exit 1; }
+          echo "$output" | grep -q 'algametrix\[desktop\]' \
+            || { echo "the failure did not name the install command"; exit 1; }
+
+  desktop:
+    # The Qt client and the setup wizard have their own tests, and they only run
+    # where Qt can start. Off-screen on a runner is enough to build every widget,
+    # drive the signals and check what the window hands the engine.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Qt's system libraries
+        # PySide6's wheel does not carry these, and importing it without them
+        # fails with 'libEGL.so.1: cannot open shared object file'.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libgl1 libxkbcommon-x11-0 libdbus-1-3 \
+                                  libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 \
+                                  libxcb-shape0
+
+      - name: Install the desktop client
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Run the desktop and wizard tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m pytest tests/test_desktop_window.py tests/test_wizard.py -q
+
+      - name: The application must start and compute its default case
+        # The same self-test the Windows build runs on the packaged executable.
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python run_desktop.py --self-test
+
+      - name: The desktop extra must make the console command work
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          pip install ".[desktop]"
+          algametrix --self-test

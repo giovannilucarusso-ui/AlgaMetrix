@@ -64,3 +64,10 @@ class KpiCard(QFrame):
 
     def set_value(self, text: str):
         self._value.setText(text)
+
+    def set_title(self, text: str):
+        self._title.setText(text)
+
+    def set_unit(self, text: str):
+        """The unit belongs to the number, so it moves when the basis does."""
+        self._unit.setText(text)

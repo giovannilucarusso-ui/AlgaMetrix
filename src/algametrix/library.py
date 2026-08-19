@@ -119,6 +119,7 @@ def _system(d: dict) -> CultivationSystem:
         substrate_yield=float(d.get("substrate_yield", 0.0)),
         capex_per_unit=float(d["capex_per_unit"]),
         land_m2_per_unit=float(d.get("land_m2_per_unit", 0.0)),
+        working_volume=float(d.get("working_volume", 0.8)),
         carbon_source=CarbonSource(d.get("carbon_source", "co2")),
         cultivation_heat_mj_per_kg=float(d.get("cultivation_heat_mj_per_kg", 0.0)),
         cultivation_heat_fuel=d.get("cultivation_heat_fuel", "natural_gas"),

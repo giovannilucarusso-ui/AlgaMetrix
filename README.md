@@ -5,6 +5,11 @@
 [![python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue.svg)](pyproject.toml)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21764183.svg)](https://doi.org/10.5281/zenodo.21764183)
 
+### [⬇ Download for Windows](https://github.com/giovannilucarusso-ui/AlgaMetrix/releases/latest)
+
+No Python needed — unzip and run `AlgaMetrix.exe`. Other ways to install are
+[below](#install).
+
 **Open-source techno-economic analysis (TEA) and life-cycle assessment (LCA) for microalgae and aquatic protist biomass.**
 
 Existing TEA/LCA tools (SuperPro Designer, SimaPro, GaBi, Aspen Plus) are proprietary, expensive, and
@@ -91,7 +96,54 @@ latter is how alkaliphilic *Arthrospira* (Spirulina) is actually grown at pH 9�
 > of the box. They are **not** validated for any specific plant. Replace them with your own data — and
 > validate against SuperPro — before drawing conclusions.
 
-## Quick start
+## Install
+
+Three different people arrive at this repository, and they do not need the same
+things. Pick the line that describes you.
+
+### 1. I just want to use the Windows app
+
+Download **`AlgaMetrix-windows.zip`** from the
+[latest release](https://github.com/giovannilucarusso-ui/AlgaMetrix/releases/latest),
+unzip it anywhere and run `AlgaMetrix.exe`. No Python, no command line. Each
+release ships a `SHA256SUMS.txt` so you can check what you downloaded:
+
+```powershell
+Get-FileHash AlgaMetrix-windows.zip -Algorithm SHA256
+```
+
+Windows SmartScreen will warn about an unsigned application from an unknown
+publisher — the build is produced by the repository's public CI workflow, and
+the checksum above is what it produced.
+
+### 2. I want the Python engine
+
+The engine has no Qt dependency: it is numpy, pandas and PyYAML.
+
+```bash
+pip install algametrix          # or: pip install "algametrix[desktop]" for the GUI too
+```
+
+```python
+from algametrix.library import load_library
+from algametrix.models import Scenario
+from algametrix.scenario import run_scenario
+
+lib = load_library()
+scn = Scenario(organism=lib.organisms["Chlorella vulgaris"],
+               system=lib.systems["Open raceway pond"],
+               harvesting=lib.harvesting["Settling + centrifugation"],
+               drying=lib.drying["Spray drying"],
+               economics=lib.economics, lcia=lib.lcia, scale=100_000)
+r = run_scenario(scn)
+print(r.tea.production_cost_eur_per_kg, r.lca.gwp_kg_co2eq_per_kg)
+```
+
+`pip install algametrix` installs the `algametrix` console command as well. It
+needs the desktop extra to run and will tell you so rather than fail with a
+traceback.
+
+### 3. I want to run the desktop app from source
 
 ```bash
 # 1. (recommended) create a virtual environment
@@ -99,11 +151,34 @@ python -m venv .venv
 .venv\Scripts\Activate.ps1        # Windows PowerShell
 # source .venv/bin/activate       # macOS / Linux
 
-# 2. install
+# 2. install the desktop client
 pip install -r requirements.txt
 
-# 3. run the desktop app
+# 3. run it
 python run_desktop.py
+```
+
+On a minimal Linux image Qt also needs system libraries pip cannot install:
+
+```bash
+sudo apt-get install libegl1 libgl1 libxkbcommon-x11-0 libdbus-1-3 libxcb-cursor0
+```
+
+### 4. I want to reproduce the paper
+
+```bash
+pip install -r requirements-paper.txt
+python reproduce.py              # add --quick to shrink the stochastic stages
+```
+
+SciPy is in that file and not in `requirements.txt`: it is needed only by the
+global sensitivity analysis, and the desktop app does not use it.
+
+To run the test suite as well (engine, desktop and wizard):
+
+```bash
+pip install -r requirements-dev.txt
+python -m pytest tests -q
 ```
 
 On first launch you choose a **language** (English, Italian, Spanish or French — remembered for next
@@ -114,7 +189,57 @@ study: start from the closest validated example (or from scratch), pick the prod
 presets with country electricity price and carbon intensity), then open the scenario in the full tool.
 "Skip to full tool" bypasses the wizard; **File → New case study (wizard)** reopens it.
 
-A web version (Streamlit) is also available: `streamlit run app/streamlit_app.py`.
+A web version (Streamlit) is also available: `pip install ".[web]"` then
+`streamlit run app/streamlit_app.py`.
+
+## Saving, exporting, and what the numbers are per
+
+**A saved case is the whole case.** `File → Save scenario` writes every field of
+the scenario — extraction, products, custom media and utilities, the waste feed,
+the batch schedule, the annual credits — as a versioned JSON file
+(`format: algametrix.scenario`). Opening it restores all of them. The same
+serialisation is available to scripts, so a case can be handed to a co-author or
+attached to a paper:
+
+```python
+from algametrix.serialization import load_scenario, save_scenario
+from algametrix.scenario import run_scenario
+
+save_scenario(scn, "case.json")
+print(run_scenario(load_scenario("case.json")).tea.production_cost_eur_per_kg)
+```
+
+Files written by an older version still open; a file written by a *newer* one is
+refused rather than half-loaded.
+
+**An export says what its numbers are per.** `File → Export results` writes a
+self-describing JSON: `basis` declares the functional unit, the reference
+product and the allocation method; `headline` is exactly what the KPI cards
+show; and both `main_product_basis` (allocated, per kg of main product) and
+`biomass_basis` (the foreground inventory, per kg of dry biomass processed) are
+present, so the two can be read together instead of confused for one another.
+The scenario that produced the run is embedded in the file.
+
+In a multiproduct case the two bases genuinely differ — 17.55 €/kg of omega-3
+oil is the same run as 6.78 €/kg of biomass processed — which is why every tab
+carries its basis in the header, and the itemised cost table is allocated the
+same way the KPI is.
+
+**An impossible scenario is refused, not computed.** Zero productivity, zero
+substrate yield on a heterotroph, a proximate composition summing to 400%: the
+engine would return `inf`, a floored 1e-6, and yields taken from a kilogram
+holding four kilograms. `algametrix.inputcheck` runs on the scenario before any
+inventory is built; the window shows what is wrong and withholds the result, the
+wizard will not finish, and export and analysis are blocked until it is fixed.
+Inputs that are merely unusual — a composition 4% off, a carbon utilisation
+below the balance's floor — are flagged as warnings and still run.
+
+```python
+from algametrix.inputcheck import check_inputs, is_admissible, format_issues
+
+if not is_admissible(scn):
+    print(format_issues(check_inputs(scn)))
+```
 
 ## Verification & validation
 
@@ -320,12 +445,13 @@ If AlgaMetrix contributes to work you publish, please cite it. GitHub's *Cite th
 button reads [CITATION.cff](CITATION.cff) and will give you BibTeX or APA directly:
 
 > Russo, G. L. (2026). *AlgaMetrix: open-source techno-economic analysis and life-cycle assessment
-> for microalgae and aquatic protist biomass* (Version 1.2.0) [Computer software]. Zenodo.
+> for microalgae and aquatic protist biomass* (Version 1.3.0) [Computer software]. Zenodo.
 > https://doi.org/10.5281/zenodo.21764183
 
 Each release is archived on Zenodo. **`10.5281/zenodo.21764183` is the concept DOI**: cite it when
 you mean "AlgaMetrix" and it will always resolve to the most recent version. To pin the exact
-version you ran, cite its own DOI instead — v1.2.0 is
+version you ran, cite its own DOI instead. v1.3.0's snapshot DOI is added here once
+Zenodo mints it on publication; v1.2.0 is
 [`10.5281/zenodo.21918511`](https://doi.org/10.5281/zenodo.21918511), v1.1.0 is
 [`10.5281/zenodo.21901542`](https://doi.org/10.5281/zenodo.21901542), v1.0.2 is
 [`10.5281/zenodo.21797014`](https://doi.org/10.5281/zenodo.21797014), v1.0.1 is
