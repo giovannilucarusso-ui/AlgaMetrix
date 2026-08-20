@@ -370,6 +370,8 @@ def test_self_test_builds_the_default_scenario(qapp, tmp_path, capsys):
     report = out.read_text(encoding="utf-8")
     assert "self-test: PASS" in report
     assert "production cost" in report
+    assert "PDF report" in report      # the report module survived the bundling
+    assert "language" in report        # and the language the build starts in
 
 
 def test_the_entry_point_says_what_to_install(monkeypatch, capsys):

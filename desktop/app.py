@@ -77,6 +77,8 @@ def self_test(out_path: str | None = None) -> int:
 
     from algametrix import __version__
 
+    from desktop.i18n import current_language
+
     from desktop.main_window import MainWindow
 
     app = QApplication.instance() or QApplication([sys.argv[0]])
@@ -114,6 +116,7 @@ def self_test(out_path: str | None = None) -> int:
         report_error = "not attempted: the default scenario did not compute"
     lines = [
         f"AlgaMetrix {__version__} self-test: {'PASS' if ok else 'FAIL'}",
+        f"  language        : {current_language()}",
         f"  organism        : {window.organism.name}",
         f"  system          : {window.system.name}",
         f"  scale           : {window.scale:,.0f}",
@@ -148,6 +151,14 @@ def main(argv: list[str] | None = None) -> int:
         print(_explain_missing(missing), file=sys.stderr)
         return 1
 
+    # Language: English unless the user has chosen otherwise from Help → Language.
+    # Settled here, before anything branches, so the self-test walks the same path
+    # a launch does — the previous arrangement returned first and left the one
+    # piece of start-up behaviour that had gone wrong untested in the build.
+    from desktop.i18n import current_language, load_saved_language, set_language
+
+    set_language(load_saved_language())
+
     if "--self-test" in argv:
         out = None
         if "--self-test-out" in argv:
@@ -163,14 +174,6 @@ def main(argv: list[str] | None = None) -> int:
     app.setApplicationName("AlgaMetrix")
     app.setOrganizationName("AlgaMetrix")
 
-    # Language: English unless the user has chosen otherwise from Help → Language.
-    # There is deliberately no question on first run. Asking somebody to pick a
-    # language before they have seen the application puts a decision in front of
-    # the thing they came for, and it offered three translations that are not
-    # complete as though they were equals of the one that is.
-    from desktop.i18n import load_saved_language, set_language
-
-    set_language(load_saved_language())
 
     window = MainWindow()
     # Open filling the screen so the whole two-panel layout is visible immediately
