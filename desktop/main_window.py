@@ -1949,13 +1949,29 @@ class MainWindow(QMainWindow):
             self.apply_scenario(wiz.scenario)
 
     def change_language(self):
-        from .i18n import LANGUAGES, current_language, save_language
+        """Offer the translations, and say plainly which ones are finished.
+
+        English is the language of the application: every label is written in it
+        first, and it is the only one that is complete. Listing the other three
+        as though they were equals would let a user pick a half-translated
+        interface without knowing that is what they were choosing.
+        """
+        from .i18n import COMPLETE_LANGUAGES, LANGUAGES, current_language, save_language
 
         codes = list(LANGUAGES)
-        names = [LANGUAGES[c] for c in codes]
+        names = [
+            LANGUAGES[c] if c in COMPLETE_LANGUAGES
+            else f"{LANGUAGES[c]} — {tr('partial')}"
+            for c in codes
+        ]
         cur = current_language()
         idx = codes.index(cur) if cur in codes else 0
-        name, ok = QInputDialog.getItem(self, tr("Language…"), tr("Select language"), names, idx, False)
+        name, ok = QInputDialog.getItem(
+            self, tr("Language…"),
+            tr("Select language. English is complete; the others are partial, and "
+               "anything not translated is shown in English."),
+            names, idx, False,
+        )
         if ok:
             save_language(codes[names.index(name)])
             QMessageBox.information(self, tr("Language…"),

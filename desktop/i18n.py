@@ -1,9 +1,23 @@
-"""Lightweight UI translation for the desktop app (en, it, es, fr).
+"""Lightweight UI translation for the desktop app.
+
+**English is the language of this application.** It is what the app starts in,
+it is the only translation that is complete, and it is what every new label is
+written in first. Italian, Spanish and French are offered under *Help →
+Language* as a convenience and are partial: strings added since they were last
+revised fall back to English, so a translated interface is a mixed one.
 
 `tr(s)` returns the translation of the English string `s` for the current
-language, falling back to English for anything not translated. The chosen
-language is remembered in a small settings file. Engine-generated data labels
-(flow names, breakdown categories, product names) are intentionally kept in English.
+language, falling back to English for anything not translated. Engine-generated
+data labels (flow names, breakdown categories, product names) are intentionally
+kept in English in every language.
+
+The chosen language is remembered in a small settings file in the user's home
+folder. That file is **outside** the application, so it survives reinstalling
+and is shared by every copy on the machine — including one run from a source
+checkout years earlier, which is how a freshly downloaded build came up in a
+language its user had not picked for it. :data:`SETTINGS_VERSION` exists for
+exactly that: a preference written by an older scheme is ignored rather than
+applied to a build that never asked the question.
 """
 
 from __future__ import annotations
@@ -12,8 +26,16 @@ import json
 from pathlib import Path
 
 LANGUAGES = {"en": "English", "it": "Italiano", "es": "Español", "fr": "Français"}
+#: The language the app uses unless the user changes it from the menu.
+DEFAULT_LANGUAGE = "en"
+#: Languages other than English are incomplete; the menu says so.
+COMPLETE_LANGUAGES = frozenset({"en"})
 _SETTINGS = Path.home() / ".algae_tea_lca.json"
-_LANG = "en"
+#: Bumped when what counts as a deliberate choice changes. Version 1 was written
+#: by a first-run dialog that no longer exists: the app now starts in English and
+#: the language is a menu choice, so a version-1 preference is not honoured.
+SETTINGS_VERSION = 2
+_LANG = DEFAULT_LANGUAGE
 
 TRANSLATIONS = {
     "it": {
@@ -607,10 +629,10 @@ TRANSLATIONS = {
 }
 
 
-def set_language(code: str) -> None:
+def set_language(code: str | None) -> None:
+    """Switch language. ``None`` or an unknown code means English."""
     global _LANG
-    if code in LANGUAGES:
-        _LANG = code
+    _LANG = code if code in LANGUAGES else DEFAULT_LANGUAGE
 
 
 def current_language() -> str:
@@ -624,16 +646,32 @@ def tr(s: str) -> str:
 
 
 def load_saved_language() -> str | None:
+    """The language the user deliberately chose, or ``None`` for the default.
+
+    A settings file from before :data:`SETTINGS_VERSION` 2 is ignored. Those were
+    written by a dialog that asked for a language before the app had been seen,
+    on a machine that may have run a source checkout long before this build
+    existed - not the same thing as picking a language from the menu, and not a
+    good enough reason to hand somebody a partially translated interface they
+    did not ask for.
+    """
     try:
         data = json.loads(_SETTINGS.read_text(encoding="utf-8"))
-        code = data.get("language")
-        return code if code in LANGUAGES else None
     except Exception:
         return None
+    if not isinstance(data, dict):
+        return None
+    if int(data.get("settings_version", 1)) < SETTINGS_VERSION:
+        return None
+    code = data.get("language")
+    return code if code in LANGUAGES else None
 
 
 def save_language(code: str) -> None:
     try:
-        _SETTINGS.write_text(json.dumps({"language": code}), encoding="utf-8")
+        _SETTINGS.write_text(
+            json.dumps({"settings_version": SETTINGS_VERSION, "language": code}),
+            encoding="utf-8",
+        )
     except Exception:
         pass

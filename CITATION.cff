@@ -21,13 +21,16 @@ authors:
 repository-code: "https://github.com/giovannilucarusso-ui/AlgaMetrix"
 url: "https://github.com/giovannilucarusso-ui/AlgaMetrix"
 license: MIT
-version: 1.3.0
+version: 1.3.1
 date-released: "2026-08-20"
 # Concept DOI: resolves to the most recent archived release.
 doi: 10.5281/zenodo.21764183
 identifiers:
   # A snapshot DOI is added only once Zenodo has minted it, which happens when
   # the GitHub release is published. Never write one here in advance.
+  - type: doi
+    value: 10.5281/zenodo.22019311
+    description: "Archived snapshot of version 1.3.0"
   - type: doi
     value: 10.5281/zenodo.21918511
     description: "Archived snapshot of version 1.2.0"

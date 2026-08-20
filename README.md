@@ -135,9 +135,10 @@ No Python, no command line, no administrator rights, no installer. Windows 10 or
    produced by [the public build workflow](.github/workflows/windows-release.yml)
    from the tagged source, on GitHub's runners, with a log anybody can read.
 
-**First launch** asks for a language (English, Italian, Spanish or French —
-remembered afterwards, changeable under *Help → Language*), then opens the
-7-step setup wizard. "Skip to full tool" goes straight to the main window.
+**First launch** opens the 7-step setup wizard, in English. "Skip to full tool"
+goes straight to the main window. Italian, Spanish and French are available
+under *Help → Language*; they are partial translations, and anything not
+translated is shown in English.
 
 **To create a desktop shortcut**, right-click `AlgaMetrix.exe` → *Show more
 options* → *Send to* → *Desktop (create shortcut)*.
@@ -217,8 +218,7 @@ pip install -r requirements-dev.txt
 python -m pytest tests -q
 ```
 
-On first launch you choose a **language** (English, Italian, Spanish or French — remembered for next
-time, changeable from **Help → Language**), then a **7-step setup wizard** helps you build your case
+On first launch a **7-step setup wizard** helps you build your case
 study: start from the closest validated example (or from scratch), pick the product goal, organism (with
 **full editable composition** — protein/lipid/carbohydrate/ash and C/N/P), cultivation system and scale
 (by target tonnage **or** by plant size), downstream, and **regional** economic/energy context (12 grid
@@ -413,9 +413,17 @@ bundled alongside it. (On macOS/Linux replace `;` with `:` in `--add-data`.)
 
 ## Languages
 
-The interface is available in **English, Italian, Spanish and French**. The language is chosen on first
-launch and remembered; change it any time from **Help → Language** (restart to apply). Engine-generated
-technical labels (flow names, cost/impact breakdown categories) stay in English as a common reference.
+**The application is in English.** That is what it starts in, it is the only complete translation, and
+every label is written in it first. Italian, Spanish and French are offered under **Help → Language**
+(restart to apply) as a convenience: they are partial, and any string added since a translation was last
+revised falls back to English, so a translated interface is a mixed one. The menu says which is which.
+
+Engine-generated technical labels (flow names, cost/impact breakdown categories, product names) stay in
+English in every language, as a common reference.
+
+The choice is remembered in `.algae_tea_lca.json` in your home folder — outside the application, so it is
+shared by every copy on the machine, including a source checkout. Only a choice made from the menu counts:
+a preference left by an older version is ignored rather than applied to a build that never asked.
 
 ## Project layout
 
@@ -481,13 +489,14 @@ If AlgaMetrix contributes to work you publish, please cite it. GitHub's *Cite th
 button reads [CITATION.cff](CITATION.cff) and will give you BibTeX or APA directly:
 
 > Russo, G. L. (2026). *AlgaMetrix: open-source techno-economic analysis and life-cycle assessment
-> for microalgae and aquatic protist biomass* (Version 1.3.0) [Computer software]. Zenodo.
+> for microalgae and aquatic protist biomass* (Version 1.3.1) [Computer software]. Zenodo.
 > https://doi.org/10.5281/zenodo.21764183
 
 Each release is archived on Zenodo. **`10.5281/zenodo.21764183` is the concept DOI**: cite it when
 you mean "AlgaMetrix" and it will always resolve to the most recent version. To pin the exact
-version you ran, cite its own DOI instead. v1.3.0's snapshot DOI is added here once
-Zenodo mints it on publication; v1.2.0 is
+version you ran, cite its own DOI instead. v1.3.1's snapshot DOI is added here once
+Zenodo mints it on publication; v1.3.0 is
+[`10.5281/zenodo.22019311`](https://doi.org/10.5281/zenodo.22019311), v1.2.0 is
 [`10.5281/zenodo.21918511`](https://doi.org/10.5281/zenodo.21918511), v1.1.0 is
 [`10.5281/zenodo.21901542`](https://doi.org/10.5281/zenodo.21901542), v1.0.2 is
 [`10.5281/zenodo.21797014`](https://doi.org/10.5281/zenodo.21797014), v1.0.1 is

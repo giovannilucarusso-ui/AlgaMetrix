@@ -163,20 +163,14 @@ def main(argv: list[str] | None = None) -> int:
     app.setApplicationName("AlgaMetrix")
     app.setOrganizationName("AlgaMetrix")
 
-    # Language: use the saved choice, or ask once on first run (before building the UI).
-    from desktop.i18n import LANGUAGES, load_saved_language, save_language, set_language
+    # Language: English unless the user has chosen otherwise from Help → Language.
+    # There is deliberately no question on first run. Asking somebody to pick a
+    # language before they have seen the application puts a decision in front of
+    # the thing they came for, and it offered three translations that are not
+    # complete as though they were equals of the one that is.
+    from desktop.i18n import load_saved_language, set_language
 
-    lang = load_saved_language()
-    if lang is None:
-        from PySide6.QtWidgets import QInputDialog
-
-        codes, names = list(LANGUAGES), list(LANGUAGES.values())
-        name, ok = QInputDialog.getItem(
-            None, "Language · Lingua · Idioma · Langue", "Select language:", names, 0, False
-        )
-        lang = codes[names.index(name)] if ok else "en"
-        save_language(lang)
-    set_language(lang)
+    set_language(load_saved_language())
 
     window = MainWindow()
     # Open filling the screen so the whole two-panel layout is visible immediately
