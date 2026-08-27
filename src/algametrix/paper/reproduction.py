@@ -86,6 +86,10 @@ class ReproductionRow:
     #: The publication group the source belongs to. Rows sharing it are several
     #: scenarios of one independent source.
     independence_group: str = ""
+    #: The value the source actually prints, where :attr:`reference` is a
+    #: harmonized endpoint rather than the published one. ``None`` when nothing
+    #: was harmonized and the two would be the same number.
+    raw_reference: float | None = None
 
     # --- price basis (cost rows only; a GWP is basis-free) -----------------
     engine_basis: PriceBasis | None = None
@@ -174,16 +178,34 @@ class ReproductionRow:
             return "n/a"
         bounds = self.deviation_bounds_pct
         if bounds is None:
-            return f"{pct:+.0f}%"
+            return format_deviation(pct)
         return f"{bounds[0]:+.0f}% to {bounds[1]:+.0f}%"
 
 
+#: Below this magnitude a deviation is printed with one decimal. Rounding 1.48 %
+#: to 1 % moves the number by a third of its own value, which matters most
+#: exactly where the agreement is closest and where the reported range has its
+#: endpoint. Above it, whole percent is the honest resolution for a
+#: reconstruction whose inputs are read off published tables.
+DECIMAL_BELOW_PCT = 2.0
+
+
+def format_deviation(pct: float) -> str:
+    """A single deviation, at the resolution it can carry.
+
+    Intervals are not routed through here: a bracketed row already states its
+    own uncertainty, and both of its ends are given in whole percent.
+    """
+    return f"{pct:+.1f}%" if abs(pct) < DECIMAL_BELOW_PCT else f"{pct:+.0f}%"
+
+
 def format_deviation_range(values) -> str:
-    """``-14% to -1%``: the extremes of a set of deviations."""
+    """``-14% to +1.5%``: the extremes of a set of deviations, each at its own
+    resolution."""
     vals = [v for v in values if v is not None]
     if not vals:
         return "no comparable deviation"
-    return f"{min(vals):+.0f}% to {max(vals):+.0f}%"
+    return f"{format_deviation(min(vals))} to {format_deviation(max(vals))}"
 
 
 def _cost_of(scn) -> float:
@@ -230,13 +252,25 @@ def cost_row(
         scenario=rec.scenario_label, metric="cost",
         endpoint=f"{endpoint} vs engine {engine_endpoint}",
         evidence_class=rec.evidence_class or "none",
-        comparison_kind="not_comparable", model=None, reference=rec.reported_value,
+        comparison_kind="not_comparable", model=None,
+        # The harmonized endpoint where there is one, so that the deviation is
+        # not between two definitions of "production cost". The raw published
+        # figure travels with the row and is printed beside it.
+        reference=rec.comparison_value,
         ref_low=rec.reported_low, ref_high=rec.reported_high,
         unit=rec.reported_unit or "",
         engine_basis=engine_basis, source_basis=source_basis,
         model_native=model_native,
         independence_group=independence_key(rec),
+        raw_reference=rec.source_value if rec.endpoint_harmonized else None,
     )
+    if rec.endpoint_harmonized:
+        row.endpoint = f"{endpoint} [endpoint-harmonized] vs engine {engine_endpoint}"
+        row.notes.append(
+            f"ENDPOINT HARMONIZED: the source prints {rec.source_value:,.4g} "
+            f"{rec.source_unit or ''}; the value compared is {rec.comparison_value:,.6g} "
+            f"{rec.harmonized_unit or ''}. {rec.endpoint_harmonization.strip()}"
+        )
 
     # --- move the engine value into the source's own basis -----------------
     tr = indices.transfer(model_native, engine_basis, source_basis, registry, shares)

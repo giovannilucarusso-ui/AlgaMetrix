@@ -88,6 +88,18 @@ studies:
   reported_unit: EUR/kg dry biomass
   reported_currency: EUR
   reported_price_year: 2016
+  endpoint_harmonized: true
+  harmonized_value: 12.114750
+  harmonized_unit: EUR/kg dry biomass
+  endpoint_harmonization: >
+    The source's plant carries EUR 446,367/yr of total annual cost over 36,000 kg/yr of
+    biomass, which is the published EUR 12.40/kg, and EUR 10,236/yr of that total is
+    financing interest (5% on a 10-year loan over 60% of the investment). The AlgaMetrix
+    production cost includes neither a financing charge nor a required return on capital,
+    so the two endpoints do not include the same things and their quotient is not a model
+    error. Removing the interest term puts the source on the engine's endpoint:
+    (446367 - 10236) / 36000 = 12.114750 EUR2016 per kg, which is the value compared.
+    The raw published 12.40 is kept in source_value and reported alongside.
   currency_basis: null
   nominal_or_real: null
   includes_depreciation: null
@@ -108,9 +120,10 @@ studies:
   published_capex_available: true
   published_opex_available: true
   dependency_notes:
-    - "ENDPOINT DIFFERENCE: the published EUR 12.40/kg folds in EUR 10,236/yr of financing
-       interest, and the AlgaMetrix production cost carries no financing charge and no
-       required return on capital. The two endpoints do not include the same things."
+    - "ENDPOINT HARMONIZED. The published EUR 12.40/kg folds in EUR 10,236/yr of financing
+       interest; the AlgaMetrix production cost carries no financing charge and no required
+       return on capital. The comparison is made against the harmonized endpoint, and the raw
+       published value is kept in source_value."
   assumptions_required:
     - "Endpoint classified as production_cost from the dataset label 'cost'; the paper's own
        definition (depreciation, return on capital, working capital) is not recorded here."
@@ -118,8 +131,9 @@ studies:
        `m2-harmonization` (PR #1), where it was committed but never merged into main.
        Ported verbatim into paper/reconstructions.py; reproduces the published value."
     - "The source folds interest into its reported unit cost (5%, 10-yr loan, 40% equity),
-       whereas the AlgaMetrix production cost excludes return on capital. This is a declared
-       endpoint difference, not a modelling error."
+       whereas the AlgaMetrix production cost excludes return on capital. The comparison is
+       therefore made against the harmonized endpoint (see endpoint_harmonization), not
+       against the raw 12.40, so the deviation no longer carries a term only one side has."
   todos:
     - "Extract the paper's cost breakdown (CAPEX/labour/energy/nutrients) to enable
        component-wise price-year normalization."

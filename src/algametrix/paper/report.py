@@ -553,6 +553,9 @@ def reproductions(rows, blocked, excluded=None) -> str:
             f"{r.verdict}"
         )
         lines.append(f"      endpoint: {r.endpoint}")
+        if r.raw_reference is not None:
+            lines.append(f"      source  : {r.raw_reference:,.6g} as published; "
+                         f"{r.reference:,.6g} after endpoint harmonization")
         if r.independence_group:
             lines.append(f"      group   : {r.independence_group}")
         if r.engine_basis is not None:

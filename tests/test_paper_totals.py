@@ -141,7 +141,20 @@ def test_untuned_production_cost_is_four_scenarios_from_two_publications(rows):
     c = reproduction.cohort(rows, "retrospective_untuned", "cost")
     assert c.n == 4
     assert c.n_publications == 2
-    assert c.range_label == "-14% to -1%"
+    assert c.range_label == "-14% to +1.5%"
+
+
+def test_tredici_is_compared_against_the_harmonized_endpoint(rows):
+    """The published 12.40 carries financing interest; the engine's endpoint does not.
+
+    (446367 - 10236) / 36000 = 12.114750 EUR2016/kg is what the engine is compared
+    against, and the raw published figure travels with the row.
+    """
+    row = next(r for r in rows if r.study_id == "tredici2016" and r.metric == "cost")
+    assert row.raw_reference == pytest.approx(12.40)
+    assert row.reference == pytest.approx((446367 - 10236) / 36000, rel=1e-12)
+    assert row.deviation_pct == pytest.approx(1.4849, abs=5e-4)
+    assert row.verdict == "+1.5%"
 
 
 def test_untuned_gwp_is_three_scenarios_from_minus_11_to_plus_4(rows):

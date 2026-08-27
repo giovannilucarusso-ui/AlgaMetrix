@@ -296,6 +296,18 @@ class StudyRecord:
     reported_unit: str | None = None
     source_value: float | None = None
     source_unit: str | None = None
+    #: ``True`` when the published endpoint and the engine's endpoint do not
+    #: include the same things, and the source value has been moved onto the
+    #: engine's basis before comparison. The raw published number stays in
+    #: :attr:`source_value`; what the engine is compared against is
+    #: :attr:`harmonized_value`. Both are kept, because a harmonization a reader
+    #: cannot undo is not an audit trail.
+    endpoint_harmonized: bool = False
+    harmonized_value: float | None = None
+    harmonized_unit: str | None = None
+    #: The arithmetic, in full: which published terms were removed or added, and
+    #: with what numbers. Required whenever :attr:`endpoint_harmonized` is set.
+    endpoint_harmonization: str | None = None
     reported_currency: str | None = None
     reported_price_year: int | None = None
     currency_basis: str | None = None
@@ -370,6 +382,27 @@ class StudyRecord:
         if self.source_unit is None:
             self.source_unit = self.reported_unit
 
+        # A harmonized endpoint is only evidence if both readings and the
+        # arithmetic between them are on the record. Half of it is worse than
+        # none: a comparison would silently be made against a number whose
+        # derivation nobody can check.
+        if self.endpoint_harmonized:
+            missing = [n for n in ("harmonized_value", "endpoint_harmonization")
+                       if getattr(self, n) is None]
+            if missing:
+                raise VocabularyError(
+                    f"{sid}: endpoint_harmonized is set but {', '.join(missing)} "
+                    f"{'is' if len(missing) == 1 else 'are'} missing; the comparison "
+                    "value and the arithmetic that produced it are both required"
+                )
+            if self.harmonized_unit is None:
+                self.harmonized_unit = self.source_unit
+        elif self.harmonized_value is not None:
+            raise VocabularyError(
+                f"{sid}: harmonized_value is set but endpoint_harmonized is not; a "
+                "value nothing declares would never reach a comparison"
+            )
+
     # ------------------------------------------------------------------
     # Derived properties
     # ------------------------------------------------------------------
@@ -381,6 +414,18 @@ class StudyRecord:
     @property
     def has_cost(self) -> bool:
         return self.reported_value is not None
+
+    @property
+    def comparison_value(self) -> float | None:
+        """The number the engine is actually compared against.
+
+        The published value, unless the endpoint had to be harmonized first, in
+        which case it is the harmonized one. :attr:`source_value` always holds
+        the raw published figure, so both readings reach every report.
+        """
+        if self.endpoint_harmonized and self.harmonized_value is not None:
+            return self.harmonized_value
+        return self.reported_value
 
     @property
     def has_published_gwp(self) -> bool:
