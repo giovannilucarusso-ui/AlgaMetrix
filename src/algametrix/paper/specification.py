@@ -135,8 +135,8 @@ SYMBOLS: list[Symbol] = [
            "system.nutrient_uptake"),
     Symbol(r"Y_{X/S}", "biomass yield on substrate (heterotrophic)", "kg kg$^{-1}$",
            "system.substrate_yield"),
-    Symbol(r"w_\mathrm{C}^{S}", "carbon mass fraction of the substrate (glucose)",
-           "kg kg$^{-1}$", "constant 0.4001"),
+    Symbol(r"w_\mathrm{C}^{S}", "carbon mass fraction of the organic substrate",
+           "kg kg$^{-1}$", "system.substrate_carbon_fraction"),
     # --- scenario: energy and downstream ---------------------------------
     Symbol(r"e_\mathrm{cult}, e_\mathrm{harv}, e_\mathrm{dry}, e_\mathrm{ext}",
            "electricity intensity of each stage", "kWh kg$^{-1}$",
@@ -241,7 +241,10 @@ def _equations_inventory() -> list[Equation]:
             "substrate carbon not incorporated into biomass is respired. The respired "
             "term is reported and is **not** summed into the GWP: substrate carbon "
             "enters biogenic and leaves biogenic, so both sides are excluded under the "
-            "0/0 convention. Its sign is the admissibility constraint of SI S2.",
+            "0/0 convention. Its sign is the admissibility constraint of SI S2. The "
+            "substrate's carbon fraction is declared per scenario "
+            "(`system.substrate_carbon_fraction`, glucose by default), because "
+            "glycerol, ethanol and a wet side-stream do not carry glucose's carbon.",
             "inventory.build_inventory",
             stated=lambda s, inv, tea, lca: _gpp(s) / max(s.system.substrate_yield, 1e-6),
             engine=lambda s, inv, tea, lca: inv.substrate_per_kg,

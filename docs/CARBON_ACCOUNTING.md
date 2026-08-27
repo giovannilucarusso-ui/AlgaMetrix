@@ -81,9 +81,21 @@ into the product, and the fact that any downstream release of that carbon lies
 **outside** the cradle-to-gate boundary. `source_specific_credit` credits nothing
 for a heterotrophic system.
 
-The substrate carbon fraction used for this bookkeeping is glucose stoichiometry
-(6 × 12.011 / 180.156 = 0.400), a chemical constant, not a fitted value. It does
-not enter any cost or impact sum.
+The substrate carbon fraction used for this bookkeeping is **declared by the
+scenario** — `system.substrate_carbon_fraction`, with `system.substrate_name`
+beside it — and defaults to glucose stoichiometry (6 × 12.011 / 180.156 = 0.400).
+It does not enter any cost or impact sum: the price and the production burden are
+per kilogram of substrate, whatever that substrate is. What it does set is the
+respired-carbon report above and the falsifiable *biomass C ≤ substrate C* check
+in [VERIFICATION.md](VERIFICATION.md), which is why it cannot stay a constant:
+glycerol carries 0.391 kg C/kg, crude glycerol about 0.31, ethanol 0.521, acetate
+0.400, and a wet food side-stream taken as received far less. Naming a substrate
+without changing its carbon fraction is flagged as a warning by
+`algametrix.inputcheck`.
+
+A waste-derived feed declares its organics as **glucose-equivalent kilograms**
+(see [WASTE_FEEDS.md](WASTE_FEEDS.md) and the comments in `data/waste_feeds.yaml`),
+so it stays consistent with whatever fraction the system declares.
 
 ## 4. Ratios
 

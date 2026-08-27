@@ -11,6 +11,7 @@ import copy
 from dataclasses import dataclass
 from typing import Callable
 
+from .inputcheck import InadmissibleScenarioError
 from .models import Scenario
 from .scenario import Results, run_scenario
 
@@ -39,13 +40,29 @@ class SweepPoint:
 
 
 def run_sweep(base: Scenario, param: "SweepParam", values: list[float]) -> list[SweepPoint]:
-    """Recompute ``base`` for each ``value`` of ``param``."""
+    """Recompute ``base`` for each ``value`` of ``param``.
+
+    A value that makes the scenario inadmissible is left out rather than plotted:
+    the engine would have had to bound it, and a bounded point is a result for a
+    different scenario than the one the axis says. The returned series is
+    therefore shorter than ``values`` where that happens, and
+    :func:`skipped_values` says which ones went.
+    """
     points: list[SweepPoint] = []
     for v in values:
         scn = copy.deepcopy(base)
         param.apply(scn, v)
-        points.append(SweepPoint(v, run_scenario(scn)))
+        try:
+            points.append(SweepPoint(v, run_scenario(scn)))
+        except InadmissibleScenarioError:
+            continue
     return points
+
+
+def skipped_values(values: list[float], points: list[SweepPoint]) -> list[float]:
+    """The swept values that produced no point, for a caller that wants to say so."""
+    kept = {p.value for p in points}
+    return [v for v in values if v not in kept]
 
 
 # Extractors for common outputs, for plotting a swept series.

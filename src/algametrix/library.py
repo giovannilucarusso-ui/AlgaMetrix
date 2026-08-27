@@ -13,6 +13,8 @@ from pathlib import Path
 
 import yaml
 
+from .inventory import SUBSTRATE_CARBON_FRACTION
+from .lciamethod import LCIAMethod, load_method
 from .models import (
     Basis,
     CarbonAccounting,
@@ -58,6 +60,10 @@ class Library:
     waste_feeds: dict[str, WasteFeed]
     economics: Economics
     lcia: LCIAFactors
+    #: The declaration the factors came with — boundary, cut-off, allocation,
+    #: impact assessment method and per-factor provenance. ``None`` only when a
+    #: custom data directory carries no ``lcia.yaml``.
+    lcia_method: "LCIAMethod | None" = None
 
 
 def _load_yaml(path: Path):
@@ -117,6 +123,9 @@ def _system(d: dict) -> CultivationSystem:
         nutrient_uptake=float(d.get("nutrient_uptake", 1.0)),
         water_m3_per_kg=float(d.get("water_m3_per_kg", 0.0)),
         substrate_yield=float(d.get("substrate_yield", 0.0)),
+        substrate_name=d.get("substrate_name", "glucose"),
+        substrate_carbon_fraction=float(
+            d.get("substrate_carbon_fraction", SUBSTRATE_CARBON_FRACTION)),
         capex_per_unit=float(d["capex_per_unit"]),
         land_m2_per_unit=float(d.get("land_m2_per_unit", 0.0)),
         working_volume=float(d.get("working_volume", 0.8)),
@@ -215,6 +224,26 @@ def _lcia(d: dict) -> LCIAFactors:
     )
 
 
+def _lcia_from(base: Path, params: dict) -> tuple[LCIAFactors, "LCIAMethod | None"]:
+    """The factors and the declaration they came with.
+
+    ``lcia.yaml`` is the source of truth: it carries the values *and* the
+    boundary, cut-off, allocation and provenance statement around them. A data
+    directory that predates the file, or a user's own directory that never had
+    one, still works — the factors then come from the ``lcia:`` block of
+    ``parameters.yaml`` and no declaration is available.
+    """
+    method = load_method(base)
+    if method is not None:
+        return method.lcia_factors(), method
+    if "lcia" not in params:
+        raise FileNotFoundError(
+            f"no life-cycle factors in {base}: expected {base / 'lcia.yaml'} "
+            "or an `lcia:` block in parameters.yaml"
+        )
+    return _lcia(params["lcia"]), None
+
+
 def load_library(data_dir: Path | str | None = None) -> Library:
     """Load all built-in data. Pass ``data_dir`` to use a custom data folder."""
     base = Path(data_dir) if data_dir is not None else DEFAULT_DATA_DIR
@@ -230,6 +259,7 @@ def load_library(data_dir: Path | str | None = None) -> Library:
     feeds_path = base / "waste_feeds.yaml"
     feeds_doc = _load_yaml(feeds_path) if feeds_path.is_file() else {}
     waste_feeds = [_waste_feed(x) for x in (feeds_doc or {}).get("waste_feeds", [])]
+    lcia, lcia_method = _lcia_from(base, params)
 
     return Library(
         organisms={o.name: o for o in organisms},
@@ -239,5 +269,6 @@ def load_library(data_dir: Path | str | None = None) -> Library:
         extraction={e.name: e for e in extraction},
         waste_feeds={w.name: w for w in waste_feeds},
         economics=_economics(params["economics"]),
-        lcia=_lcia(params["lcia"]),
+        lcia=lcia,
+        lcia_method=lcia_method,
     )

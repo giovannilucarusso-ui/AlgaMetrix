@@ -1,0 +1,659 @@
+# Life-cycle background and method declaration.
+#
+# Two things live in this file:
+#
+#   * `factors:` - the numbers algametrix.lca uses, one per input per impact
+#     category, each with its unit, provenance, geography, reference period and
+#     a quality flag;
+#   * everything else - the declaration ISO 14044 asks a study to make about the
+#     background it used: goal and scope, boundary, cut-off, allocation, impact
+#     assessment method, and what is left outside.
+#
+# The factors are aggregated cradle-to-gate values, not elementary flows: one
+# already-characterized number per input per category. AlgaMetrix ships no LCI
+# database and needs none to run. What that costs is stated under `limitations:`
+# and is printed with every method statement.
+#
+# Editing: change a value and change its `source`, `geography`,
+# `reference_period` and `quality` with it. The test suite refuses a factor that
+# carries no provenance.
+#
+# Print the whole declaration with:
+#     python -m algametrix.lciamethod
+
+method:
+  name: AlgaMetrix default background
+  version: 1
+  released: 2026-08-27
+  standard:
+    - "ISO 14040:2006 Environmental management - Life cycle assessment - Principles and framework"
+    - "ISO 14044:2006 Environmental management - Life cycle assessment - Requirements and guidelines"
+  conformance: >
+    The calculation is organised in the four phases of ISO 14040 (goal and scope,
+    inventory analysis, impact assessment, interpretation) and this file is the
+    scope declaration ISO 14044 clause 4.2.3 asks for. Conformance itself is a
+    property of a study, not of a program: a study made with AlgaMetrix conforms
+    only if its author states goal and scope, replaces the defaults below with
+    data representative of the system studied, and - for comparative assertions
+    disclosed to the public - obtains the critical review ISO 14044 clause 6
+    requires. The defaults shipped here do not meet that condition on their own.
+  study_type: attributional
+  modelling: linear, process-based, steady-state, average (not marginal)
+  functional_unit: >
+    1 kg of dry biomass leaving the plant gate; in a multi-product configuration,
+    1 kg of the designated main product.
+  reference_flow: >
+    The gross biomass, energy, carbon, nutrient, water and land flows required to
+    deliver that kilogram, taken from the shared mass-energy inventory.
+  boundary: cradle-to-gate
+  gate: >
+    The product as it leaves the production site: dry powder, wet paste or the
+    designated main product of a downstream train, depending on the scenario.
+  geography:
+    default: EU-27
+    note: >
+      The defaults are indicative of an average European background. They are not
+      regionalized: no factor responds to where the plant is. Grid electricity
+      alone spans two orders of magnitude between national grids, so a study
+      outside Europe must replace at least the electricity, heat and fertiliser
+      factors before its results mean anything.
+  reference_period:
+    default: 2019-2022
+    note: >
+      The defaults describe a background of roughly 2019-2022. They carry no
+      trend and no scenario year: a prospective study of a 2035 plant on a 2035
+      grid has to supply its own factors.
+  database:
+    name: none
+    note: >
+      No licensed LCI database (ecoinvent, GaBi, Agri-footprint) is shipped,
+      required or read. The background is the aggregated factor table below. A
+      user with a database licence is expected to replace the table with values
+      exported from it, and to record the database name and version here.
+
+# --- what the impact assessment reports -------------------------------------
+# `method` names the characterization each indicator is meant to follow. Where
+# the shipped factors are aggregated CO2-eq or SO2-eq values from heterogeneous
+# secondary sources, the underlying characterization vintage is not uniform;
+# that is recorded per indicator rather than implied.
+indicators:
+  - key: gwp
+    label: Climate change (GWP100)
+    unit: kg CO2-eq
+    method: IPCC GWP100
+    kind: characterized
+    note: >
+      The shipped background factors arrive already expressed in CO2-eq by their
+      sources, which do not all use the same IPCC assessment report, so the
+      vintage is mixed and the indicator is screening-level. The biogenic carbon
+      term is not a characterization factor but a declared convention - see
+      `conventions:` below and docs/CARBON_ACCOUNTING.md.
+  - key: ced
+    label: Cumulative energy demand
+    unit: MJ
+    method: Cumulative energy demand, total primary energy with fossil and non-fossil pooled
+    kind: characterized
+    note: >
+      Reported as one pooled total. Renewable, fossil and nuclear primary energy
+      are not separated, so the indicator cannot be read as fossil depletion.
+  - key: water
+    label: Water use
+    unit: m3
+    method: none - inventory-level water consumption
+    kind: inventory
+    note: >
+      Direct process water consumed by the foreground plus the water carried by
+      the electricity factor. This is a water inventory, not a water-scarcity
+      indicator: no AWARE or equivalent characterization is applied, so a cubic
+      metre in Sicily and a cubic metre in Norway count the same.
+  - key: land
+    label: Land occupation
+    unit: m2*a
+    method: none - inventory-level occupation
+    kind: inventory
+    note: >
+      On-site occupation of the cultivation footprint only. No land
+      transformation, no occupation embodied in purchased inputs - in particular
+      none for the agricultural land behind a heterotrophic sugar feedstock - and
+      no land-use characterization factor.
+  - key: eutroph_n
+    label: Marine eutrophication
+    unit: kg N-eq
+    method: ReCiPe 2016 midpoint (H), marine eutrophication
+    kind: characterized
+    note: >
+      The direct term uses the ReCiPe reference substance, for which nitrogen
+      released to water characterizes at 1 kg N-eq per kg N. What fraction of the
+      un-assimilated nitrogen reaches water is an inventory assumption, not a
+      characterization factor - see `inventory_assumptions:`. The upstream
+      fertiliser term is an aggregated secondary value. The receiving compartment
+      is not modelled: all released nitrogen is counted here and all released
+      phosphorus under freshwater eutrophication, wherever the discharge actually
+      goes, where ReCiPe would characterize by compartment.
+  - key: eutroph_p
+    label: Freshwater eutrophication
+    unit: kg P-eq
+    method: ReCiPe 2016 midpoint (H), freshwater eutrophication
+    kind: characterized
+    note: >
+      As above, with phosphorus to freshwater at 1 kg P-eq per kg P, and the same
+      absence of a receiving compartment.
+  - key: acid
+    label: Terrestrial acidification
+    unit: kg SO2-eq
+    method: SO2-equivalent acidification, CML / ReCiPe family
+    kind: characterized
+    note: >
+      Every acidification factor in the table is an aggregated secondary value
+      with no traceable dataset behind it. The indicator is a screening estimate,
+      and no acidification result produced by AlgaMetrix has been compared
+      against a published study.
+
+# --- the inputs the factor table can characterize ---------------------------
+# The coverage matrix printed by the method statement is this list crossed with
+# `indicators:`; a cell is filled only where `factors:` declares one. The empty
+# cells are the statement of what the background does not cover.
+inputs:
+  - key: electricity
+    label: Grid electricity
+    unit: kWh
+  - key: heat
+    label: Process heat (natural gas)
+    unit: MJ
+  - key: nitrogen
+    label: Nitrogen fertiliser (as N)
+    unit: kg N
+  - key: phosphorus
+    label: Phosphorus fertiliser (as P)
+    unit: kg P
+  - key: co2_supply
+    label: CO2 supply (captured, compressed, delivered)
+    unit: kg CO2
+  - key: bicarbonate
+    label: Sodium bicarbonate
+    unit: kg NaHCO3
+  - key: substrate
+    label: Organic substrate (glucose)
+    unit: kg
+  - key: solvent
+    label: Extraction solvent make-up
+    unit: kg
+    note: >
+      GWP and CED come from the extraction preset in parameters.yaml, one pair
+      per solvent; only the acidification factor is global and sits in this file.
+  - key: process_water
+    label: Process water
+    unit: m3
+    note: Enters the water indicator directly, with no upstream burden of its own.
+  - key: land
+    label: Site land occupation
+    unit: m2*a
+    note: Enters the land indicator directly, with no characterization applied.
+  - key: material
+    label: Declared materials (media components, chemicals)
+    unit: per declared unit
+    note: >
+      Carried on the scenario, not in this file: each material declares its own
+      factors. Categories left undeclared are reported as not characterized by
+      the completeness check rather than counted as zero.
+  - key: utility
+    label: Declared utilities (steam, cooling, chilled water)
+    unit: per declared unit
+    note: As for materials.
+  - key: waste_feed
+    label: Waste-derived feed
+    unit: per declared unit
+    note: >
+      Carried on the scenario. GWP and CED only, under the convention the
+      scenario declares - cut-off or avoided treatment. See docs/WASTE_FEEDS.md.
+
+# --- what is inside the boundary --------------------------------------------
+included:
+  - Cultivation - carbon supply (CO2 or bicarbonate), nitrogen and phosphorus, process water, site land occupation, cultivation and circulation electricity
+  - Harvesting and dewatering electricity
+  - Drying - thermal energy and electricity, where the scenario dries
+  - Downstream processing where enabled - disruption and extraction electricity, solvent-recovery heat, net solvent make-up
+  - Declared materials and utilities, in the categories for which the scenario declares a factor
+  - Direct nitrogen and phosphorus release to water from the un-assimilated fraction
+  - Biogenic carbon fixed into the biomass, under the declared convention
+
+# --- what is outside it, and why --------------------------------------------
+excluded:
+  - item: Infrastructure and capital goods
+    note: >
+      Ponds, photobioreactors, fermenters, buildings, piping, membranes and their
+      replacement are costed in the TEA and absent from the LCA. Published algal
+      LCAs put infrastructure at a few per cent of GWP for open ponds and
+      materially more for closed reactors and thin films, so the exclusion is not
+      neutral for a comparison between reactor types.
+  - item: Transport
+    note: Inbound transport of nutrients, substrate, solvent and CO2, and outbound transport of the product.
+  - item: Packaging
+    note: Primary and secondary packaging of the product.
+  - item: End-of-life and use phase
+    note: Outside a cradle-to-gate boundary by definition.
+  - item: Treatment of the spent medium
+    note: >
+      Discharge and treatment of the residual broth are not modelled; only the
+      direct nutrient release is, through the partitioning fractions below. A
+      scenario that treats its effluent has to declare that treatment as a
+      utility.
+  - item: Cleaning and sterilisation chemicals
+    note: Not derived from the process. Declare them as materials where they matter.
+  - item: Direct emissions other than N and P to water
+    note: >
+      No methane, nitrous oxide, ammonia or VOC release is modelled - not from
+      the culture, not from the drying stack, not from solvent losses.
+  - item: Labour, employee transport, laboratory and office overhead
+    note: Present in the TEA as cost, absent from the LCA as burden.
+
+# --- cut-off ----------------------------------------------------------------
+cutoff:
+  rule: structural
+  note: >
+    No mass, energy or economic cut-off threshold is applied, and none can be: a
+    threshold rule presupposes a complete inventory from which small contributors
+    are then dropped, whereas the boundary here is set by what the process model
+    represents. Everything under `excluded:` is absent by construction, not
+    because it fell below a percentage. A study that needs a conventional cut-off
+    statement has to establish it against a complete database-backed inventory,
+    which this tool does not build.
+  recycled_content: >
+    Where a waste-derived feed is used, the default convention is cut-off: the
+    stream arrives burden-free at the fence line and only its own transport and
+    pre-treatment are counted. Avoided-treatment credits apply only where the
+    scenario declares system expansion, and are reported on their own line.
+
+# --- allocation -------------------------------------------------------------
+allocation:
+  hierarchy: >
+    ISO 14044 clause 4.3.4.2 asks that allocation be avoided by subdivision or
+    system expansion where possible, then be done on an underlying physical
+    relationship, and only then on another relationship such as economic value.
+  implemented:
+    - step: 1 - avoid
+      how: >
+        Single-product scenarios allocate nothing: the whole burden goes to the
+        product. Waste-derived feeds may be handled by system expansion, which is
+        the ISO-preferred route, and the credit is reported on its own line so it
+        can be removed.
+    - step: 2 - physical
+      how: Mass allocation between co-products, selectable per scenario.
+    - step: 3 - economic
+      how: >
+        Revenue-share allocation between co-products. This is the shipped default
+        for multi-product configurations, and it is step 3 of the hierarchy, not
+        step 2. It is the default because mass partitioning of a fractionated
+        biomass assigns nearly the whole burden to a low-value residual meal and
+        nearly none to the pigment or lipid the plant exists to make. ISO permits
+        the choice; it requires that the choice be declared and tested, so both
+        bases are selectable and a study should report the result under each.
+  sensitivity: >
+    The allocation basis is a scenario setting, so re-running under mass and
+    under economic allocation is the sensitivity analysis ISO 14044 clause
+    4.3.4.3 asks for. No multi-product result is allocation-free.
+  biogenic_carbon: >
+    Four conventions are implemented, and the result always carries the gross
+    value, the adjustment and the convention that produced it, so a reader can
+    undo the credit. See docs/CARBON_ACCOUNTING.md.
+
+# --- known limitations of this background -----------------------------------
+limitations:
+  - id: aggregated-background
+    text: >
+      The background is aggregated at the point of characterization: each input
+      carries one number per category, already in CO2-eq, MJ, SO2-eq, N-eq or
+      P-eq. No elementary-flow inventory sits behind it. Contribution analysis
+      therefore stops at the input, no substance-level result exists, and in the
+      matrix formulation of the same calculation the characterization matrix is
+      close to an identity mapping - it has almost nothing left to do. An
+      independent matrix or Brightway run over these factors verifies the linear
+      algebra and the foreground, not the characterization.
+  - id: no-regionalization
+    text: >
+      No factor depends on location. Water and land are inventory totals with no
+      scarcity or biome weighting, and electricity is a single average.
+  - id: partial-coverage
+    text: >
+      Coverage is not uniform across categories. GWP and CED are the only columns
+      most inputs fill; declared materials and utilities reach the other five
+      categories only when the scenario declares those factors, and no shipped
+      input carries a water or land factor except electricity for water and the
+      site itself for land. The completeness check reports the gaps for each
+      scenario rather than letting an absent factor read as a zero burden.
+  - id: indicative-defaults
+    text: >
+      Most shipped values are literature-typical order-of-magnitude defaults,
+      chosen so that the software runs out of the box, and are flagged
+      `quality: indicative`. The acidification and eutrophication factors carry no
+      traceable dataset at all. GWP results have been compared against published
+      studies; the acidification, eutrophication, water and land results have not
+      been compared against anything.
+  - id: no-uncertainty-in-background
+    text: >
+      The factors are point values. The uncertainty layer samples them over
+      declared bands, but those bands are scenario assumptions, not database
+      uncertainty distributions.
+
+# --- the factors ------------------------------------------------------------
+# quality:
+#   sourced    - the value is the one the cited source reports
+#   derived    - computed from the cited source, with the arithmetic in `source`
+#   indicative - literature-typical placeholder, no single traceable dataset
+factors:
+  elec_gwp:
+    input: electricity
+    indicator: gwp
+    value: 0.35
+    unit: kg CO2-eq/kWh
+    geography: EU-27
+    reference_period: 2019-2021
+    quality: indicative
+    source: >
+      Order of magnitude for an average European consumption mix. EEA reporting
+      puts EU-27 generation intensity in the range 0.25-0.30 kg CO2-eq/kWh around
+      2019-2021; the value here is uplifted for upstream fuel supply and grid
+      losses and is not traceable to a single dataset. National grids span
+      roughly 0.01-0.9.
+
+  elec_ced:
+    input: electricity
+    indicator: ced
+    value: 9.5
+    unit: MJ/kWh
+    geography: EU-27
+    reference_period: 2019-2021
+    quality: indicative
+    source: >
+      Equivalent to a total primary energy factor near 2.6 MJ per MJ delivered
+      (3.6 MJ/kWh x 2.6). European convention puts that factor in the range
+      2.1-2.5 (the Energy Efficiency Directive Annex IV coefficient, revised from
+      2.5 to 2.1 in 2018); a cumulative-energy-demand factor sits above it
+      because it counts non-fossil primary energy in full.
+
+  elec_water:
+    input: electricity
+    indicator: water
+    value: 0.002
+    unit: m3/kWh
+    geography: EU-27
+    reference_period: 2019-2021
+    quality: indicative
+    source: >
+      Cooling-water consumption of thermal generation, order of magnitude.
+      Consumption, not withdrawal, and strongly dependent on the generation and
+      cooling technologies in the mix.
+
+  elec_acid:
+    input: electricity
+    indicator: acid
+    value: 0.0018
+    unit: kg SO2-eq/kWh
+    geography: EU-27
+    reference_period: 2019-2021
+    quality: indicative
+    source: >
+      Order of magnitude for a European grid with flue-gas desulphurisation. No
+      traceable dataset. Was an undeclared default in models.py before this file
+      existed.
+
+  elec_eutroph_p:
+    input: electricity
+    indicator: eutroph_p
+    value: 0.00005
+    unit: kg P-eq/kWh
+    geography: EU-27
+    reference_period: 2019-2021
+    quality: indicative
+    source: >
+      Phosphate release associated with coal mining spoil in the generation mix,
+      order of magnitude. No traceable dataset.
+
+  heat_gwp:
+    input: heat
+    indicator: gwp
+    value: 0.066
+    unit: kg CO2-eq/MJ
+    geography: EU-27
+    reference_period: 2019-2021
+    quality: derived
+    source: >
+      Natural-gas heat. The IPCC 2006 Guidelines give a default combustion factor
+      of 56.1 kg CO2/GJ for natural gas; the value here adds an allowance for
+      upstream supply. Boiler efficiency is not applied - the factor is per MJ of
+      heat the inventory demands.
+
+  heat_ced:
+    input: heat
+    indicator: ced
+    value: 1.15
+    unit: MJ/MJ
+    geography: EU-27
+    reference_period: 2019-2021
+    quality: indicative
+    source: Natural-gas heat with an allowance for extraction, processing and distribution losses.
+
+  heat_acid:
+    input: heat
+    indicator: acid
+    value: 0.00007
+    unit: kg SO2-eq/MJ
+    geography: EU-27
+    reference_period: 2019-2021
+    quality: indicative
+    source: >
+      Natural-gas combustion, NOx-dominated, order of magnitude. No traceable
+      dataset. Was an undeclared default in models.py.
+
+  nitrogen_gwp:
+    input: nitrogen
+    indicator: gwp
+    value: 8.0
+    unit: kg CO2-eq/kg N
+    geography: EU-27
+    reference_period: 2019-2021
+    quality: indicative
+    source: >
+      Mineral nitrogen fertiliser production, per kg N. Published cradle-to-gate
+      values run from roughly 3 kg CO2-eq/kg N for best-available-technique
+      ammonium nitrate with N2O abatement to above 10 without it. The value sits
+      mid-range and describes no specific product.
+
+  nitrogen_ced:
+    input: nitrogen
+    indicator: ced
+    value: 45.0
+    unit: MJ/kg N
+    geography: EU-27
+    reference_period: 2019-2021
+    quality: indicative
+    source: >
+      Ammonia synthesis dominates; European plants report roughly 35-45 MJ/kg N
+      including feedstock energy.
+
+  nitrogen_acid:
+    input: nitrogen
+    indicator: acid
+    value: 0.008
+    unit: kg SO2-eq/kg N
+    geography: EU-27
+    reference_period: 2019-2021
+    quality: indicative
+    source: >
+      Fertiliser production, order of magnitude. No traceable dataset. Was an
+      undeclared default in models.py.
+
+  nitrogen_eutroph_n:
+    input: nitrogen
+    indicator: eutroph_n
+    value: 0.012
+    unit: kg N-eq/kg N
+    geography: EU-27
+    reference_period: 2019-2021
+    quality: indicative
+    source: >
+      Nitrogen released during fertiliser production, upstream of the plant gate.
+      Order of magnitude, no traceable dataset. Distinct from the direct release
+      of un-assimilated nitrogen, which is an inventory term.
+
+  phosphorus_gwp:
+    input: phosphorus
+    indicator: gwp
+    value: 2.0
+    unit: kg CO2-eq/kg P
+    geography: EU-27
+    reference_period: 2019-2021
+    quality: indicative
+    source: >
+      Phosphate fertiliser production, per kg P rather than per kg P2O5.
+      Published values move with the rock source and the beneficiation route.
+
+  phosphorus_ced:
+    input: phosphorus
+    indicator: ced
+    value: 25.0
+    unit: MJ/kg P
+    geography: EU-27
+    reference_period: 2019-2021
+    quality: indicative
+    source: Phosphate fertiliser production, per kg P. Order of magnitude.
+
+  phosphorus_acid:
+    input: phosphorus
+    indicator: acid
+    value: 0.006
+    unit: kg SO2-eq/kg P
+    geography: EU-27
+    reference_period: 2019-2021
+    quality: indicative
+    source: >
+      Sulphuric-acid digestion of phosphate rock is the acidifying step. Order of
+      magnitude, no traceable dataset. Was an undeclared default in models.py.
+
+  phosphorus_eutroph_p:
+    input: phosphorus
+    indicator: eutroph_p
+    value: 0.03
+    unit: kg P-eq/kg P
+    geography: EU-27
+    reference_period: 2019-2021
+    quality: indicative
+    source: >
+      Phosphate losses in mining and beneficiation, upstream of the plant gate.
+      Order of magnitude, no traceable dataset.
+
+  co2_supply_gwp:
+    input: co2_supply
+    indicator: gwp
+    value: 0.10
+    unit: kg CO2-eq/kg CO2
+    geography: EU-27
+    reference_period: 2019-2021
+    quality: indicative
+    source: >
+      Burden of capturing, purifying, compressing and delivering one kilogram of
+      CO2 - not of the CO2 itself, which is accounted under the biogenic
+      convention. Set it to zero for a flue gas taken at the fence line and
+      higher for merchant liquid CO2 delivered by tanker.
+
+  bicarbonate_gwp:
+    input: bicarbonate
+    indicator: gwp
+    value: 0.87
+    unit: kg CO2-eq/kg NaHCO3
+    geography: EU-27
+    reference_period: 2019-2021
+    quality: indicative
+    source: >
+      Sodium bicarbonate production, order of magnitude. Natural trona routes are
+      nearer 0.4 and Solvay-route material nearer 1.3. Quoted in the literature
+      from ecoinvent market datasets; no licensed dataset is shipped here, so the
+      value is not traceable to a version.
+
+  bicarbonate_ced:
+    input: bicarbonate
+    indicator: ced
+    value: 11.0
+    unit: MJ/kg NaHCO3
+    geography: EU-27
+    reference_period: 2019-2021
+    quality: indicative
+    source: Soda-ash production is reported at 12-18 MJ/kg; bicarbonate somewhat below it.
+
+  substrate_gwp:
+    input: substrate
+    indicator: gwp
+    value: 0.75
+    unit: kg CO2-eq/kg glucose
+    geography: EU-27
+    reference_period: 2019-2021
+    quality: indicative
+    source: >
+      Glucose syrup from starch crops, cradle-to-gate, excluding land-use change.
+      Published values move with the crop, the region and whether indirect
+      land-use change is counted.
+
+  substrate_ced:
+    input: substrate
+    indicator: ced
+    value: 12.0
+    unit: MJ/kg glucose
+    geography: EU-27
+    reference_period: 2019-2021
+    quality: indicative
+    source: Starch hydrolysis to glucose syrup, cultivation included. Order of magnitude.
+
+  substrate_acid:
+    input: substrate
+    indicator: acid
+    value: 0.002
+    unit: kg SO2-eq/kg glucose
+    geography: EU-27
+    reference_period: 2019-2021
+    quality: indicative
+    source: >
+      Ammonia volatilisation from crop fertilisation dominates. Order of
+      magnitude, no traceable dataset. Was an undeclared default in models.py.
+
+  solvent_acid:
+    input: solvent
+    indicator: acid
+    value: 0.004
+    unit: kg SO2-eq/kg solvent
+    geography: EU-27
+    reference_period: 2019-2021
+    quality: indicative
+    source: >
+      One global value applied to whatever solvent the extraction preset names,
+      unlike the solvent GWP and CED, which are declared per preset in
+      parameters.yaml. Order of magnitude, no traceable dataset. Was an
+      undeclared default in models.py.
+
+# --- foreground assumptions that are not characterization factors -----------
+# These partition a foreground flow. They belong to the inventory phase, not to
+# the impact assessment, and are kept here only because they sit on the same
+# object in the code.
+inventory_assumptions:
+  n_to_water_frac:
+    value: 0.3
+    unit: fraction of un-assimilated N
+    quality: indicative
+    source: >
+      Share of the nitrogen the culture does not take up that is assumed to reach
+      water. A scenario assumption with no evidence base. The remainder is
+      neither emitted nor tracked, so nitrogen is not closed to the environment,
+      and ammonia volatilisation and denitrification to N2O are not modelled.
+  p_to_water_frac:
+    value: 0.5
+    unit: fraction of un-assimilated P
+    quality: indicative
+    source: >
+      Share of the phosphorus not taken up that is assumed to reach water. As
+      above; the remainder is assumed retained in sludge or soil and is not
+      tracked further.
+
+# --- declared conventions ---------------------------------------------------
+conventions:
+  count_biogenic_uptake: true
+  carbon_accounting: source_specific_credit
+  custom_biogenic_credit_fraction: 1.0

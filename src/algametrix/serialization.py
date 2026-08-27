@@ -27,7 +27,8 @@ import json
 from dataclasses import fields, is_dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, ForwardRef, get_args, get_origin, get_type_hints
+from types import UnionType
+from typing import Any, ForwardRef, Union, get_args, get_origin, get_type_hints
 
 from . import models
 from .models import Scenario
@@ -79,8 +80,21 @@ def _resolve(tp: Any) -> Any:
     return tp
 
 
+def _optional_of(tp: Any) -> Any:
+    """The ``X`` of an ``X | None`` annotation, or ``None`` if it is not one."""
+    if get_origin(tp) not in (Union, UnionType):
+        return None
+    args = [a for a in get_args(tp) if a is not type(None)]
+    return args[0] if len(args) == 1 else None
+
+
 def _decode(tp: Any, value: Any) -> Any:
     tp = _resolve(tp)
+    if _optional_of(tp) is not None:
+        # `float | None` on a material's water or acidification factor: None is
+        # "no factor declared", which the LCA reports rather than treating as a
+        # zero burden, so it has to survive a save and a reload as None.
+        return None if value is None else _decode(_optional_of(tp), value)
     if get_origin(tp) is list:
         (item_tp,) = get_args(tp) or (Any,)
         return [_decode(item_tp, v) for v in (value or [])]
@@ -193,6 +207,28 @@ def _finite(value):
     return value
 
 
+def _method_summary() -> dict:
+    """Name, version and scope of the life-cycle background in force."""
+    from .lciamethod import load_method
+
+    method = load_method()
+    if method is None:
+        return {}
+    scope = method.scope
+    return {
+        "background": f"{method.name} v{method.version}",
+        "standard": list(method.standard),
+        "boundary": " ".join(str(scope.get("boundary", "")).split()),
+        "functional_unit": " ".join(str(scope.get("functional_unit", "")).split()),
+        "geography": (scope.get("geography") or {}).get("default", ""),
+        "reference_period": (scope.get("reference_period") or {}).get("default", ""),
+        "database": (scope.get("database") or {}).get("name", ""),
+        "cutoff": method.cutoff.get("rule", ""),
+        "excluded": [str(x.get("item", "")) for x in method.excluded],
+        "indicative_factors": f"{len(method.indicative_factors())} of {len(method.factors)}",
+    }
+
+
 def results_to_dict(results) -> dict:
     """A complete, self-describing export of one run.
 
@@ -228,6 +264,11 @@ def results_to_dict(results) -> dict:
         "impacts": dict(lca.impacts),
         "carbon_accounting_mode": lca.carbon_accounting_mode,
         "waste_burden_convention": lca.waste_burden_convention,
+        # Which categories this scenario leaves incomplete, and because of what.
+        # An exported result travels without the software, so it has to carry
+        # the qualification with it.
+        "not_characterized": {k: list(v) for k, v in (lca.not_characterized or {}).items()},
+        "method": _method_summary(),
     }
 
     main_product_basis = None

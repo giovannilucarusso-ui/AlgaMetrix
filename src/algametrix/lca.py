@@ -8,6 +8,16 @@ per kilogram of dry biomass:
 * CED  - Cumulative Energy Demand (MJ)
 * Water use (m3)
 * Land use (m2*a)
+* Marine and freshwater eutrophication (kg N-eq, kg P-eq)
+* Acidification (kg SO2-eq)
+
+The factors are aggregated cradle-to-gate values, one per input per category.
+Where they came from, what boundary they assume, what is excluded from it, which
+cut-off and allocation rules apply and which impact-assessment method each
+indicator follows are declared in ``data/lcia.yaml`` and read by
+:mod:`algametrix.lciamethod`. Coverage is not uniform across the categories, and
+a flow with no factor for a category is reported in
+:attr:`LCAResult.not_characterized` rather than counted as a zero burden.
 
 For phototrophic systems the CO2 biologically fixed into the biomass can be
 credited at the gate (``count_biogenic_uptake``). Whether that credit is
@@ -20,6 +30,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from .inventory import Inventory
+from .lciamethod import completeness
 from .models import CarbonAccounting, CarbonSource, Scenario, WasteBurdenConvention
 
 
@@ -50,6 +61,12 @@ class LCAResult:
     # different things: one a carbon flow, the other a displaced process.
     avoided_treatment_kg_co2eq_per_kg: float = 0.0
     waste_burden_convention: str = ""    # empty when no waste feed is enabled
+    # --- completeness ------------------------------------------------------
+    # Flows this scenario declares for which no factor exists, keyed by impact
+    # category ("acid", "water", ...). Those flows contribute nothing to those
+    # categories, which understates them by an unknown amount; an empty dict
+    # means every declared material, utility and solvent carried a factor.
+    not_characterized: dict = field(default_factory=dict)
 
     @property
     def gwp_net_kg_co2eq_per_kg(self) -> float:
@@ -141,8 +158,21 @@ def run_lca(scenario: Scenario, inv: Inventory) -> LCAResult:
         ced += inv.solvent_net_per_kg * ext.solvent_ced
 
     # --- Water & land -----------------------------------------------------
-    water = inv.water_m3_per_kg + inv.elec_kwh_per_kg * f.elec_water
-    land = inv.land_m2a_per_kg
+    # Direct process water plus the water the electricity factor carries. No
+    # other purchased input carries a water or a land factor unless the scenario
+    # declares one on the material or utility itself, so both categories are
+    # narrower than GWP and CED — see data/lcia.yaml.
+    water = (
+        inv.water_m3_per_kg
+        + inv.elec_kwh_per_kg * f.elec_water
+        + _declared(scenario.materials, "water")
+        + _declared(scenario.utilities, "water")
+    )
+    land = (
+        inv.land_m2a_per_kg
+        + _declared(scenario.materials, "land")
+        + _declared(scenario.utilities, "land")
+    )
 
     # --- Eutrophication & acidification -----------------------------------
     solvent = inv.solvent_net_per_kg if scenario.extraction.enabled else 0.0
@@ -152,11 +182,15 @@ def run_lca(scenario: Scenario, inv: Inventory) -> LCAResult:
     marine_eutroph = (
         inv.nitrogen_emitted_per_kg * f.n_to_water_frac
         + inv.nitrogen_purchased_per_kg * f.nitrogen_eutroph_n
+        + _declared(scenario.materials, "eutroph_n")
+        + _declared(scenario.utilities, "eutroph_n")
     )
     fresh_eutroph = (
         inv.phosphorus_emitted_per_kg * f.p_to_water_frac
         + inv.phosphorus_purchased_per_kg * f.phosphorus_eutroph_p
         + inv.elec_kwh_per_kg * f.elec_eutroph_p
+        + _declared(scenario.materials, "eutroph_p")
+        + _declared(scenario.utilities, "eutroph_p")
     )
     acidification = (
         inv.elec_kwh_per_kg * f.elec_acid
@@ -165,6 +199,8 @@ def run_lca(scenario: Scenario, inv: Inventory) -> LCAResult:
         + inv.phosphorus_purchased_per_kg * f.phosphorus_acid
         + inv.substrate_purchased_per_kg * f.substrate_acid
         + solvent * f.solvent_acid
+        + _declared(scenario.materials, "acid")
+        + _declared(scenario.utilities, "acid")
     )
 
     impacts = {
@@ -176,6 +212,12 @@ def run_lca(scenario: Scenario, inv: Inventory) -> LCAResult:
         "Freshwater eutrophication (kg P-eq)": fresh_eutroph,
         "Acidification (kg SO₂-eq)": acidification,
     }
+
+    gaps: dict[str, list[str]] = {}
+    for gap in completeness(scenario):
+        gaps.setdefault(gap.indicator, [])
+        if gap.item not in gaps[gap.indicator]:
+            gaps[gap.indicator].append(gap.item)
 
     return LCAResult(
         gwp_kg_co2eq_per_kg=gwp,
@@ -190,7 +232,19 @@ def run_lca(scenario: Scenario, inv: Inventory) -> LCAResult:
         carbon_supply_gwp_kg_co2eq_per_kg=carbon_supply_gwp,
         avoided_treatment_kg_co2eq_per_kg=avoided_gwp,
         waste_burden_convention=(wf.convention.value if inv.waste_feed_per_kg > 0 else ""),
+        not_characterized=gaps,
     )
+
+
+def _declared(items, attr: str) -> float:
+    """Sum ``amount x factor`` over the items that declare that factor.
+
+    An item with no factor for a category adds nothing to it. That is not the
+    same as adding zero, and the difference is reported: the names go into
+    ``LCAResult.not_characterized`` instead of quietly reading as no burden.
+    """
+    return sum(item.amount_per_kg * getattr(item, attr) for item in items
+               if getattr(item, attr, None))
 
 
 def _effective_carbon_mode(factors) -> CarbonAccounting:

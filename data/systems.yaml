@@ -139,6 +139,13 @@
   nutrient_uptake: 0.95
   water_m3_per_kg: 0.065    # process water ~65 kg/kg powder (SuperPro)
   substrate_yield: 0.37     # kg biomass / kg glucose (-> ~3 kg glucose/kg powder)
+  # What the substrate is, and how much carbon a kilogram of it carries. Only the
+  # carbon bookkeeping and the "biomass C <= substrate C" check read the fraction;
+  # the price and the GWP factor are per kg of substrate and do not. Change both
+  # together when the feed is not glucose: glycerol 0.391, crude glycerol ~0.31,
+  # ethanol 0.521, acetate 0.400, a wet side-stream taken as-is much lower.
+  substrate_name: glucose
+  substrate_carbon_fraction: 0.40002  # kg C / kg (C6H12O6: 6 x 12.011 / 180.156)
   capex_per_unit: 800.0     # EUR/m3 working volume (sterile fermenter train)
   land_m2_per_unit: 0.5
   product_price: 20.0       # EUR/kg microalgae powder (seed value)

@@ -20,7 +20,7 @@ this page and a generated file disagree, the generated file is authoritative.
 ## The scenario suite
 
 All three checks run over one set, so they describe the same population:
-`algametrix.paper.suite`. 34 members, **26 structurally distinct** — several members build an
+`algametrix.paper.suite`. 35 members, **27 structurally distinct** — several members build an
 identical `Scenario` by different routes (a template and the reconstruction wrapping it; an
 archetype and its template) and are counted once, so the evidence base is not inflated.
 
@@ -63,7 +63,7 @@ worth running — they detect a change to `inventory.py` that is not mirrored he
 evidence that mass is conserved. Earlier versions of this page and of the reports called them
 carbon, nitrogen and phosphorus *balances*, which claimed more than they test.
 
-**26/26 PASS, maximum relative residual 1.2 × 10⁻¹⁶ — a statement about the implementation,
+**27/27 PASS, maximum relative residual 1.2 × 10⁻¹⁶ — a statement about the implementation,
 not about the physics.**
 
 ### 1b. Physical admissibility
@@ -80,7 +80,7 @@ Inequalities a scenario can genuinely violate:
 - **Scale invariance** — per-kg intensities unchanged when the plant scale is doubled
   (continuous mode, where this is mathematically required).
 
-**26/26 PASS.** Across the four heterotrophic scenarios, 51–54 % of the substrate carbon is
+**27/27 PASS.** Across the four heterotrophic scenarios, 51–54 % of the substrate carbon is
 incorporated into biomass and the remaining 2.0–2.2 kg CO₂-eq per kg product is respired.
 
 > Respired carbon is **reported, not summed**. Substrate carbon enters as biogenic carbon and
@@ -145,7 +145,7 @@ so the check is not vacuous.
 
 ### Result
 
-**26 scenarios, 162 flow comparisons, all PASS.** Maximum relative TEA–LCA discrepancy
+**27 scenarios, 167 flow comparisons, all PASS.** Maximum relative TEA–LCA discrepancy
 **1.2 × 10⁻¹³**; maximum gap between a recovered quantity and the inventory field itself
 **1.2 × 10⁻¹³**. The residual is round-off in the two evaluations of the central difference and
 is bounded by double precision.
@@ -192,13 +192,16 @@ Two honest caveats: **C** is close to the identity, because AlgaMetrix ships alr
 cradle-to-gate factors; **A** is block-triangular, because the background is a cut-off
 unit-process system.
 
-**26 scenarios × 9 indicators = 234 comparisons; maximum relative difference 2.4 × 10⁻¹⁵.**
+**27 scenarios × 9 indicators = 243 comparisons; maximum relative difference 2.5 × 10⁻¹⁵.**
 Technosphere condition numbers 18–1.3 × 10⁵.
 
 ### Brightway cross-check (optional)
 
 The same **A**, **B** and **C** matrices handed to `bw2calc` 2.5.0: **182 comparisons, maximum
 relative difference 4.9 × 10⁻¹⁵** ([`results/brightway_crosscheck.txt`](../results/brightway_crosscheck.txt)).
+That file was produced on 2026-08-07, over the 26 scenarios the suite had then; it is one
+scenario behind the numbers above and has to be regenerated in an environment with `bw2calc`
+before it is cited as current.
 
 Not part of `reproduce.py` — `bw2calc` pulls in around thirty packages the engine does not need:
 

@@ -18,6 +18,7 @@ studies        results/study_selection_audit.txt
 endpoints      results/economic_endpoint_audit.txt
 verification   results/verification.txt
 consistency    results/shared_inventory_consistency.txt
+method         results/lcia_method_statement.txt
 benchmark      results/lca_implementation_benchmark.txt
 reproductions  results/validation.txt
 harmonization  results/harmonization.txt
@@ -102,7 +103,7 @@ UNCERTAINTY_METRICS = ("Production cost (EUR/kg)", "GWP net (kg CO2-eq/kg)")
 RESULTS = ROOT / "results"
 FIGURES = ROOT / "figures"
 
-STAGES = ("studies", "endpoints", "verification", "consistency", "benchmark",
+STAGES = ("studies", "endpoints", "verification", "consistency", "method", "benchmark",
           "reproductions", "harmonization", "gwp", "carbon", "sobol", "uncertainty",
           "figures", "figures_jie", "supplementary", "summary")
 
@@ -279,6 +280,62 @@ def stage_consistency(run: Run) -> None:
     )
     if not ok:
         raise SystemExit("shared-inventory consistency FAILED")
+
+
+def stage_method(run: Run) -> None:
+    """The LCA method declaration, and the coverage it does not have."""
+    print("[method] life-cycle method statement and coverage")
+    from algametrix.lciamethod import completeness, method_statement
+    from algametrix.paper import suite
+
+    method = run.lib.lcia_method
+    if method is None:
+        raise SystemExit("no data/lcia.yaml: there is no method declaration to report")
+
+    cases, _ = suite.distinct_cases(run.lib)
+    order = [ind.key for ind in method.indicators]
+    gaps: dict[tuple[str, str], dict[str, set[str]]] = {}
+    for case in cases:
+        for gap in completeness(case.scenario(run.lib)):
+            entry = gaps.setdefault((gap.item, gap.kind), {"cat": set(), "case": set()})
+            entry["cat"].add(gap.indicator)
+            entry["case"].add(case.key)
+
+    lines = ["", "", "8  Completeness over the scenarios of this paper",
+             "-" * 47, ""]
+    if gaps:
+        lines.append(
+            f"  {len(cases)} scenarios. {len(gaps)} declared flows carry no factor in at "
+            "least one category,")
+        lines.append(
+            "  so they contribute nothing to it - which understates that category by an "
+            "unknown")
+        lines.append("  amount rather than by zero.")
+        lines.append("")
+        rows = [("flow", "kind", "scenarios", "categories with no factor")]
+        for (item, kind), entry in sorted(gaps.items()):
+            rows.append((item, kind, str(len(entry["case"])),
+                         ", ".join(k for k in order if k in entry["cat"])))
+        widths = [max(len(r[i]) for r in rows) for i in range(4)]
+        for n, row in enumerate(rows):
+            lines.append("  " + "  ".join(c.ljust(w) for c, w in zip(row, widths)).rstrip())
+            if n == 0:
+                lines.append("  " + "  ".join("-" * w for w in widths))
+    else:
+        lines.append(
+            f"  None of the {len(cases)} scenarios declares a material, utility or "
+            "solvent outside\n  what the factor table characterizes. The structural "
+            "exclusions of section 2 still\n  apply to all of them.")
+
+    indicative = method.indicative_factors()
+    _write(RESULTS / "lcia_method_statement.txt", method_statement(method) + "\n".join(lines) + "\n")
+    run.status["lcia_method_declared"] = "pass"
+    run.notes.append(
+        f"Life-cycle method declared in data/lcia.yaml: {len(method.factors)} background "
+        f"factors, each with unit, geography, reference period, source and quality flag "
+        f"({len(indicative)} flagged indicative); {len(method.excluded)} declared "
+        f"exclusions from the boundary; {len(method.limitations)} declared limitations."
+    )
 
 
 def stage_benchmark(run: Run) -> None:
@@ -688,6 +745,7 @@ def stage_supplementary(run: Run) -> None:
     required = {
         "verification.txt": "verification",
         "shared_inventory_consistency.txt": "consistency",
+        "lcia_method_statement.txt": "method",
         "lca_implementation_benchmark.txt": "benchmark",
         "validation.txt": "reproductions",
         "carbon_accounting.txt": "carbon",
@@ -717,7 +775,8 @@ def stage_summary(run: Run) -> None:
     print("[summary] machine-readable status")
     run.collect_todos()
     tests_passed, tests_failed = _run_tests()
-    task_stages = ("studies", "endpoints", "verification", "consistency", "benchmark",
+    task_stages = ("studies", "endpoints", "verification", "consistency", "method",
+                   "benchmark",
                    "reproductions", "harmonization", "gwp", "carbon", "sobol",
                    "uncertainty")
     missing = [st for st in task_stages if st not in run.stages_run]
@@ -733,6 +792,7 @@ def stage_summary(run: Run) -> None:
         "stages_run": list(run.stages_run),
         **{k: run.status.get(k, "not_run") for k in (
             "consistency",
+            "lcia_method_declared",
             "lca_implementation_benchmark",
             "task_1_cost_harmonization",
             "task_2_endpoint_classification",
@@ -780,6 +840,7 @@ STAGE_FUNCS = {
     "endpoints": stage_endpoints,
     "verification": stage_verification,
     "consistency": stage_consistency,
+    "method": stage_method,
     "benchmark": stage_benchmark,
     "reproductions": stage_reproductions,
     "harmonization": stage_harmonization,

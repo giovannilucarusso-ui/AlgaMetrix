@@ -29,7 +29,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .inventory import MIN_CARBON_UTILIZATION
-from .models import Basis, Scenario, TrophicMode
+from .inventory import SUBSTRATE_CARBON_FRACTION as GLUCOSE_CARBON_FRACTION
+from .models import Basis, CarbonAccounting, Scenario, TrophicMode
 from .products import product_yield
 
 ERROR = "error"
@@ -140,6 +141,22 @@ def _cultivation(scn: Scenario) -> list[InputIssue]:
                 f"substrate yield is {sys.substrate_yield:g} kg biomass per kg "
                 f"substrate: more biomass than the substrate fed to make it.",
             ))
+        if not 0 < sys.substrate_carbon_fraction <= 1:
+            issues.append(InputIssue(
+                "system.substrate_carbon_fraction",
+                f"the substrate carries {sys.substrate_carbon_fraction:g} kg C per kg; "
+                f"a mass fraction is above 0 and at most 1.",
+            ))
+        elif (sys.substrate_name.strip().lower() != "glucose"
+                and abs(sys.substrate_carbon_fraction - GLUCOSE_CARBON_FRACTION) < 1e-4):
+            issues.append(InputIssue(
+                "system.substrate_carbon_fraction",
+                f"the substrate is named '{sys.substrate_name}' but carries glucose's "
+                f"carbon fraction ({GLUCOSE_CARBON_FRACTION:.3f} kg C/kg). The respired "
+                f"carbon and the carbon-admissibility check will describe glucose. "
+                f"Glycerol is 0.391, crude glycerol about 0.31, ethanol 0.521.",
+                WARNING,
+            ))
     else:
         if sys.co2_utilization <= 0:
             issues.append(InputIssue(
@@ -189,7 +206,29 @@ def _downstream(scn: Scenario) -> list[InputIssue]:
                 "the dryer leaves the product no drier than it arrived, so it "
                 "evaporates nothing and costs only its electricity.", WARNING,
             ))
+    ext = scn.extraction
+    if ext.enabled and not 0 <= ext.solvent_recovery <= 1:
+        issues.append(InputIssue(
+            "extraction.solvent_recovery",
+            f"solvent recovery of {ext.solvent_recovery:g} is not a fraction of the "
+            f"solvent contacted; the make-up would be negative or larger than the feed.",
+        ))
     return issues
+
+
+def _conventions(scn: Scenario) -> list[InputIssue]:
+    """The declared accounting conventions, and the numbers that parameterise them."""
+    factors = scn.lcia
+    mode = factors.carbon_accounting
+    mode = mode if isinstance(mode, CarbonAccounting) else CarbonAccounting(mode)
+    if (mode is CarbonAccounting.CUSTOM
+            and not 0 <= factors.custom_biogenic_credit_fraction <= 1):
+        return [InputIssue(
+            "lcia.custom_biogenic_credit_fraction",
+            f"a credit fraction of {factors.custom_biogenic_credit_fraction:g} is not a "
+            f"share of the biogenic carbon in the product.",
+        )]
+    return []
 
 
 def _batch(scn: Scenario) -> list[InputIssue]:
@@ -289,7 +328,7 @@ def check_inputs(scenario: Scenario) -> list[InputIssue]:
     """Everything wrong with ``scenario``, errors first."""
     issues: list[InputIssue] = []
     for check in (_composition, _cultivation, _downstream, _batch,
-                  _products, _economics, _waste):
+                  _products, _economics, _waste, _conventions):
         issues.extend(check(scenario))
     return sorted(issues, key=lambda i: 0 if i.is_error else 1)
 
@@ -302,6 +341,24 @@ def errors(scenario: Scenario) -> list[InputIssue]:
 def is_admissible(scenario: Scenario) -> bool:
     """True when the scenario describes something that could exist."""
     return not errors(scenario)
+
+
+class InadmissibleScenarioError(ValueError):
+    """Raised when a scenario is asked to produce a result it cannot have.
+
+    The engine bounds the values it has to divide by, so it will return numbers
+    for a recovery of 1.4 or a substrate yield of 0 — computed from values the
+    user never entered. :func:`algametrix.scenario.run_scenario` refuses those
+    scenarios by default and raises this instead, so a script cannot collect a
+    result that silently describes different inputs than the ones it set.
+    """
+
+    def __init__(self, issues: list[InputIssue]):
+        self.issues = tuple(issues)
+        super().__init__(
+            "this scenario is not physically admissible:\n"
+            + format_issues(list(issues))
+        )
 
 
 def format_issues(issues: list[InputIssue]) -> str:

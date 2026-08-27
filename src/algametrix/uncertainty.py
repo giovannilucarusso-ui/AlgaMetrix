@@ -13,6 +13,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from .inputcheck import InadmissibleScenarioError
 from .models import Scenario
 from .scenario import run_scenario
 from .sensitivity import OUTPUTS, PARAMETERS, SweepParam
@@ -20,10 +21,20 @@ from .sensitivity import OUTPUTS, PARAMETERS, SweepParam
 
 @dataclass
 class MonteCarloResult:
-    """Sampled output series and their summary statistics."""
+    """Sampled output series and their summary statistics.
+
+    ``n`` is the number of draws that produced a result. ``skipped`` counts the
+    draws that did not: a triangular support around a nominal recovery of 0.9
+    reaches past 1, and a recovery above 1 is not a sample of anything. Those
+    draws are dropped rather than bounded, because bounding them would pile
+    probability mass onto the limit itself and report it as the model's answer.
+    A large ``skipped`` means the declared width crosses a physical limit and the
+    support, not the result, is what needs revisiting.
+    """
 
     n: int
     series: dict[str, list[float]]              # output name -> sampled values
+    skipped: int = 0                            # draws refused as inadmissible
 
     def stats(self, output: str) -> dict[str, float]:
         vals = np.asarray(self.series[output], dtype=float)
@@ -53,6 +64,7 @@ def run_montecarlo(
     outs = outputs if outputs is not None else OUTPUTS
     rng = random.Random(seed)
     series: dict[str, list[float]] = {name: [] for name in outs}
+    skipped = 0
 
     for _ in range(n):
         scn = copy.deepcopy(base)
@@ -65,8 +77,12 @@ def run_montecarlo(
             else:
                 value = rng.triangular(lo, hi, nominal)
             param.apply(scn, max(value, 0.0))
-        r = run_scenario(scn)
+        try:
+            r = run_scenario(scn)
+        except InadmissibleScenarioError:
+            skipped += 1
+            continue
         for name, getter in outs.items():
             series[name].append(getter(r))
 
-    return MonteCarloResult(n=n, series=series)
+    return MonteCarloResult(n=n - skipped, series=series, skipped=skipped)

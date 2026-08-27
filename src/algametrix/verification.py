@@ -256,7 +256,9 @@ def verify(scenario: Scenario) -> VerificationReport:
             "Admissible: biomass C <= substrate C (heterotrophic)",
             c_biomass <= c_in * (1.0 + TOL),
             f"{fraction:.3f} of substrate carbon into biomass; "
-            f"{inv.biogenic_co2_respired_per_kg:.3f} kg CO2-eq/kg respired"))
+            f"{inv.biogenic_co2_respired_per_kg:.3f} kg CO2-eq/kg respired; "
+            f"substrate {sys.substrate_name} at "
+            f"{sys.substrate_carbon_fraction:.3f} kg C/kg"))
 
     # --- downstream product mass never exceeds the biomass fed ---------------
     if scenario.products:

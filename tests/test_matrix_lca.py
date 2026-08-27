@@ -82,3 +82,26 @@ def test_brightway_solves_the_same_system(key):
     ours = matrixlca.run_matrix_lca(scn).impacts
     for cat, value in bw.items():
         assert value == pytest.approx(ours[cat], rel=1e-9, abs=1e-12), cat
+
+
+def test_a_material_declaring_every_category_is_mirrored_by_the_matrix():
+    """Materials and utilities may carry factors beyond GWP and CED.
+
+    Both implementations have to consume all of them, or the benchmark would
+    only be a benchmark for the shipped background and would pass silently on a
+    scenario that declares its own.
+    """
+    from algametrix.models import Material, Utility
+    from algametrix.templates import build_template
+
+    scenario = build_template("Whole biomass — food (Chlorella, raceway)", LIB)
+    scenario.materials = [Material(name="Chelated iron", amount_per_kg=0.01, price=8.0,
+                                   gwp=3.0, ced=40.0, acid=0.5, water=0.02, land=0.3,
+                                   eutroph_n=0.001, eutroph_p=0.002)]
+    scenario.utilities = [Utility(name="Chilled water", amount_per_kg=2.0, unit="MJ",
+                                  price=0.01, gwp=0.005, ced=0.05, acid=1e-4,
+                                  water=1e-3, eutroph_p=1e-6)]
+    report = matrixlca.benchmark(scenario, "declared-factor material")
+    bad = [(r.label, r.engine, r.matrix, r.rel_diff)
+           for r in report.rows if r.rel_diff > matrixlca.BENCHMARK_TOL]
+    assert not bad, bad

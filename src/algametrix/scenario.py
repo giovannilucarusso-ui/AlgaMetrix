@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 from dataclasses import dataclass, field
 
+from .inputcheck import InadmissibleScenarioError, errors
 from .inventory import Inventory, build_inventory
 from .lca import LCAResult, run_lca
 from .models import Scenario
@@ -24,8 +25,26 @@ class Results:
     main_product: ProductResult | None = None
 
 
-def run_scenario(scenario: Scenario) -> Results:
-    """Build the inventory once and run both analyses on it."""
+def run_scenario(scenario: Scenario, *, validate: bool = True) -> Results:
+    """Build the inventory once and run both analyses on it.
+
+    The balance has to divide by harvesting recovery, carbon utilization,
+    nutrient uptake and substrate yield, so it bounds each of them before use. A
+    scenario that needs one of those bounds is not a scenario the numbers
+    describe: with ``validate=True`` — the default — it is refused, and
+    :class:`~algametrix.inputcheck.InadmissibleScenarioError` names the fields.
+    The desktop client has always blocked on the same rules; this puts the same
+    guarantee under any script that imports the engine.
+
+    Pass ``validate=False`` where computing past the bound is the point — a
+    sweep exploring a range, a sampler that may step outside it. The bounds that
+    actually fired are then on ``results.inventory.clamps``, one record each,
+    with the value given and the value used.
+    """
+    if validate:
+        bad = errors(scenario)
+        if bad:
+            raise InadmissibleScenarioError(bad)
     inv = build_inventory(scenario)
     tea = run_tea(scenario, inv)
     lca = run_lca(scenario, inv)

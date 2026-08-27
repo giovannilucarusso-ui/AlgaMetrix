@@ -755,6 +755,13 @@ class MainWindow(QMainWindow):
         self.lbl_lca_totals.setObjectName("subtle")
         self.lbl_lca_totals.setWordWrap(True)
         lca_l.addWidget(self.lbl_lca_totals)
+        # An impact number is not interpretable without its method, so the tab
+        # that shows the numbers also says which method produced them and which
+        # flows this scenario leaves uncharacterized.
+        self.lbl_lca_method = QLabel("")
+        self.lbl_lca_method.setObjectName("subtle")
+        self.lbl_lca_method.setWordWrap(True)
+        lca_l.addWidget(self.lbl_lca_method)
         tabs.addTab(lca_tab, tr("🌍  Life-cycle"))
 
         inv_tab = QWidget()
@@ -916,6 +923,7 @@ class MainWindow(QMainWindow):
         s = mc.stats(out_name)
         self._last_uncertainty = {
             "output": out_name, "n": mc.n, "vals": list(vals), "stats": dict(s),
+            "skipped": mc.skipped,
         }
         ax = self.cv_unc.reset()
         ax.hist(vals, bins=30, color=ACCENT, alpha=0.85)
@@ -925,9 +933,16 @@ class MainWindow(QMainWindow):
         ax.set_xlabel(out_name, fontsize=9)
         ax.tick_params(labelsize=8)
         self.cv_unc.refresh()
+        # A draw whose recovery or uptake landed past its physical limit is not a
+        # sample of anything, so it is dropped rather than bounded — and said, or
+        # the histogram would quietly be of fewer draws than were asked for.
+        dropped = (f"   ·   {mc.skipped} of {mc.skipped + mc.n} draws dropped as "
+                   f"physically inadmissible: the width crosses a limit"
+                   if mc.skipped else "")
         self.lbl_unc_stats.setText(
             f"P10: {s['p10']:,.2f}   ·   P50 (median): {s['p50']:,.2f}   ·   "
             f"P90: {s['p90']:,.2f}   ·   mean: {s['mean']:,.2f}   ·   std: {s['std']:,.2f}"
+            + dropped
         )
 
     def snapshot_scenario(self):
@@ -1879,6 +1894,26 @@ class MainWindow(QMainWindow):
             item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
             self.tbl_impacts.setItem(i, 1, item)
         self.tbl_impacts.resizeColumnsToContents()
+        self.lbl_lca_method.setText(self._lca_method_note(r))
+
+    def _lca_method_note(self, r) -> str:
+        """One line of scope, plus this scenario's uncharacterized flows."""
+        from algametrix.lciamethod import load_method
+
+        method = load_method()
+        scope = method.scope if method else {}
+        geography = (scope.get("geography") or {}).get("default", "EU-27")
+        period = (scope.get("reference_period") or {}).get("default", "")
+        note = (f"Cradle-to-gate, attributional; {geography} background {period}, "
+                "aggregated indicative factors — no LCI database. Infrastructure, "
+                "transport and packaging are outside the boundary. Method: "
+                "docs/LCA_METHOD.md.")
+        gaps = getattr(r.lca, "not_characterized", {}) or {}
+        if gaps:
+            names = sorted({name for items in gaps.values() for name in items})
+            note += ("  Not characterized in every category: "
+                     + ", ".join(names) + " — those categories are understated.")
+        return note
 
     def _draw_inventory(self, r):
         inv = r.inventory
@@ -1891,7 +1926,7 @@ class MainWindow(QMainWindow):
             ("Nitrogen", inv.nitrogen_per_kg, "kg"),
             ("Phosphorus", inv.phosphorus_per_kg, "kg"),
             ("Water", inv.water_m3_per_kg, "m³"),
-            ("Substrate (glucose)", inv.substrate_per_kg, "kg"),
+            (f"Substrate ({r.scenario.system.substrate_name})", inv.substrate_per_kg, "kg"),
         ]
         for m in r.scenario.materials:
             rows.append((f"  {m.name}", m.amount_per_kg, "kg"))

@@ -320,10 +320,12 @@ def build_system(scenario: Scenario) -> MatrixSystem:
         # is a separate elementary flow below, so that the matrix's gross means
         # the same thing the engine's does.
         bg_factors[waste_name] = (wf.gwp_per_unit, wf.ced_per_unit, 0.0, 0.0)
-    for m, nm in zip(scenario.materials, mat_names):
-        bg_factors[nm] = (m.gwp, m.ced, 0.0, 0.0)
-    for u, nm in zip(scenario.utilities, util_names):
-        bg_factors[nm] = (u.gwp, u.ced, 0.0, 0.0)
+    # A declared material or utility may carry a factor in any of the seven
+    # categories; an undeclared one is None and emits nothing, which is what the
+    # sequential engine does with it too.
+    for item, nm in list(zip(scenario.materials, mat_names)) + list(
+            zip(scenario.utilities, util_names)):
+        bg_factors[nm] = (item.gwp, item.ced, item.water or 0.0, item.acid or 0.0)
 
     for nm, (g, c, w, a) in bg_factors.items():
         p = idx[nm]
@@ -331,6 +333,11 @@ def build_system(scenario: Scenario) -> MatrixSystem:
         emit(energy, p, c)
         emit(water, p, w)
         emit(acid, p, a)
+    for item, nm in list(zip(scenario.materials, mat_names)) + list(
+            zip(scenario.utilities, util_names)):
+        emit(land, idx[nm], item.land or 0.0)
+        emit(up_n, idx[nm], item.eutroph_n or 0.0)
+        emit(up_p, idx[nm], item.eutroph_p or 0.0)
     emit(up_n, idx["nitrogen (kg N)"], f_.nitrogen_eutroph_n)
     emit(up_p, idx["phosphorus (kg P)"], f_.phosphorus_eutroph_p)
     emit(up_p, idx["electricity (kWh)"], f_.elec_eutroph_p)

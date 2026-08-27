@@ -213,6 +213,20 @@ class CultivationSystem:
     #: ``batch_size_kg = scale x working_volume x biomass_conc``, with g/L and
     #: kg/m3 numerically equal. Continuous operation does not read it.
     working_volume: float = 0.8
+    #: What the organic substrate is, and how much carbon a kilogram of it
+    #: carries. Only heterotrophic systems read them. The default is glucose
+    #: (C6H12O6, 6 x 12.011 / 180.156 = 0.4001 kg C/kg), which is what the
+    #: carbon bookkeeping assumed for every substrate before this was a field —
+    #: wrongly for glycerol (0.391), crude glycerol (~0.31), ethanol (0.521) or
+    #: a wet side-stream taken at face value. It sets the respired-carbon report
+    #: and the "biomass C <= substrate C" admissibility check; it does not enter
+    #: any cost or impact sum, which are per kilogram of substrate.
+    #:
+    #: A waste-derived feed declares its organics as glucose-equivalent
+    #: kilograms (see data/waste_feeds.yaml), so it stays consistent with
+    #: whatever fraction the system declares.
+    substrate_name: str = "glucose"
+    substrate_carbon_fraction: float = 6 * 12.011 / 180.156   # kg C / kg substrate
     notes: str = ""
     # Inorganic-carbon feed for phototrophic systems (CO2 gas vs NaHCO3 solution).
     carbon_source: CarbonSource = CarbonSource.CO2
@@ -268,6 +282,15 @@ class Material:
     price: float           # EUR/kg
     gwp: float = 0.0        # kg CO2-eq / kg (cradle-to-gate)
     ced: float = 0.0        # MJ / kg
+    # The other five impact categories. ``None`` means no factor was declared:
+    # the material then contributes nothing to that category and the
+    # completeness check (algametrix.lciamethod) reports it. That is not the
+    # same as a declared zero, which says the burden is genuinely nil.
+    water: float | None = None       # m3 / kg
+    land: float | None = None        # m2*a / kg
+    acid: float | None = None        # kg SO2-eq / kg
+    eutroph_n: float | None = None   # kg N-eq / kg
+    eutroph_p: float | None = None   # kg P-eq / kg
     notes: str = ""
 
 
@@ -284,6 +307,12 @@ class Utility:
     price: float           # EUR per unit
     gwp: float = 0.0        # kg CO2-eq / unit
     ced: float = 0.0        # MJ / unit
+    # As for Material: ``None`` is an undeclared factor, not a zero burden.
+    water: float | None = None       # m3 / unit
+    land: float | None = None        # m2*a / unit
+    acid: float | None = None        # kg SO2-eq / unit
+    eutroph_n: float | None = None   # kg N-eq / unit
+    eutroph_p: float | None = None   # kg P-eq / unit
     notes: str = ""
 
 
@@ -357,7 +386,16 @@ class Economics:
 
 @dataclass
 class LCIAFactors:
-    """Cradle-to-gate characterization factors for the impact assessment."""
+    """Cradle-to-gate characterization factors for the impact assessment.
+
+    The values, their units, provenance, geography, reference period and quality
+    flag are declared in ``data/lcia.yaml``, together with the boundary, cut-off
+    and allocation statement they belong to; :mod:`algametrix.lciamethod` reads
+    that file and builds this object from it. The defaults written here are the
+    fallback for code that constructs the class directly and are the same numbers
+    the file declares — the declaration is where a reader should look for what
+    they mean and where they came from.
+    """
 
     elec_gwp: float        # kg CO2-eq / kWh
     elec_ced: float        # MJ / kWh
@@ -380,7 +418,10 @@ class LCIAFactors:
     # --- sodium bicarbonate carbon source (defaults provided) -------------
     bicarbonate_gwp: float = 0.87  # kg CO2-eq / kg NaHCO3 (Solvay/trona production)
     bicarbonate_ced: float = 11.0  # MJ / kg NaHCO3
-    # --- eutrophication & acidification (defaults provided) ---------------
+    # --- eutrophication & acidification -----------------------------------
+    # Declared, with their provenance and quality flag, in data/lcia.yaml. The
+    # two partitioning fractions are inventory assumptions rather than
+    # characterization factors and are marked as such in that file.
     n_to_water_frac: float = 0.3   # fraction of un-assimilated N reaching water
     p_to_water_frac: float = 0.5   # fraction of un-assimilated P reaching water
     elec_acid: float = 0.0018      # kg SO2-eq / kWh

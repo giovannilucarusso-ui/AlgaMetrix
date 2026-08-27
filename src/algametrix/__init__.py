@@ -24,6 +24,13 @@ from __future__ import annotations
 
 from .inventory import Inventory, build_inventory
 from .lca import LCAResult, run_lca
+from .lciamethod import (
+    LCIAMethod,
+    completeness,
+    completeness_report,
+    load_method,
+    method_statement,
+)
 from .library import Library, load_library
 from .models import (
     Basis,
@@ -58,7 +65,7 @@ from .uncertainty import MonteCarloResult, run_montecarlo
 # Single source of truth for the version: pyproject.toml reads it from here
 # (`[tool.setuptools.dynamic]`), so bumping this line is enough for the package
 # metadata, the desktop PDF report cover and the console `--version` alike.
-__version__ = "1.3.1"
+__version__ = "1.4.0"
 
 __all__ = [
     "Basis",
@@ -71,6 +78,7 @@ __all__ = [
     "Extraction",
     "LCAResult",
     "LCIAFactors",
+    "LCIAMethod",
     "Library",
     "Material",
     "MonteCarloResult",
@@ -86,13 +94,17 @@ __all__ = [
     "build_inventory",
     "capital_recovery_factor",
     "check_benchmarks",
+    "completeness",
+    "completeness_report",
     "compute_products",
     "infer_category",
     "irr",
     "load_benchmarks",
     "load_market_prices",
     "load_library",
+    "load_method",
     "load_validation_references",
+    "method_statement",
     "minimum_selling_price",
     "npv",
     "product_masses",

@@ -325,6 +325,7 @@ def build(run, outdir: Path, results_dir: Path, root: Path,
     the console: an SI assembled from a partial run has to say so where a reader
     will see it.
     """
+    from ..lciamethod import factor_rows
     from . import archetypes, parameters, specification, suite
 
     spec_cases, _ = suite.distinct_cases(run.lib)
@@ -339,12 +340,19 @@ def build(run, outdir: Path, results_dir: Path, root: Path,
     params = parameter_provenance_rows(run.lib, archetypes, parameters)
     modules = module_map(root)
 
+    lcia_factors = factor_rows(run.lib.lcia_method) if run.lib.lcia_method else []
+
     written = [
         _write_csv(data_dir / "studies.csv", studies),
         _write_csv(data_dir / "parameter_provenance.csv", params),
         _write_csv(data_dir / "module_map.csv", modules,
                    fieldnames=["role", "module", "summary", "lines"]),
     ]
+    if lcia_factors:
+        written.append(_write_csv(
+            data_dir / "lcia_factors.csv", lcia_factors,
+            fieldnames=["factor", "input", "indicator", "value", "unit", "geography",
+                        "reference_period", "quality", "source"]))
     (data_dir / "studies.json").write_text(
         json.dumps(studies, indent=2, ensure_ascii=False), encoding="utf-8")
     written.append(data_dir / "studies.json")
@@ -393,7 +401,7 @@ def build(run, outdir: Path, results_dir: Path, root: Path,
         "listed here. The claim is deliberately not stated as byte-identity: the "
         "Sobol' validation and convergence reports print wall-clock timings, which "
         "differ between runs and are diagnostics rather than results. Every other file "
-        "listed in S8.4 is byte-identical across runs.",
+        "listed in S8.5 is byte-identical across runs.",
         "",
         "### Provenance of this build",
         "",
@@ -431,7 +439,7 @@ def build(run, outdir: Path, results_dir: Path, root: Path,
         "| Section | Content |",
         "|---|---|",
         "| S1 | Model specification: symbols, governing equations, assumptions |",
-        "| S2 | Verification suite and flow-by-flow TEA/LCA recovery, 26 scenarios |",
+        "| S2 | Verification suite and flow-by-flow TEA/LCA recovery, 27 scenarios |",
         "| S3 | Controlled duplicated-foreground counter-examples, both archetypes |",
         "| S4 | External validation: protocol, price basis, carbon accounting, "
         "exclusions, failed range check |",
@@ -450,6 +458,31 @@ def build(run, outdir: Path, results_dir: Path, root: Path,
     # a residual matters without knowing what equation produced it.
     L += ["## S1 Model specification", ""]
     L += specification.render_markdown(run.lib, spec_cases)
+    L += [
+        "### Life-cycle method declaration",
+        "",
+        "The equations above say how an impact is computed from the inventory. They do "
+        "not say what the factors in them mean, where they came from, what the boundary "
+        "around them is or what it leaves out - and an impact result is not "
+        "interpretable without that. The declaration below is the scope statement ISO "
+        "14044 clause 4.2.3 asks a study to make. It is generated from "
+        "`data/lcia.yaml`, the same file the engine loads its factors from, so the "
+        "statement and the numbers cannot drift apart.",
+        "",
+        "Three things in it are worth reading before any environmental result in this "
+        "manuscript. **Section 2** lists what the boundary excludes - infrastructure, "
+        "transport, packaging, spent-medium treatment and every direct emission other "
+        "than N and P to water. **Section 6** is the coverage matrix: GWP and cumulative "
+        "energy demand are the only categories most inputs reach, and water, land, "
+        "acidification and the two eutrophication categories are correspondingly "
+        "narrower. **Section 7** records that 22 of the 23 shipped factors are "
+        "order-of-magnitude values with no traceable dataset behind them, which is why "
+        "the external validation in S4 compares GWP and production cost and nothing "
+        "else.",
+        "",
+    ]
+    L += _embed("Method statement: scope, coverage matrix and factor provenance",
+                results_dir / "lcia_method_statement.txt", root, manifest)
     L += ["---", ""]
 
     # ---- S2 ----------------------------------------------------------
@@ -461,10 +494,10 @@ def build(run, outdir: Path, results_dir: Path, root: Path,
         "```",
         "",
         "Both checks run over one scenario set (`algametrix.paper.suite`), so the "
-        "results describe the same population: 34 members, **26 structurally "
+        "results describe the same population: 35 members, **27 structurally "
         "distinct**, because several members build an identical `Scenario` by "
         "different routes and are counted once rather than inflating the evidence "
-        "base. The coverage table at the head of S2.2 states what those 26 span.",
+        "base. The coverage table at the head of S2.2 states what those 27 span.",
         "",
         "S2.1 reports two families of check that are not equally strong evidence. The "
         "**construction identities** restate each inventory field as a closed form of "
@@ -724,6 +757,20 @@ def build(run, outdir: Path, results_dir: Path, root: Path,
     L += _markdown_table(modules, [("role", "Role"), ("module", "Module"),
                                    ("summary", "What it does"), ("lines", "Lines")])
 
+    L += [
+        "### S8.4 Life-cycle background factors",
+        "",
+        f"`data/lcia_factors.csv`, {len(lcia_factors)} rows: every characterization "
+        "factor the engine uses and every foreground partitioning fraction, each with "
+        "its input, impact category, value, unit, geography, reference period, quality "
+        "flag and source. The authoritative file is `data/lcia.yaml` in the software "
+        "repository, which additionally carries the boundary, cut-off, allocation and "
+        "impact-assessment statement rendered in S1. A `quality` of `indicative` "
+        "means a literature-typical value with no traceable dataset behind it.",
+        "",
+        "",
+    ]
+
     # The manifest has to come last: it hashes everything written above it.
     si_path = outdir / "SI.md"
     for p in written:
@@ -755,7 +802,7 @@ def build(run, outdir: Path, results_dir: Path, root: Path,
             "table."
         )
     L += [
-        "### S8.4 Manifest",
+        "### S8.5 Manifest",
         "",
         "`data/manifest.csv` lists every file embedded in this document and every file "
         "shipped alongside it, with its SHA-256, byte count, line count, longest line "

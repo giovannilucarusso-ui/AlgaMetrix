@@ -302,6 +302,110 @@ def _lca(results, page, total):
     return fig
 
 
+def _lca_method(results, scenario, page, total):
+    """The declaration that has to travel with the impact numbers.
+
+    A report that leaves the building carries its own scope statement: what the
+    boundary is, what it excludes, where the factors came from, and which
+    categories are incomplete for *this* scenario. Read from data/lcia.yaml, so
+    a user who replaces the background sees their own declaration here.
+    """
+    from algametrix.lciamethod import completeness, load_method
+
+    fig = _portrait()
+    _watermark(fig)
+    fig.text(0.07, 0.945, "Life-cycle method and limitations", fontsize=16,
+             fontweight="bold", color=INK)
+    ax = fig.add_axes([0, 0, 1, 1]); ax.axis("off")
+
+    method = load_method()
+    scope = method.scope if method else {}
+    rows = [
+        ("Standard", "ISO 14040:2006 / ISO 14044:2006 structure"),
+        ("Study type", _one_line(scope.get("study_type", "attributional"))),
+        ("Boundary", _one_line(scope.get("boundary", "cradle-to-gate"))),
+        ("Functional unit", _one_line(scope.get("functional_unit", ""), 62)),
+        ("Geography", _one_line((scope.get("geography") or {}).get("default", ""))),
+        ("Reference period", _one_line((scope.get("reference_period") or {}).get("default", ""))),
+        ("Background", _one_line((scope.get("database") or {}).get("name", ""))),
+        ("Cut-off", _one_line((method.cutoff if method else {}).get("rule", ""))),
+    ]
+    _table(ax, ["Scope", "As declared"], rows, [0.30, 0.54], y_top=0.90,
+           cell_h=0.038, aligns=["left", "left"])
+
+    y = 0.90 - 0.038 * (len(rows) + 1) - 0.042
+    ax.text(0.07, y, "Outside the boundary", fontsize=12, fontweight="bold",
+            color=INK, transform=ax.transAxes)
+    y -= 0.028
+    excluded = [str(x.get("item", "")) for x in (method.excluded if method else [])]
+    for item in excluded:
+        ax.text(0.09, y, f"• {item}", fontsize=9.5, color=INK, transform=ax.transAxes)
+        y -= 0.022
+
+    y -= 0.020
+    ax.text(0.07, y, "Incomplete for this scenario", fontsize=12, fontweight="bold",
+            color=INK, transform=ax.transAxes)
+    y -= 0.028
+    # Grouped by flow rather than by category: a material that carries no factor
+    # anywhere is one line here instead of five.
+    by_flow: dict[str, list[str]] = {}
+    for gap in completeness(scenario):
+        by_flow.setdefault(gap.item, []).append(_SHORT_CATEGORY.get(gap.indicator, gap.indicator))
+    if by_flow:
+        # The closing note is anchored to the bottom of the page, so the list has
+        # to stop above it however many flows a scenario leaves open.
+        rows = list(by_flow.items())
+        room = max(1, int((y - 0.165) / 0.024))
+        for item, categories in rows[:room]:
+            ax.text(0.09, y, _one_line(f"• {item}: no {', '.join(categories)} factor", 92),
+                    fontsize=9.5, color=BURDEN, transform=ax.transAxes)
+            y -= 0.024
+        if len(rows) > room:
+            ax.text(0.09, y, f"• and {len(rows) - room} more — see the method statement",
+                    fontsize=9.5, color=BURDEN, transform=ax.transAxes)
+            y -= 0.024
+        y -= 0.008
+        ax.text(0.09, y, "These flows contribute nothing to the categories listed.",
+                fontsize=9, color=SUBTLE, transform=ax.transAxes)
+    else:
+        ax.text(0.09, y, "Every declared material, utility and solvent carries a factor "
+                         "in every category.", fontsize=9.5, color=INK, transform=ax.transAxes)
+
+    n_ind = len(method.indicative_factors()) if method else 0
+    n_all = len(method.factors) if method else 0
+    note = (f"{n_ind} of the {n_all} shipped background factors are literature-typical "
+            "values with no traceable dataset behind them. Water and land are inventory "
+            "totals, not characterized impact indicators. Acidification, eutrophication, "
+            "water and land have not been compared against any published study. Replace "
+            "the background with a declared database before publishing a plant-specific "
+            "result — see data/lcia.yaml.")
+    ax.text(0.07, 0.062, _wrap_text(note, 92), fontsize=9, color=SUBTLE, va="bottom",
+            transform=ax.transAxes)
+
+    _footer(fig, page, total)
+    return fig
+
+
+#: Compact category names for the report's completeness list, where the full
+#: indicator labels would truncate before the list is readable.
+_SHORT_CATEGORY = {
+    "gwp": "GWP", "ced": "energy", "water": "water", "land": "land",
+    "eutroph_n": "marine eutr.", "eutroph_p": "freshwater eutr.",
+    "acid": "acidification",
+}
+
+
+def _one_line(text, limit: int = 46) -> str:
+    text = " ".join(str(text or "").split())
+    return text if len(text) <= limit else text[: limit - 1] + "…"
+
+
+def _wrap_text(text: str, width: int) -> str:
+    import textwrap
+
+    return "\n".join(textwrap.wrap(" ".join(text.split()), width=width))
+
+
 def _inventory_chart(results, page, total):
     fig = _portrait()
     _watermark(fig)
@@ -506,6 +610,7 @@ def build_process_report(pdf_path: str | Path, results, scenario,
         (_tea_charts, (results,)),
         (_cost_table, (results,)),
         (_lca, (results,)),
+        (_lca_method, (results, scenario)),
         (_inventory_chart, (results,)),
         (_inventory_table, (results,)),
     ]

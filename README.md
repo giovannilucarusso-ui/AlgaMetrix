@@ -53,7 +53,12 @@ For a user-defined production scenario it computes, from a single mass/energy ba
   kept out of the operating cost, because no money changes hands for it — unlike the gate fee.
 - **Life-cycle assessment** — cradle-to-gate **Global Warming Potential (kg CO₂-eq)**, **Cumulative
   Energy Demand (MJ)**, **water use (m³)**, **land use (m²·a)**, **marine & freshwater eutrophication**
-  and **acidification** per kg of biomass, with GWP contribution analysis.
+  and **acidification** per kg of biomass, with GWP contribution analysis. The method behind those
+  numbers is declared, not implied: [`data/lcia.yaml`](data/lcia.yaml) carries the boundary, the
+  cut-off rule, the allocation hierarchy, the impact-assessment method of each indicator and the
+  source, geography, reference period and quality flag of **every** factor — plus a coverage matrix
+  showing which inputs reach which category and which do not. See
+  [docs/LCA_METHOD.md](docs/LCA_METHOD.md), or print it with `python -m algametrix.lciamethod`.
 - **Sensitivity analysis** — sweep any key input (scale, product price, productivity, discount rate, …)
   and plot how production cost, NPV or GWP respond.
 - **Uncertainty analysis** — Monte-Carlo propagation of several uncertain inputs at once, giving the
@@ -261,21 +266,35 @@ oil is the same run as 6.78 €/kg of biomass processed — which is why every t
 carries its basis in the header, and the itemised cost table is allocated the
 same way the KPI is.
 
-**An impossible scenario is refused, not computed.** Zero productivity, zero
-substrate yield on a heterotroph, a proximate composition summing to 400%: the
-engine would return `inf`, a floored 1e-6, and yields taken from a kilogram
-holding four kilograms. `algametrix.inputcheck` runs on the scenario before any
-inventory is built; the window shows what is wrong and withholds the result, the
-wizard will not finish, and export and analysis are blocked until it is fixed.
-Inputs that are merely unusual — a composition 4% off, a carbon utilisation
-below the balance's floor — are flagged as warnings and still run.
+**An impossible scenario is refused, not computed — in a script as well as in the
+app.** Zero productivity, zero substrate yield on a heterotroph, a recovery of
+1.4, a proximate composition summing to 400%: the engine would return `inf`, or a
+number computed from a value it had to bound rather than the one you set.
+`algametrix.inputcheck` runs on the scenario before any inventory is built, and
+`run_scenario` runs it for you: the window shows what is wrong and withholds the
+result, the wizard will not finish, export and analysis are blocked — and an
+import of the engine raises `InadmissibleScenarioError` naming the fields. Inputs
+that are merely unusual — a composition 4% off, a carbon utilisation below the
+balance's floor — are warnings and still run.
 
 ```python
 from algametrix.inputcheck import check_inputs, is_admissible, format_issues
 
 if not is_admissible(scn):
     print(format_issues(check_inputs(scn)))
+
+results = run_scenario(scn)                    # raises if it is not admissible
+sweep = run_scenario(scn, validate=False)      # computes anyway, and says what it bounded
+print(sweep.inventory.clamps)                  # -> harvesting.recovery: 1.4 used as 1
 ```
+
+**The organic substrate says what it is.** A heterotrophic system declares
+`substrate_name` and `substrate_carbon_fraction` (glucose, 0.400 kg C/kg, by
+default). The fraction sets the respired-carbon report and the *biomass C ≤
+substrate C* admissibility check — not the price or the GWP, which are per
+kilogram of substrate — so a scenario feeding glycerol (0.391), crude glycerol
+(≈0.31), ethanol (0.521) or a wet side-stream taken as-is has to declare it.
+Naming a substrate and leaving glucose's carbon behind is flagged.
 
 ## Verification & validation
 
@@ -316,7 +335,8 @@ See **[docs/VERIFICATION.md](docs/VERIFICATION.md)** for the three self-consiste
 what they do *not* establish, **[docs/VALIDATION.md](docs/VALIDATION.md)** for the validation
 tables, [docs/STUDY_SELECTION.md](docs/STUDY_SELECTION.md) for how the studies were chosen (and
 why this is not a systematic review), [docs/PRICE_BASIS.md](docs/PRICE_BASIS.md) for currency and
-price-year handling, [docs/CARBON_ACCOUNTING.md](docs/CARBON_ACCOUNTING.md) for the
+price-year handling, [docs/LCA_METHOD.md](docs/LCA_METHOD.md) for the life-cycle scope, boundary,
+cut-off, allocation and background declaration (and what the LCA leaves out), [docs/CARBON_ACCOUNTING.md](docs/CARBON_ACCOUNTING.md) for the
 biogenic-carbon conventions, and [docs/WASTE_FEEDS.md](docs/WASTE_FEEDS.md) for growing on
 effluents and food-industry side-streams (the dosing rule, gate fees, and the cut-off vs
 avoided-treatment choice).
@@ -428,7 +448,8 @@ a preference left by an older version is ignored rather than applied to a build 
 ## Project layout
 
 ```
-data/                     editable YAML: organisms, systems, prices, LCIA factors, SuperPro template
+data/                     editable YAML: organisms, systems, prices, SuperPro template
+  lcia.yaml               life-cycle factors + the ISO 14040/44 scope declaration around them
   waste_feeds.yaml        waste-derived nutrient / carbon streams, each with its source
 src/algametrix/   the engine
   models.py               dataclasses describing a scenario
@@ -489,12 +510,12 @@ If AlgaMetrix contributes to work you publish, please cite it. GitHub's *Cite th
 button reads [CITATION.cff](CITATION.cff) and will give you BibTeX or APA directly:
 
 > Russo, G. L. (2026). *AlgaMetrix: open-source techno-economic analysis and life-cycle assessment
-> for microalgae and aquatic protist biomass* (Version 1.3.1) [Computer software]. Zenodo.
+> for microalgae and aquatic protist biomass* (Version 1.4.0) [Computer software]. Zenodo.
 > https://doi.org/10.5281/zenodo.21764183
 
 Each release is archived on Zenodo. **`10.5281/zenodo.21764183` is the concept DOI**: cite it when
 you mean "AlgaMetrix" and it will always resolve to the most recent version. To pin the exact
-version you ran, cite its own DOI instead. v1.3.1's snapshot DOI is added here once
+version you ran, cite its own DOI instead. v1.4.0's snapshot DOI is added here once
 Zenodo mints it on publication; v1.3.0 is
 [`10.5281/zenodo.22019311`](https://doi.org/10.5281/zenodo.22019311), v1.2.0 is
 [`10.5281/zenodo.21918511`](https://doi.org/10.5281/zenodo.21918511), v1.1.0 is

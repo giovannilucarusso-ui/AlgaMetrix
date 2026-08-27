@@ -190,20 +190,13 @@ economics:
   discount_rate: 0.08          # for the capital recovery factor
   plant_lifetime: 20.0         # yr
 
-# Cradle-to-gate life-cycle inventory characterization factors.
-lcia:
-  elec_gwp: 0.35        # kg CO2-eq / kWh   (grid electricity)
-  elec_ced: 9.5         # MJ / kWh          (cumulative/primary energy)
-  elec_water: 0.002     # m3 / kWh
-  heat_gwp: 0.066       # kg CO2-eq / MJ    (natural-gas heat)
-  heat_ced: 1.15        # MJ / MJ
-  nitrogen_gwp: 8.0     # kg CO2-eq / kg N  (mineral N fertilizer production)
-  nitrogen_ced: 45.0    # MJ / kg N
-  phosphorus_gwp: 2.0   # kg CO2-eq / kg P
-  phosphorus_ced: 25.0  # MJ / kg P
-  co2_supply_gwp: 0.10  # kg CO2-eq / kg CO2 supplied (capture/compression burden)
-  substrate_gwp: 0.75   # kg CO2-eq / kg glucose
-  substrate_ced: 12.0   # MJ / kg glucose
-  bicarbonate_gwp: 0.87 # kg CO2-eq / kg NaHCO3 (ecoinvent "market for sodium bicarbonate" ~0.87; range 0.4 natural trona - 1.3 Solvay)
-  bicarbonate_ced: 11.0 # MJ / kg NaHCO3 (soda-ash 12-18; NaHCO3 ~10-14)
-  count_biogenic_uptake: true   # credit the CO2 fixed into biomass at the gate (CO2-fed phototrophic only)
+# Cradle-to-gate life-cycle characterization factors: see data/lcia.yaml.
+#
+# The factors used to live here as bare numbers, and the acidification and
+# eutrophication ones did not live in a data file at all - they were defaults in
+# models.py. They are now all in data/lcia.yaml, each with its unit, source,
+# geography, reference period and quality flag, alongside the boundary, cut-off,
+# allocation and impact-assessment statement they belong to. Edit them there.
+#
+# A data directory without lcia.yaml still loads: the loader then falls back to an
+# `lcia:` block here, which is how a user's own older data folder keeps working.

@@ -22,9 +22,11 @@ NAHCO3_PER_C = 84.007 / 12.011
 # run at 0 % efficiency (that implies an infinite carbon feed), so the balance is
 # floored here to keep the supplied-carbon flow finite and physically sensible.
 MIN_CARBON_UTILIZATION = 0.05
-# Carbon mass fraction of the default organic substrate (glucose, C6H12O6:
-# 6 x 12.011 / 180.156). Used only for the carbon bookkeeping that the
-# biogenic-carbon accounting reports; it does not enter the cost or impact sums.
+# Carbon mass fraction of glucose (C6H12O6: 6 x 12.011 / 180.156). The default
+# for CultivationSystem.substrate_carbon_fraction, which is what the balance
+# actually reads — a scenario feeding glycerol or a side-stream declares its own.
+# Used only for the carbon bookkeeping the biogenic-carbon accounting reports; it
+# does not enter the cost or impact sums.
 SUBSTRATE_CARBON_FRACTION = 6 * 12.011 / 180.156
 
 
@@ -94,6 +96,10 @@ class Inventory:
     # entered with the substrate, which is physically impossible and is what
     # :func:`algametrix.verification.verify` tests for.
     biogenic_co2_respired_per_kg: float = 0.0
+    # Bounds that actually bit while building this inventory. Empty for a
+    # scenario whose inputs the balance could use as entered — which is every
+    # scenario run_scenario accepts, since it refuses the inadmissible ones.
+    clamps: tuple = ()
     batches_per_year: float = 0.0     # 0 in continuous mode
     batch_product_kg: float = 0.0     # final product per batch (batch mode)
     elec_breakdown: dict = field(default_factory=dict)  # kWh/kg by stage
@@ -106,13 +112,54 @@ class Inventory:
     _water_evaporated: float = 0.0
 
 
-def _water_to_evaporate(solids_in: float, solids_out: float) -> float:
+@dataclass(frozen=True)
+class Clamp:
+    """A value the balance could not use as given, and what it used instead.
+
+    The balance divides by recovery, by carbon utilization, by nutrient uptake
+    and by substrate yield, so a zero or a negative there is not a number it can
+    carry. Every such value is therefore bounded before use — and every bound
+    that actually bites is recorded here and reported on the inventory, because
+    a result computed from a number the user did not enter has to say so.
+
+    ``field`` is the dotted path :mod:`algametrix.inputcheck` uses, so a clamp
+    and the input rule that should have caught it name the same thing.
+    """
+
+    field: str
+    given: float
+    used: float
+    why: str
+
+    def __str__(self) -> str:
+        return f"{self.field}: {self.given:g} used as {self.used:g} ({self.why})"
+
+
+class _Clamper:
+    """Bounds a value and remembers when the bound bit."""
+
+    def __init__(self) -> None:
+        self.fired: list[Clamp] = []
+
+    def __call__(self, field: str, value: float, low: float, high: float,
+                 why: str) -> float:
+        used = min(max(value, low), high)
+        if used != value:
+            self.fired.append(Clamp(field, float(value), float(used), why))
+        return used
+
+
+def _water_to_evaporate(solids_in: float, solids_out: float,
+                        clamp: "_Clamper | None" = None) -> float:
     """kg water removed per kg dry solids, going from ``solids_in`` to ``solids_out``.
 
     Water associated with 1 kg dry solids at solids fraction ``s`` is ``(1-s)/s``.
     """
-    solids_in = min(max(solids_in, 1e-6), 1.0)
-    solids_out = min(max(solids_out, 1e-6), 1.0)
+    clamp = clamp or _Clamper()
+    solids_in = clamp("harvesting.final_solids", solids_in, 1e-6, 1.0,
+                      "a solids fraction outside (0, 1] has no water content")
+    solids_out = clamp("drying.final_solids", solids_out, 1e-6, 1.0,
+                       "a solids fraction outside (0, 1] has no water content")
     water_in = (1.0 - solids_in) / solids_in
     water_out = (1.0 - solids_out) / solids_out
     return max(water_in - water_out, 0.0)
@@ -131,7 +178,7 @@ class _WasteSplit:
 
 
 def _waste_split(scenario: Scenario, nitrogen: float, phosphorus: float,
-                 substrate: float) -> _WasteSplit:
+                 substrate: float, clamp: "_Clamper | None" = None) -> _WasteSplit:
     """Dose the waste stream against one demand and see what else it brings.
 
     The quantity follows from ``dosed_on`` alone. Everything the same quantity
@@ -161,7 +208,9 @@ def _waste_split(scenario: Scenario, nitrogen: float, phosphorus: float,
         # to a different nutrient: the scenario as written buys everything.
         return _WasteSplit()
 
-    coverage = min(max(wf.coverage, 0.0), 1.0)
+    coverage = (clamp or _Clamper())(
+        "waste_feed.coverage", wf.coverage, 0.0, 1.0,
+        "coverage is a fraction of the demand the stream is dosed on")
     quantity = coverage * demand[key] / concentration
     delivered = {k: quantity * max(per_unit[k], 0.0) for k in demand}
     met = {k: min(delivered[k], demand[k]) for k in demand}
@@ -197,7 +246,9 @@ def build_inventory(scenario: Scenario) -> Inventory:
         gross_kg_yr = sys.productivity * (scenario.scale * 1000.0) * sys.operating_days / 1000.0
     total_land_m2 = scenario.scale * sys.land_m2_per_unit
 
-    recovery = min(max(harv.recovery, 1e-6), 1.0)
+    clamp = _Clamper()
+    recovery = clamp("harvesting.recovery", harv.recovery, 1e-6, 1.0,
+                     "the balance divides by recovery")
     annual_kg = gross_kg_yr * recovery  # dry biomass leaving the gate
     batch_product_kg = scenario.batch_size_kg * recovery if scenario.batch_mode else 0.0
 
@@ -213,7 +264,9 @@ def build_inventory(scenario: Scenario) -> Inventory:
     if sys.mode == TrophicMode.PHOTOTROPHIC:
         carbon_per_product = org.carbon * gross_per_product  # kg C fixed / kg product
         co2_fixed = carbon_per_product * CO2_PER_C
-        util = min(max(sys.co2_utilization, MIN_CARBON_UTILIZATION), 1.0)
+        util = clamp("system.co2_utilization", sys.co2_utilization,
+                     MIN_CARBON_UTILIZATION, 1.0,
+                     f"below {MIN_CARBON_UTILIZATION:.0%} the carbon feed diverges")
         if sys.carbon_source == CarbonSource.BICARBONATE:
             co2_supply = 0.0
             bicarbonate_supply = carbon_per_product * NAHCO3_PER_C / util
@@ -225,11 +278,13 @@ def build_inventory(scenario: Scenario) -> Inventory:
         co2_fixed = 0.0
         co2_supply = 0.0
         bicarbonate_supply = 0.0
-        yield_ = max(sys.substrate_yield, 1e-6)
+        yield_ = clamp("system.substrate_yield", sys.substrate_yield, 1e-6, float("inf"),
+                       "the balance divides by the mass yield")
         substrate = gross_per_product / yield_  # kg substrate / kg product
 
     # --- nutrients --------------------------------------------------------
-    uptake = min(max(sys.nutrient_uptake, 1e-6), 1.0)
+    uptake = clamp("system.nutrient_uptake", sys.nutrient_uptake, 1e-6, 1.0,
+                   "the balance divides by the uptake efficiency")
     nitrogen = org.nitrogen * gross_per_product / uptake
     phosphorus = org.phosphorus * gross_per_product / uptake
     nitrogen_emitted = nitrogen * (1.0 - uptake)
@@ -239,7 +294,7 @@ def build_inventory(scenario: Scenario) -> Inventory:
     # A stream of fixed composition displaces part of what would be bought. The
     # demands above are untouched: the biomass needs the same nitrogen however
     # it arrives, and only the *purchase* moves.
-    waste = _waste_split(scenario, nitrogen, phosphorus, substrate)
+    waste = _waste_split(scenario, nitrogen, phosphorus, substrate, clamp)
     nitrogen_emitted += waste.nitrogen_surplus
     phosphorus_emitted += waste.phosphorus_surplus
 
@@ -267,7 +322,7 @@ def build_inventory(scenario: Scenario) -> Inventory:
     heat_mj = cult_heat_mj
     water_evap = 0.0
     if dry.enabled:
-        water_evap = _water_to_evaporate(harv.final_solids, dry.final_solids)
+        water_evap = _water_to_evaporate(harv.final_solids, dry.final_solids, clamp)
         drying_heat_mj = water_evap * dry.thermal_mj_per_kg_water
         if dry.fuel == "electricity":
             # Move the drying energy from the heat account to electricity.
@@ -282,7 +337,9 @@ def build_inventory(scenario: Scenario) -> Inventory:
     if ext.enabled:
         elec_extraction = ext.disruption_elec_kwh_per_kg + ext.elec_kwh_per_kg
         heat_mj += ext.heat_mj_per_kg
-        solvent_net = ext.solvent_kg_per_kg * (1.0 - min(max(ext.solvent_recovery, 0.0), 1.0))
+        recycled = clamp("extraction.solvent_recovery", ext.solvent_recovery, 0.0, 1.0,
+                         "the recycled share is a fraction of the solvent contacted")
+        solvent_net = ext.solvent_kg_per_kg * (1.0 - recycled)
 
     elec_total = elec_cultivation + elec_harvest + elec_drying + elec_extraction
 
@@ -290,7 +347,7 @@ def build_inventory(scenario: Scenario) -> Inventory:
     # What leaves the gate: the carbon in 1 kg of product, with no recovery
     # factor - biomass lost at harvest never becomes product.
     biogenic_co2_in_product = org.carbon * CO2_PER_C
-    substrate_co2_supplied = substrate * SUBSTRATE_CARBON_FRACTION * CO2_PER_C
+    substrate_co2_supplied = substrate * sys.substrate_carbon_fraction * CO2_PER_C
     inorganic_co2_supplied = co2_supply + bicarbonate_supply * (12.011 / 84.007) * CO2_PER_C
     # Carbon into the gross biomass cultivated, and - for a heterotroph - the
     # substrate carbon left over, which is respired. For a phototroph the carbon
@@ -343,4 +400,5 @@ def build_inventory(scenario: Scenario) -> Inventory:
         },
     )
     inv._water_evaporated = water_evap
+    inv.clamps = tuple(clamp.fired)
     return inv
