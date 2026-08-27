@@ -62,12 +62,36 @@ def _sha256(path: Path) -> str:
     return h.hexdigest()
 
 
+#: The paths whose content decides what this pipeline produces: the engine, the
+#: data it reads, and the scripts that drive it. Everything else in the
+#: repository - the results, the figures, this document, the prose - is output.
+INPUT_PATHS = ("src", "data", "reproduce.py", "scripts")
+
+
 def _git_commit(root: Path) -> str:
-    try:
-        out = subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"],
+    """The commit the model, the data and the pipeline were at when this ran.
+
+    Not ``HEAD``. Committing the regenerated results is itself a commit, so a
+    manifest stamped with ``HEAD`` names the commit *before* the one that carries
+    the files it describes - which is what the previous build did, and why its
+    hash pointed one commit short. Pinning the stamp to the last commit that
+    touched :data:`INPUT_PATHS` makes it a fixed point instead: committing the
+    output does not move it, and re-running the pipeline afterwards reproduces
+    the same manifest.
+
+    Uncommitted changes to those paths are declared, because a hash that does not
+    describe what actually ran is worse than no hash.
+    """
+    def git(*args: str) -> str | None:
+        out = subprocess.run(["git", "-C", str(root), *args],
                              capture_output=True, text=True, timeout=15)
-        if out.returncode == 0:
-            return out.stdout.strip()
+        return out.stdout.strip() if out.returncode == 0 else None
+
+    try:
+        commit = git("log", "-1", "--format=%H", "--", *INPUT_PATHS)
+        if commit:
+            dirty = git("status", "--porcelain", "--", *INPUT_PATHS)
+            return commit + (" + UNCOMMITTED changes to the inputs" if dirty else "")
     except Exception:                                   # pragma: no cover
         pass
     return "unknown (not a git checkout, or git unavailable)"
@@ -408,7 +432,7 @@ def build(run, outdir: Path, results_dir: Path, root: Path,
     ]
     L += _markdown_table(
         [{"k": "generated", "v": date.today().isoformat()},
-         {"k": "git commit", "v": f"`{commit}`"},
+         {"k": "git commit of the model, data and pipeline", "v": f"`{commit}`"},
          {"k": "master seed", "v": str(seed)},
          {"k": "stages run before this one, in the same invocation",
           "v": ", ".join(run.stages_run) or "none"}]
