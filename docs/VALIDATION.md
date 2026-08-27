@@ -149,11 +149,11 @@ implementation, and all three sit at floating-point resolution because they are 
 | **Shared-inventory consistency**: the quantity the TEA priced vs the quantity the LCA characterized, each recovered independently from the published results | [`results/shared_inventory_consistency.txt`](../results/shared_inventory_consistency.txt) | 167 flow comparisons | 1.2 × 10⁻¹³ |
 | **LCA implementation**: sequential engine vs an independent matrix-formalism implementation (`A s = f`) | [`results/lca_implementation_benchmark.txt`](../results/lca_implementation_benchmark.txt) | 243 indicator comparisons | 2.5 × 10⁻¹⁵ |
 
-Optionally, the same matrices solved by Brightway's `bw2calc` agree to 4.9 × 10⁻¹⁵ over 182
-comparisons ([`results/brightway_crosscheck.txt`](../results/brightway_crosscheck.txt)); that
-check runs from `scripts/brightway_crosscheck.py` in its own environment, because `bw2calc`
-pulls in around thirty packages the engine does not need. The stored run is from 2026-08-07 and
-covers the 26 scenarios of the suite as it then stood, one behind the counts above.
+Optionally, the same matrices solved by Brightway's `bw2calc` agree to 4.9 × 10⁻¹⁵ over 189
+comparisons, 180 of them non-zero on both sides
+([`results/brightway_crosscheck.txt`](../results/brightway_crosscheck.txt)); that check runs
+from `scripts/brightway_crosscheck.py` in its own environment, because `bw2calc` pulls in around
+thirty packages the engine does not need.
 
 The consistency result is an **architectural invariant**: `run_scenario` builds one `Inventory`
 and hands the same object to both analyses, so agreement is guaranteed by the call graph rather

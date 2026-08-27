@@ -70,6 +70,10 @@ def main() -> int:
         worst = max(worst, per_cat[worst_cat])
 
     ok = worst <= matrixlca.BENCHMARK_TOL
+    nonzero = sum(1
+                  for _k, _l, bw, ours, _m, _c in rows
+                  for cat, value in bw.items()
+                  if value != 0.0 or ours[cat] != 0.0)
     lines = [
         "BRIGHTWAY (bw2calc) CROSS-CHECK",
         RULE,
@@ -102,6 +106,11 @@ def main() -> int:
         RULE,
         f"  scenarios cross-checked      : {len(rows)}",
         f"  indicator comparisons        : {sum(len(r[2]) for r in rows)}",
+        # An indicator both engines return as zero agrees trivially. Counting
+        # those separately keeps the headline from claiming more agreement than
+        # was tested: a scenario whose source reported no water or no land
+        # footprint has nothing for either solver to get wrong.
+        f"  of which non-zero on both sides: {nonzero}",
         f"  maximum relative difference  : {worst:.3e}",
         f"  criterion                    : <= {matrixlca.BENCHMARK_TOL:g}",
         f"  overall                      : {'PASS' if ok else 'FAIL'}",

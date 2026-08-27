@@ -15,6 +15,9 @@ build_log.txt
 .venv/
 venv/
 env/
+# The environment the optional Brightway cross-check runs in; see
+# docs/VERIFICATION.md. Thirty-odd packages the engine does not need.
+.bwenv/
 
 # Tooling / caches
 .pytest_cache/

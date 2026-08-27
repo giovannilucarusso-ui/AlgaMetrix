@@ -197,11 +197,13 @@ Technosphere condition numbers 18–1.3 × 10⁵.
 
 ### Brightway cross-check (optional)
 
-The same **A**, **B** and **C** matrices handed to `bw2calc` 2.5.0: **182 comparisons, maximum
-relative difference 4.9 × 10⁻¹⁵** ([`results/brightway_crosscheck.txt`](../results/brightway_crosscheck.txt)).
-That file was produced on 2026-08-07, over the 26 scenarios the suite had then; it is one
-scenario behind the numbers above and has to be regenerated in an environment with `bw2calc`
-before it is cited as current.
+The same **A**, **B** and **C** matrices handed to `bw2calc` 2.5.0: **27 scenarios × 7
+indicators = 189 comparisons, maximum relative difference 4.9 × 10⁻¹⁵**
+([`results/brightway_crosscheck.txt`](../results/brightway_crosscheck.txt)). Nine of those
+comparisons are zero on both sides — reconstructions whose source reported no water or no land
+footprint — so 180 test anything, and the file says so rather than counting them as agreement.
+It also records the environment that produced it (bw2calc 2.5.0, Python 3.14.5, numpy 2.5.2),
+because a cross-check that does not say what it ran against is not a cross-check.
 
 Not part of `reproduce.py` — `bw2calc` pulls in around thirty packages the engine does not need:
 
