@@ -96,7 +96,8 @@ ARCHETYPES: list[Archetype] = [
         provenance="reconstructions.heterotrophic_powder -> templates 'Heterotrophic microalgae powder'",
         kind="study_reconstruction",
         study_id="russo2022_aury",
-        notes="Blind reproduction of Russo et al. (2022); authors' own study, disclosed.",
+        notes="Calibrated against the SuperPro reference published with Russo et al. (2022); "
+              "the authors' own study, disclosed.",
     ),
     Archetype(
         key="led_pbr",

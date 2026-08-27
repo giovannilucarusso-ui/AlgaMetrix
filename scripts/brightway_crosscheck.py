@@ -142,6 +142,12 @@ def main() -> int:
         "tolerance": float(matrixlca.BENCHMARK_TOL),
         "max_relative_difference": float(worst),
         "passed": bool(ok),
+        "scenarios": len(rows),
+        "indicator_comparisons": sum(len(r[2]) for r in rows),
+        # The count the manuscript quotes beside the total: an indicator both
+        # solvers return as zero agrees trivially, so it is reported separately
+        # rather than folded into the headline.
+        "non_zero_comparisons": int(nonzero),
         "per_scenario": {key: float(mx) for key, _l, _b, _o, mx, _c in rows},
         "all_relative_differences": sorted(
             float(d)

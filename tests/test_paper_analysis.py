@@ -181,7 +181,7 @@ def test_a_source_declared_no_credit_convention_is_honoured(lib):
 def test_published_and_model_derived_are_classified_apart(dataset):
     for r in dataset:
         cls = gwp.classify(r)
-        if cls in gwp.VALIDATION_CLASSES:
+        if cls in gwp.COMPARISON_CLASSES:
             assert r.has_published_gwp, f"{r.study_id} labelled validation without a published GWP"
             assert r.is_executable
         if cls == gwp.CLASS_MODEL_DERIVED:
@@ -198,7 +198,7 @@ def test_reproduction_count_matches_published_and_executable(dataset, lib):
 def test_model_derived_scenarios_are_not_in_the_validation_set(dataset, lib):
     pops = gwp.build_populations(dataset, lib=lib)
     for case in pops.reproduced_cases:
-        assert case.analysis_class in gwp.VALIDATION_CLASSES
+        assert case.analysis_class in gwp.COMPARISON_CLASSES
         assert case.published_gwp is not None
 
 

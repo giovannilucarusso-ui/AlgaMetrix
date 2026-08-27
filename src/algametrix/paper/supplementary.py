@@ -571,23 +571,34 @@ def build(run, outdir: Path, results_dir: Path, root: Path,
     L += [
         "---",
         "",
-        "## S4 External validation",
+        "## S4 Retrospective literature reconstruction and external benchmarking",
         "",
         "```bash",
         "python reproduce.py --only reproductions --only carbon",
         "```",
         "",
-        "This is the only section of this document that is validation. Reproductions "
-        "are kept apart by how the scenario was built, because they are not equally "
-        "strong evidence: a **blind** case traces every input to a value published by "
-        "the source or to an itemised library default and never uses the reported "
-        "endpoint as an input; a **calibrated** case deliberately imposes the "
-        "reference's design assumptions. No blind case was tuned, and the two classes "
-        "are never pooled. A **range** check is a plausibility check against a "
-        "published envelope and is never converted into a percentage deviation from an "
-        "envelope midpoint. An **excluded** record is one whose published figures could "
-        "not be traced to the cited source; it stays in the dataset with its reason so "
-        "the exclusion is countable, and it enters no population.",
+        "This is the only section of this document that compares AlgaMetrix against a "
+        "number somebody else published. None of it is prospective validation: every "
+        "target was already in print when its scenario was built, and no prediction "
+        "was registered before the target was read. Comparisons are therefore "
+        "classified by **what each one depends on**, and the classes are never "
+        "pooled: a **retrospective untuned** case enters the source's own assumptions "
+        "without adjusting anything to its reported endpoint; a **component-informed** "
+        "case builds one or more model inputs out of a published aggregate outcome, so "
+        "part of the target appears on both sides; a **calibrated** case deliberately "
+        "imposes a reference design in order to test the implementation against it. A "
+        "**range** check is a plausibility check against a published envelope and is "
+        "never converted into a percentage deviation from an envelope midpoint. An "
+        "**excluded** record is one whose published figures could not be traced to the "
+        "cited source; it stays in the dataset with its reason so the exclusion is "
+        "countable, and it enters no population.",
+        "",
+        "Two further dependencies are recorded per record rather than described in "
+        "prose: **author overlap**, where an author of AlgaMetrix is an author of the "
+        "source, and the **independence group**, which names the publication, facility "
+        "model and author group a record belongs to. Records sharing a group are "
+        "several scenarios and one independent source, and the counts below say both "
+        "numbers.",
         "",
         "Two bases have to be fixed before any deviation means anything, and each has "
         "its own note below: the **price basis**, because a cost is only comparable "

@@ -14,6 +14,21 @@
 #   * `reconstruction_builder` names a callable in
 #     src/algametrix/paper/reconstructions.py. Without one, a study
 #     cannot be executed by the engine no matter what tier it claims.
+#   * `evidence_class` says what the comparison DEPENDS ON, not how well it did:
+#     retrospective_untuned, component_informed, calibrated, range, excluded, none.
+#     The vocabulary is defined in schema.py. It replaces the earlier
+#     `validation_mode`, whose top class was `blind`; nothing here was predicted
+#     before its target was known, so that word claimed a protocol this work does
+#     not have. A file still using the old field name fails to load.
+#   * `independence_group` names the publication / facility model / author group.
+#     Records sharing it are several scenarios and ONE independent source.
+#   * `dependency_notes` lists what a row takes from its source beyond the
+#     physical data: inputs built from a published aggregate, an author overlap,
+#     an endpoint that had to be harmonized.
+#   * `endpoint_harmonized` + `harmonized_value` + `endpoint_harmonization` record
+#     a source endpoint moved onto the engine's basis: the raw published number
+#     stays in `source_value`, the compared number is the harmonized one, and the
+#     arithmetic between them is written out in full.
 #
 # PROVENANCE OF THIS FILE
 #   Transcribed from paper_handoff/DATASET.md (the citation-ready table that
@@ -30,7 +45,7 @@
 # =====================================================================
 
 meta:
-  dataset_version: "2.0"
+  dataset_version: "3.0"
   description: >
     Curated evidence set of microalgal / cyanobacterial / thraustochytrid
     production-cost and cradle-to-gate GWP estimates. NOT a systematic review:
@@ -55,6 +70,7 @@ studies:
   full_citation: "Tredici et al. 2016, Algal Research 19:253-263"
   doi: 10.1016/j.algal.2016.09.005
   publication_year: 2016
+  independence_group: tredici_algal_research_2016
   data_location_in_source: null
   eligibility_status: included
   eligibility_reason: "Bottom-up TEA of a dedicated microalgal biomass plant, cost per kg dry biomass."
@@ -85,12 +101,16 @@ studies:
   environmental_endpoint_type: none
   published_gwp_available: false
   reconstructability_tier: B
-  validation_mode: blind
+  evidence_class: retrospective_untuned
   reconstruction_builder: tredici2016
   reconstruction_status: reproduced
   published_inventory_available: true
   published_capex_available: true
   published_opex_available: true
+  dependency_notes:
+    - "ENDPOINT DIFFERENCE: the published EUR 12.40/kg folds in EUR 10,236/yr of financing
+       interest, and the AlgaMetrix production cost carries no financing charge and no
+       required return on capital. The two endpoints do not include the same things."
   assumptions_required:
     - "Endpoint classified as production_cost from the dataset label 'cost'; the paper's own
        definition (depreciation, return on capital, working capital) is not recorded here."
@@ -112,6 +132,7 @@ studies:
   full_citation: "Vazquez-Romero et al. 2022, Algal Research 64:102679"
   doi: 10.1016/j.algal.2022.102679
   publication_year: 2022
+  independence_group: vazquez_algal_research_2022
   data_location_in_source: null
   eligibility_status: included
   eligibility_reason: "TEA of microalgal biomass for aquaculture, cost per kg dry biomass."
@@ -136,12 +157,23 @@ studies:
   environmental_endpoint_type: none
   published_gwp_available: false
   reconstructability_tier: B
-  validation_mode: blind
+  evidence_class: component_informed
   reconstruction_builder: vazquez2022
   reconstruction_status: reproduced
   published_inventory_available: true
   published_capex_available: true
   published_opex_available: true
+  dependency_notes:
+    - "COMPONENT-INFORMED, not an independent endpoint test. Two engine inputs are built from
+       the source's own published aggregate outcome, its total annual OPEX of EUR 2,228,066:
+       labour = 0.3879 x paper_opex, and the other-OPEX line (thermal utilities 0.0863,
+       consumables 0.0055, wastewater 0.0031) = 0.0949 x paper_opex."
+    - "0.3879 + 0.0949 = 0.4828, so 48.28% of the numerator of the compared production cost is
+       taken from the published total rather than derived from the mass balance. The reported
+       -4% is therefore partly a self-comparison and is never pooled with the retrospective
+       untuned cases."
+    - "Same first author as the three vazquez_stoten_2022 records, but a different publication,
+       facility, country, strain and reactor system."
   assumptions_required:
     - "Endpoint classified as production_cost from the dataset label 'cost'."
     - "Scenario definition recovered from the unmerged feature branch
@@ -156,13 +188,16 @@ studies:
 # which rested on two external primary studies, one self-citation and one
 # benchmark with no primary source. This paper is CC-BY and its supplementary
 # material publishes the complete financial convention (Lang factors,
-# depreciation, interest, maintenance, overheads) and every input price, so both
-# cases are reconstructed BLIND: the engine is given the physical data and the
-# accounting rules, never the reported biomass cost.
+# depreciation, interest, maintenance, overheads) and every input price, so the
+# three cases are RETROSPECTIVE UNTUNED: the engine is given the physical data and
+# the accounting rules, never the reported biomass cost. Untuned, not blind - the
+# published cost was already available when the scenarios were built, and no
+# prediction was registered before it was read.
 #
-# Independence: a different publication, facility, country, strain and reactor
-# system from `vazquez2022`, but the same first author. Disclosed rather than
-# counted as a fully independent group.
+# Independence: the three scenarios are ONE publication, facility model and author
+# group (independence_group vazquez_stoten_2022), and are counted as one source.
+# A different publication, facility, country, strain and reactor system from
+# `vazquez2022`, but the same first author. Disclosed, not counted as independent.
 - study_id: vazquez2022b_nas
   short_citation: "Vázquez-Romero et al., 2022b"
   scenario_label: "N. oceanica, 1 ha"
@@ -170,6 +205,7 @@ studies:
   full_citation: "Vazquez-Romero et al. 2022, Science of the Total Environment 837:155742"
   doi: 10.1016/j.scitotenv.2022.155742
   publication_year: 2022
+  independence_group: vazquez_stoten_2022
   search_source: "targeted search for open-access microalgae TEAs with a published cost breakdown"
   date_identified: "2026-08-02"
   data_location_in_source: "Supplementary Table 9, case 1b; parameters in Supplementary Tables 1, 3, 4, 5, 7"
@@ -202,7 +238,7 @@ studies:
   published_gwp_available: false
   gwp_analysis_class: model_derived_gwp_from_tea_scenario
   reconstructability_tier: B
-  validation_mode: blind
+  evidence_class: retrospective_untuned
   reconstruction_builder: vazquez2022b_nas
   reconstruction_status: reproduced
   published_inventory_available: true
@@ -215,6 +251,11 @@ studies:
     electricity: 0.0745
     overhead: 0.1067
     other_opex: 0.2174
+  dependency_notes:
+    - "One of three scenarios from a single publication, facility model and author group
+       (independence_group vazquez_stoten_2022). Three scenarios, ONE independent source."
+    - "Same first author as vazquez2022 (Algal Research); a different publication, facility,
+       country, strain and reactor system."
   assumptions_required:
     - "Interest on capital (8% of depreciation), property tax and insurance are
        summed into the engine's single non-depreciation capital charge; the
@@ -243,6 +284,7 @@ studies:
   full_citation: "Vazquez-Romero et al. 2022, Science of the Total Environment 837:155742"
   doi: 10.1016/j.scitotenv.2022.155742
   publication_year: 2022
+  independence_group: vazquez_stoten_2022
   search_source: "targeted search for open-access microalgae TEAs with a published cost breakdown"
   date_identified: "2026-08-02"
   data_location_in_source: "Supplementary Table 9, case 1a; parameters in Supplementary Tables 1, 3, 4, 5, 7"
@@ -274,7 +316,7 @@ studies:
   published_gwp_available: false
   gwp_analysis_class: model_derived_gwp_from_tea_scenario
   reconstructability_tier: B
-  validation_mode: blind
+  evidence_class: retrospective_untuned
   reconstruction_builder: vazquez2022b_tiso_pht
   reconstruction_status: reproduced
   published_inventory_available: true
@@ -287,6 +329,11 @@ studies:
     electricity: 0.0975
     overhead: 0.1129
     other_opex: 0.1707
+  dependency_notes:
+    - "One of three scenarios from a single publication, facility model and author group
+       (independence_group vazquez_stoten_2022). Three scenarios, ONE independent source."
+    - "Same first author as vazquez2022 (Algal Research); a different publication, facility,
+       country, strain and reactor system."
   assumptions_required:
     - "Two strains alternate for six months each; the engine models one organism,
        so the composition is the unweighted mean of the two published ones."
@@ -303,6 +350,7 @@ studies:
   full_citation: "Vazquez-Romero et al. 2022, Science of the Total Environment 837:155742"
   doi: 10.1016/j.scitotenv.2022.155742
   publication_year: 2022
+  independence_group: vazquez_stoten_2022
   search_source: "targeted search for open-access microalgae TEAs with a published cost breakdown"
   date_identified: "2026-08-02"
   data_location_in_source: "Supplementary Table 9, case 4a; parameters in Supplementary Tables 1, 3, 4, 5, 7"
@@ -334,7 +382,7 @@ studies:
   published_gwp_available: false
   gwp_analysis_class: model_derived_gwp_from_tea_scenario
   reconstructability_tier: B
-  validation_mode: blind
+  evidence_class: retrospective_untuned
   reconstruction_builder: vazquez2022b_nas_10ha
   reconstruction_status: reproduced
   published_inventory_available: true
@@ -348,6 +396,11 @@ studies:
     heat_fuel: 0.0227
     overhead: 0.0683
     other_opex: 0.1805
+  dependency_notes:
+    - "One of three scenarios from a single publication, facility model and author group
+       (independence_group vazquez_stoten_2022). Three scenarios, ONE independent source."
+    - "Same first author as vazquez2022 (Algal Research); a different publication, facility,
+       country, strain and reactor system."
   assumptions_required:
     - "The 62.71 kWh/kg total energy is split into 36.45 kWh/kg of natural gas for
        spray drying (the paper's own figure) and 26.26 kWh/kg of electricity."
@@ -364,9 +417,11 @@ studies:
   full_citation: "Russo et al. 2022, Bioresource Technology Reports 18:100997"
   doi: 10.1016/j.biteb.2022.100997
   publication_year: 2022
+  independence_group: russo_btr_2022
   data_location_in_source: null
   eligibility_status: included
-  eligibility_reason: "SuperPro-based TEA of heterotrophic biomass; authors' own study, reproduced blind."
+  eligibility_reason: "SuperPro-based TEA of heterotrophic biomass; the authors' own study,
+    reconstructed from the SuperPro reference case published with it."
   study_type: tea
   organism: null
   cultivation_system: heterotrophic fermenter
@@ -388,12 +443,20 @@ studies:
   environmental_endpoint_type: none
   published_gwp_available: false
   reconstructability_tier: B
-  validation_mode: blind
+  evidence_class: calibrated
   reconstruction_builder: heterotrophic_powder
   reconstruction_status: reproduced
   published_inventory_available: true
   published_capex_available: true
   published_opex_available: true
+  dependency_notes:
+    - "AUTHOR OVERLAP: an author of AlgaMetrix is an author of the source
+       (author_overlap_with_algametrix: true). A self-reproduction."
+    - "CALIBRATED: the scenario is the shipped heterotrophic template, whose parameters were
+       set against the SuperPro reference case published with the source
+       (data/reference_superpro_heterotrophic.csv). It is a benchmark against a reference
+       implementation under matched assumptions, not a retrospective untuned reconstruction,
+       and the +5% to +6% interval must not be read as independent validation."
   assumptions_required:
     - "Endpoint classified as production_cost from the dataset label 'cost'."
     - "Self-reproduction: the authors of AlgaMetrix are authors of the source study.
@@ -439,7 +502,7 @@ studies:
   environmental_endpoint_type: none
   published_gwp_available: false
   reconstructability_tier: A
-  validation_mode: none
+  evidence_class: excluded
   reconstruction_builder: null
   reconstruction_status: not_applicable
   published_inventory_available: false
@@ -465,6 +528,7 @@ studies:
     using SuperPro Designer. Intelligen Inc."
   doi: 10.13140/RG.2.2.12639.48805
   publication_year: 2020
+  independence_group: intelligen_algal_oil
   # The document is dated 2020; the economic evaluation it exports carries 2015
   # prices, stated in the header of data/reference_superpro_phototrophic.csv.
   # reported_price_year follows the prices and not the publication date, which is
@@ -495,14 +559,18 @@ studies:
   environmental_endpoint_type: none
   published_gwp_available: false
   reconstructability_tier: B
-  validation_mode: calibrated
+  evidence_class: calibrated
   reconstruction_builder: algal_oil
   reconstruction_status: reproduced
   published_inventory_available: true
   published_capex_available: true
   published_opex_available: true
+  dependency_notes:
+    - "CALIBRATED: the scenario reproduces the vendor's own reference design and is fed the
+       reference's own prices, so agreement tests implementation against a reference tool under
+       matched assumptions, not predictive accuracy."
   assumptions_required:
-    - "Calibrated, not blind: scenario parameters were set to reproduce the reference tool."
+    - "Calibrated: scenario parameters were set to reproduce the reference tool."
   todos: []
 
 - study_id: superpro_omega3
@@ -514,6 +582,7 @@ studies:
     Assessment (TEA) using SuperPro Designer. Intelligen Inc."
   doi: 10.13140/RG.2.2.32102.34885
   publication_year: 2021
+  independence_group: intelligen_omega3
   notes: "Vendor reference case. Publicly retrievable through the DOI, so the calibration
     target is checkable by a reader without a SuperPro Designer licence."
   data_location_in_source: "data/reference_superpro_omega3.csv"
@@ -540,14 +609,18 @@ studies:
   environmental_endpoint_type: none
   published_gwp_available: false
   reconstructability_tier: B
-  validation_mode: calibrated
+  evidence_class: calibrated
   reconstruction_builder: omega3
   reconstruction_status: reproduced
   published_inventory_available: true
   published_capex_available: true
   published_opex_available: true
+  dependency_notes:
+    - "CALIBRATED: the scenario reproduces the vendor's own reference design and is fed the
+       reference's own prices, so agreement tests implementation against a reference tool under
+       matched assumptions, not predictive accuracy."
   assumptions_required:
-    - "Calibrated, not blind."
+    - "Calibrated: the scenario reproduces the vendor's reference design."
   todos: []
 
 - study_id: superpro_dunaliella
@@ -591,7 +664,7 @@ studies:
   environmental_endpoint_type: none
   published_gwp_available: false
   reconstructability_tier: A
-  validation_mode: none
+  evidence_class: none
   reconstruction_status: not_applicable
   published_inventory_available: true
   published_capex_available: true
@@ -659,7 +732,7 @@ studies:
   environmental_endpoint_type: none
   published_gwp_available: false
   reconstructability_tier: A
-  validation_mode: none
+  evidence_class: none
   reconstruction_status: not_applicable
   published_inventory_available: true
   published_capex_available: true
@@ -729,7 +802,7 @@ studies:
   environmental_endpoint_type: none
   published_gwp_available: false
   reconstructability_tier: B
-  validation_mode: range
+  evidence_class: excluded
   reconstruction_builder: phycocyanin
   reconstruction_status: reproduced
   published_inventory_available: true
@@ -785,7 +858,7 @@ studies:
   environmental_endpoint_type: none
   published_gwp_available: false
   reconstructability_tier: B
-  validation_mode: range
+  evidence_class: excluded
   reconstruction_builder: astaxanthin
   reconstruction_status: reproduced
   published_inventory_available: true
@@ -810,6 +883,7 @@ studies:
     Frontiers in Sustainable Food Systems 10:1763476."
   doi: 10.3389/fsufs.2026.1763476
   publication_year: 2026
+  independence_group: ahmed_frontiers_2026
   data_location_in_source: "Impact assessment: baseline GWP 15.05 kg CO2-eq per kg dried
     biomass, of which sodium bicarbonate 4.56 (about 30%), attributed to Solvay-process
     production of the primary inorganic carbon source."
@@ -833,17 +907,21 @@ studies:
   published_gwp_available: true
   economic_endpoint_type: null
   reconstructability_tier: B
-  validation_mode: calibrated
+  evidence_class: calibrated
   reconstruction_builder: spirulina_padi
   reconstruction_status: reproduced
   gwp_reconstruction_status: reproduced
   published_inventory_available: true
   published_capex_available: true
   published_opex_available: true
+  dependency_notes:
+    - "CALIBRATED: the registered builder reconstructs the Padi et al. (2023) Scenario-I
+       bicarbonate Spirulina plant that this study's design follows, so the scenario was not
+       built from this source's own data and the -5% is not an independent endpoint test."
   assumptions_required:
     - "The registered builder reconstructs the Padi et al. (2023) Scenario-I bicarbonate
        Spirulina plant, which the legacy work used as the reconstruction for this LCA;
-       calibrated, not blind."
+       calibrated."
     - "CONVENTION VERIFIED 2026-08-07 from the source: it does not discuss or apply a
        biogenic-carbon credit, and the reported GWP is an operational-inputs figure with
        no netting of photosynthetic uptake. Recorded as no_biogenic_credit. The engine
@@ -866,6 +944,7 @@ studies:
     24:991-1001. Correction: Mar Biotechnol 24 (2022), electricity per FU 137.9 -> 54.48 kWh."
   doi: 10.1007/s10126-022-10162-8
   publication_year: 2022
+  independence_group: tzachor_marine_biotechnology_2022
   data_location_in_source: "LCA results: CO2-eq contributions listed as construction
     materials 0.201, energy 0.460, nutrients 0.028, cleaning agent 0.004 (sum 0.693),
     less CO2 biofixation -0.702, giving -0.008 kg CO2-eq per FU. FU = 1 kg edible
@@ -898,13 +977,18 @@ studies:
   published_gwp_available: true
   economic_endpoint_type: null
   reconstructability_tier: B
-  validation_mode: blind
+  evidence_class: retrospective_untuned
   reconstruction_builder: iceland_spirulina
   reconstruction_status: reproduced
   gwp_reconstruction_status: reproduced
   published_inventory_available: true
   published_capex_available: true
   published_opex_available: true
+  dependency_notes:
+    - "The source side is DERIVED, not printed: the paper reports per kg wet biomass at 61%
+       water and includes facility construction, and every figure compared here is obtained
+       from its published components by one declared division onto the engine's per-kg-dry
+       operational basis. This is the weakest of the retrospective untuned GWP points."
   assumptions_required:
     - "Scenario definition recovered from the unmerged feature branch
        `m2-harmonization` (PR #1), where it was committed but never merged into main.
@@ -930,6 +1014,7 @@ studies:
   full_citation: "Braud et al. 2025, Bioresource Technology Reports 29:102027 (SpiralG pilot, 2019 inventory)"
   doi: 10.1016/j.biteb.2025.102027
   publication_year: 2025
+  independence_group: braud_btr_2025
   data_location_in_source: null
   eligibility_status: included
   eligibility_reason: "Published pilot-scale cradle-to-gate GWP with a documented Brightway2/ecoinvent background."
@@ -949,7 +1034,7 @@ studies:
   published_gwp_available: true
   economic_endpoint_type: null
   reconstructability_tier: B
-  validation_mode: blind
+  evidence_class: retrospective_untuned
   reconstruction_builder: spiralg2019
   reconstruction_status: reproduced
   gwp_reconstruction_status: reproduced
@@ -957,6 +1042,10 @@ studies:
   published_capex_available: true
   published_opex_available: true
   biogenic_carbon_convention: no_biogenic_credit
+  dependency_notes:
+    - "BOUNDARY DIFFERENCE: the published total includes infrastructure and transport terms
+       (about 2 kg CO2-eq/kg) that the operational AlgaMetrix boundary does not represent,
+       which accounts for most of the -11%. Informative, not strictly like-for-like."
   assumptions_required:
     - "Scenario definition recovered from the unmerged feature branch
        `m2-harmonization` (PR #1), where it was committed but never merged into main.
@@ -975,6 +1064,7 @@ studies:
   full_citation: "McKuin et al. 2022, Elementa: Science of the Anthropocene 10(1):00098 (Schizochytrium, whole cell)"
   doi: 10.1525/elementa.2021.00098
   publication_year: 2022
+  independence_group: mckuin_elementa_2022
   data_location_in_source: null
   eligibility_status: included
   eligibility_reason: "Published cradle-to-gate GWP for heterotrophic thraustochytrid biomass."
@@ -994,13 +1084,17 @@ studies:
   published_gwp_available: true
   economic_endpoint_type: null
   reconstructability_tier: B
-  validation_mode: blind
+  evidence_class: retrospective_untuned
   reconstruction_builder: mckuin_schizo
   reconstruction_status: reproduced
   gwp_reconstruction_status: reproduced
   published_inventory_available: true
   published_capex_available: true
   published_opex_available: true
+  dependency_notes:
+    - "The source does not state a biogenic-carbon convention. The engine's own adjustment on
+       this scenario is 0.000 on a gross of 2.385, so no convention could materially move the
+       comparison; it is made on the net figure with that stated."
   assumptions_required:
     - "Scenario definition recovered from the unmerged feature branch
        `m2-harmonization` (PR #1), where it was committed but never merged into main.
@@ -1017,6 +1111,7 @@ studies:
   full_citation: "Padi et al. 2023, Algal Research 74:103190 (Spirulina DSFP, greenhouse ORP)"
   doi: 10.1016/j.algal.2023.103190
   publication_year: 2023
+  independence_group: padi_algal_research_2023
   data_location_in_source: "data/validation_references.yaml (three metrics); data/systems.yaml
     'Open raceway pond (Spirulina, NaHCO3)' is calibrated to this paper"
   eligibility_status: included
@@ -1047,12 +1142,16 @@ studies:
   environmental_endpoint_type: none
   published_gwp_available: false
   reconstructability_tier: B
-  validation_mode: calibrated
+  evidence_class: range
   reconstruction_builder: spirulina_padi
   reconstruction_status: reproduced
   published_inventory_available: true
   published_capex_available: true
   published_opex_available: true
+  dependency_notes:
+    - "RANGE check only: the target is a published envelope, and the engine's MEPP is compared
+       against it as a plausibility check. It is never converted into a deviation from an
+       envelope midpoint, and it FAILS - retained as a negative result rather than dropped."
   assumptions_required:
     - "MEPP embeds a required return on capital by construction; the discount rate used is
        not recorded here, so the value cannot be recomputed to the production-cost endpoint."
@@ -1092,7 +1191,7 @@ studies:
   environmental_endpoint_type: none
   published_gwp_available: false
   reconstructability_tier: A
-  validation_mode: none
+  evidence_class: none
   reconstruction_status: not_applicable
   assumptions_required:
     - "Endpoint classified as production_cost from the dataset label 'cost'."
@@ -1124,7 +1223,7 @@ studies:
   environmental_endpoint_type: none
   published_gwp_available: false
   reconstructability_tier: A
-  validation_mode: none
+  evidence_class: none
   reconstruction_status: not_applicable
   assumptions_required:
     - "Endpoint classified as production_cost from the dataset label 'cost'."
@@ -1152,7 +1251,7 @@ studies:
   environmental_endpoint_type: none
   published_gwp_available: false
   reconstructability_tier: A
-  validation_mode: none
+  evidence_class: none
   reconstruction_status: not_applicable
   assumptions_required:
     - "Endpoint classified as production_cost from the dataset label 'cost'."
@@ -1181,7 +1280,7 @@ studies:
   environmental_endpoint_type: none
   published_gwp_available: false
   reconstructability_tier: A
-  validation_mode: none
+  evidence_class: none
   reconstruction_status: not_applicable
   assumptions_required:
     - "Endpoint classified as production_cost from the dataset label 'cost'."
@@ -1211,7 +1310,7 @@ studies:
   environmental_endpoint_type: none
   published_gwp_available: false
   reconstructability_tier: A
-  validation_mode: none
+  evidence_class: none
   reconstruction_status: not_applicable
   assumptions_required:
     - "Endpoint classified as production_cost from the dataset label 'cost'."
@@ -1243,7 +1342,7 @@ studies:
   environmental_endpoint_type: none
   published_gwp_available: false
   reconstructability_tier: A
-  validation_mode: none
+  evidence_class: none
   reconstruction_status: not_applicable
   assumptions_required:
     - "MBSP by construction embeds a required return on capital (the discount rate at which
@@ -1275,7 +1374,7 @@ studies:
   environmental_endpoint_type: none
   published_gwp_available: false
   reconstructability_tier: A
-  validation_mode: none
+  evidence_class: none
   reconstruction_status: not_applicable
   assumptions_required:
     - "Endpoint classified as production_cost from the dataset label 'cost'."
@@ -1306,7 +1405,7 @@ studies:
   environmental_endpoint_type: none
   published_gwp_available: false
   reconstructability_tier: A
-  validation_mode: none
+  evidence_class: none
   reconstruction_status: not_applicable
   assumptions_required:
     - "Endpoint classified as production_cost from the dataset label 'cost'."
@@ -1334,7 +1433,7 @@ studies:
   environmental_endpoint_type: none
   published_gwp_available: false
   reconstructability_tier: A
-  validation_mode: none
+  evidence_class: none
   reconstruction_status: not_applicable
   assumptions_required:
     - "Endpoint classified as production_cost from the dataset label 'cost'."
@@ -1364,7 +1463,7 @@ studies:
   environmental_endpoint_type: none
   published_gwp_available: false
   reconstructability_tier: A
-  validation_mode: none
+  evidence_class: none
   reconstruction_status: not_applicable
   assumptions_required:
     - "Endpoint classified as production_cost from the dataset label 'cost'."
@@ -1393,7 +1492,7 @@ studies:
   environmental_endpoint_type: none
   published_gwp_available: false
   reconstructability_tier: A
-  validation_mode: none
+  evidence_class: none
   reconstruction_status: not_applicable
   assumptions_required:
     - "Endpoint classified as production_cost from the dataset label 'cost'."
@@ -1421,7 +1520,7 @@ studies:
   environmental_endpoint_type: none
   published_gwp_available: false
   reconstructability_tier: A
-  validation_mode: none
+  evidence_class: none
   reconstruction_status: not_applicable
   assumptions_required:
     - "Endpoint classified as production_cost from the dataset label 'cost'."
@@ -1450,7 +1549,7 @@ studies:
   environmental_endpoint_type: none
   published_gwp_available: false
   reconstructability_tier: A
-  validation_mode: none
+  evidence_class: none
   reconstruction_status: not_applicable
   assumptions_required:
     - "Endpoint classified as production_cost from the dataset label 'cost'."
@@ -1477,7 +1576,7 @@ studies:
   reported_gwp_unit: kg CO2-eq/kg dry biomass
   published_gwp_available: true
   reconstructability_tier: A
-  validation_mode: none
+  evidence_class: none
   reconstruction_status: not_applicable
   gwp_reconstruction_status: not_applicable
   todos:
@@ -1505,7 +1604,7 @@ studies:
   reported_gwp_unit: kg CO2-eq/kg dry biomass
   published_gwp_available: true
   reconstructability_tier: A
-  validation_mode: none
+  evidence_class: none
   reconstruction_status: not_applicable
   gwp_reconstruction_status: not_applicable
   assumptions_required:
@@ -1534,7 +1633,7 @@ studies:
   reported_gwp_unit: kg CO2-eq/kg dry biomass
   published_gwp_available: true
   reconstructability_tier: A
-  validation_mode: none
+  evidence_class: none
   reconstruction_status: not_applicable
   gwp_reconstruction_status: not_applicable
   notes: >
@@ -1562,7 +1661,7 @@ studies:
   reported_gwp_unit: kg CO2-eq/kg dry biomass
   published_gwp_available: true
   reconstructability_tier: A
-  validation_mode: none
+  evidence_class: none
   reconstruction_status: not_applicable
   gwp_reconstruction_status: not_applicable
 
@@ -1584,7 +1683,7 @@ studies:
   reported_gwp_unit: kg CO2-eq/kg dry biomass
   published_gwp_available: true
   reconstructability_tier: A
-  validation_mode: none
+  evidence_class: none
   reconstruction_status: not_applicable
   gwp_reconstruction_status: not_applicable
   assumptions_required:
@@ -1611,7 +1710,7 @@ studies:
   reported_gwp_unit: kg CO2-eq/kg dry biomass
   published_gwp_available: true
   reconstructability_tier: A
-  validation_mode: none
+  evidence_class: none
   reconstruction_status: not_applicable
   gwp_reconstruction_status: not_applicable
   assumptions_required:
@@ -1636,7 +1735,7 @@ studies:
   reported_gwp_unit: kg CO2-eq/kg dry biomass
   published_gwp_available: true
   reconstructability_tier: A
-  validation_mode: none
+  evidence_class: none
   reconstruction_status: not_applicable
   gwp_reconstruction_status: not_applicable
   todos:
@@ -1660,7 +1759,7 @@ studies:
   reported_gwp_unit: kg CO2-eq/kg dry biomass
   published_gwp_available: true
   reconstructability_tier: A
-  validation_mode: none
+  evidence_class: none
   reconstruction_status: not_applicable
   gwp_reconstruction_status: not_applicable
   todos:
@@ -1684,7 +1783,7 @@ studies:
   reported_gwp_unit: kg CO2-eq/kg dry biomass
   published_gwp_available: true
   reconstructability_tier: A
-  validation_mode: none
+  evidence_class: none
   reconstruction_status: not_applicable
   gwp_reconstruction_status: not_applicable
   todos:
@@ -1712,7 +1811,7 @@ studies:
   reported_gwp_unit: kg CO2-eq/kg dry biomass
   published_gwp_available: true
   reconstructability_tier: A
-  validation_mode: none
+  evidence_class: none
   reconstruction_status: not_applicable
   gwp_reconstruction_status: not_applicable
   assumptions_required:
@@ -1742,7 +1841,7 @@ studies:
   reported_gwp_unit: kg CO2-eq/kg dry biomass
   published_gwp_available: true
   reconstructability_tier: A
-  validation_mode: none
+  evidence_class: none
   reconstruction_status: not_applicable
   gwp_reconstruction_status: not_applicable
   assumptions_required:
@@ -1768,7 +1867,7 @@ studies:
   reported_gwp_unit: kg CO2-eq/kg dry biomass
   published_gwp_available: true
   reconstructability_tier: A
-  validation_mode: none
+  evidence_class: none
   reconstruction_status: not_applicable
   gwp_reconstruction_status: not_applicable
 
@@ -1791,7 +1890,7 @@ studies:
   reported_gwp_unit: kg CO2-eq/kg dry biomass
   published_gwp_available: true
   reconstructability_tier: A
-  validation_mode: none
+  evidence_class: none
   reconstruction_status: not_applicable
   gwp_reconstruction_status: not_applicable
 
@@ -1814,6 +1913,6 @@ studies:
   reported_gwp_unit: kg CO2-eq/kg dry biomass
   published_gwp_available: true
   reconstructability_tier: A
-  validation_mode: none
+  evidence_class: none
   reconstruction_status: not_applicable
   gwp_reconstruction_status: not_applicable

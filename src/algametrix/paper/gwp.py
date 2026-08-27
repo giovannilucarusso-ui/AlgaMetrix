@@ -37,13 +37,17 @@ from .stats import Spread, compute_spread
 from .studies import Cohort, Dataset
 
 CLASS_UNTUNED = "published_gwp_untuned_reconstruction"
+CLASS_COMPONENT_INFORMED = "published_gwp_component_informed_reconstruction"
 CLASS_CALIBRATED = "published_gwp_calibrated_reconstruction"
 CLASS_RANGE_ONLY = "published_gwp_range_only"
 CLASS_MODEL_DERIVED = "model_derived_gwp_from_tea_scenario"
 CLASS_LITERATURE_ONLY = "literature_point_only"
 
-#: Classes that constitute validation evidence about the engine's GWP.
-VALIDATION_CLASSES = (CLASS_UNTUNED, CLASS_CALIBRATED)
+#: Classes that compare an engine GWP against a published one. They are NOT
+#: equally strong: only :data:`CLASS_UNTUNED` is a reconstruction the source's
+#: own reported endpoint did not feed, and the three are never pooled into one
+#: reported range.
+COMPARISON_CLASSES = (CLASS_UNTUNED, CLASS_COMPONENT_INFORMED, CLASS_CALIBRATED)
 
 
 @dataclass(frozen=True)
@@ -76,9 +80,11 @@ def classify(record: StudyRecord) -> str:
     if record.has_published_gwp:
         if not executable:
             return CLASS_LITERATURE_ONLY
-        if record.validation_mode == "calibrated":
+        if record.evidence_class == "calibrated":
             return CLASS_CALIBRATED
-        if record.validation_mode == "range":
+        if record.evidence_class == "component_informed":
+            return CLASS_COMPONENT_INFORMED
+        if record.evidence_class == "range":
             return CLASS_RANGE_ONLY
         return CLASS_UNTUNED
     return CLASS_MODEL_DERIVED if executable else CLASS_LITERATURE_ONLY
@@ -204,7 +210,7 @@ def build_populations(
 
     executable_records = [r for r in dataset if r.is_executable]
     cases = [evaluate_case(r, bg, lib) for r in executable_records]
-    reproduced = [c for c in cases if c.analysis_class in VALIDATION_CLASSES]
+    reproduced = [c for c in cases if c.analysis_class in COMPARISON_CLASSES]
 
     blocked = {
         r.study_id: (

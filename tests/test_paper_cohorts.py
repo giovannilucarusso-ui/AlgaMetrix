@@ -108,11 +108,19 @@ def test_records_sharing_a_publication_are_flagged_as_not_independent(dataset):
         assert "not independent evidence" in " ".join(ind.statement())
 
 
-def test_new_reconstructions_are_blind_and_carry_a_cost_breakdown(dataset):
+def test_stoten_reconstructions_are_untuned_and_carry_a_cost_breakdown(dataset):
     for sid in ("vazquez2022b_nas", "vazquez2022b_tiso_pht", "vazquez2022b_nas_10ha"):
         rec = dataset.by_id(sid)
-        assert rec.validation_mode == "blind"
+        assert rec.evidence_class == "retrospective_untuned"
         assert rec.is_executable
         assert rec.has_cost_breakdown
         assert abs(sum(rec.cost_breakdown.values()) - 1.0) < 5e-3, sid
         assert rec.author_overlap_with_algametrix is False
+
+
+def test_the_three_stoten_scenarios_are_one_independent_source(dataset):
+    """Three scenarios of one publication are three comparisons and one source."""
+    groups = {dataset.by_id(sid).independence_group
+              for sid in ("vazquez2022b_nas", "vazquez2022b_tiso_pht",
+                          "vazquez2022b_nas_10ha")}
+    assert groups == {"vazquez_stoten_2022"}

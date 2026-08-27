@@ -65,8 +65,47 @@ NOMINAL_OR_REAL = ("nominal", "real", "unknown")
 #: Operational definition of the reconstructability tiers. See :func:`tier_rule`.
 TIERS = ("A", "B")
 
-#: Validation protocol actually used for a Tier-B case.
-VALIDATION_MODES = ("blind", "calibrated", "range", "none")
+#: How far a comparison against a published number depends on that number.
+#:
+#: This replaces the earlier ``validation_mode``, whose strongest class was called
+#: ``blind``. Nothing in this dataset was predicted before its target was known:
+#: every source was already published when its reconstruction was built, and no
+#: prediction was registered in advance. ``blind`` therefore named a protocol the
+#: work does not have. The classes below say instead what each comparison *takes*
+#: from the source, which is the property a reader has to weigh.
+#:
+#: ``retrospective_untuned``
+#:     the source's own assumptions were entered without adjustment to its
+#:     reported endpoint, but the endpoint was already available and no
+#:     pre-specification is claimed;
+#: ``component_informed``
+#:     a published *aggregate outcome* of the source (a total OPEX, say) was used
+#:     to construct one or more model inputs, so part of the target appears on
+#:     both sides and the comparison is not an independent endpoint test;
+#: ``calibrated``
+#:     the scenario was deliberately configured to reproduce a reference
+#:     simulator or case study;
+#: ``range``
+#:     a plausibility check against a published envelope, never converted into a
+#:     deviation from an envelope midpoint;
+#: ``excluded``
+#:     the target could not be traced to an eligible primary source; the record
+#:     stays in the dataset with its reason and enters no population;
+#: ``none``
+#:     not a reconstruction at all - a literature point that enters descriptive
+#:     statistics only.
+EVIDENCE_CLASSES = (
+    "retrospective_untuned",
+    "component_informed",
+    "calibrated",
+    "range",
+    "excluded",
+    "none",
+)
+
+#: Classes that may be pooled into the headline retrospective range. Everything
+#: else is reported separately, by name.
+UNTUNED_CLASSES = ("retrospective_untuned",)
 
 #: Whether the engine can currently execute the study's foreground scenario.
 RECONSTRUCTION_STATUSES = (
@@ -81,6 +120,7 @@ RECONSTRUCTION_STATUSES = (
 #: model output.
 GWP_ANALYSIS_CLASSES = (
     "published_gwp_untuned_reconstruction",
+    "published_gwp_component_informed_reconstruction",
     "published_gwp_calibrated_reconstruction",
     "published_gwp_range_only",
     "model_derived_gwp_from_tea_scenario",
@@ -212,6 +252,18 @@ class StudyRecord:
     #: same size that does not, and the difference must be countable rather than
     #: buried in a prose disclosure.
     author_overlap_with_algametrix: bool | None = None
+    #: Which publication, facility model and author group this record belongs to.
+    #: Three scenarios of one paper are three scenarios and **one** independent
+    #: source; counting them as three publications would treble the apparent
+    #: breadth of the evidence. Records sharing this string are one group. Left
+    #: ``None``, :func:`independence_key` falls back to the DOI, which groups
+    #: correctly for a source contributing a single record.
+    independence_group: str | None = None
+    #: What this comparison takes from the source beyond its physical data:
+    #: which inputs were built from a published aggregate, which endpoint had to
+    #: be harmonized, whose authors overlap. One line per dependency, so a reader
+    #: can see what is *not* independent about the row without reading prose.
+    dependency_notes: list[str] = field(default_factory=list)
     notes: str = ""
 
     # --- eligibility ------------------------------------------------------
@@ -273,7 +325,9 @@ class StudyRecord:
 
     # --- reconstructability ----------------------------------------------
     reconstructability_tier: str | None = None
-    validation_mode: str | None = None
+    #: See :data:`EVIDENCE_CLASSES`. Named for what the comparison depends on,
+    #: not for a validation protocol.
+    evidence_class: str | None = None
     reconstruction_status: str | None = None
     reconstruction_builder: str | None = None
     published_inventory_available: bool | None = None
@@ -298,7 +352,7 @@ class StudyRecord:
         _check(self.plant_maturity, PLANT_MATURITIES, "plant_maturity", sid)
         _check(self.nominal_or_real, NOMINAL_OR_REAL, "nominal_or_real", sid)
         _check(self.reconstructability_tier, TIERS, "reconstructability_tier", sid)
-        _check(self.validation_mode, VALIDATION_MODES, "validation_mode", sid)
+        _check(self.evidence_class, EVIDENCE_CLASSES, "evidence_class", sid)
         _check(self.reconstruction_status, RECONSTRUCTION_STATUSES, "reconstruction_status", sid)
         _check(self.gwp_reconstruction_status, RECONSTRUCTION_STATUSES,
                "gwp_reconstruction_status", sid)
@@ -404,6 +458,18 @@ class StudyRecord:
 # --------------------------------------------------------------------------
 # Operational tier rule
 # --------------------------------------------------------------------------
+
+def independence_key(record: StudyRecord) -> str:
+    """The publication group a record belongs to, for counting independent sources.
+
+    The declared :attr:`~StudyRecord.independence_group` where there is one; the
+    DOI, then the full citation, then the id otherwise. Records that share a
+    publication, a facility model or an author group are one independent source
+    however many scenarios they contribute.
+    """
+    return (record.independence_group or record.doi or record.full_citation
+            or record.study_id)
+
 
 def tier_rule(record: StudyRecord) -> str:
     """Tier that the *declared evidence* supports, independent of any label.

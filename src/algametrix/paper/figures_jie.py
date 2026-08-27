@@ -8,7 +8,8 @@ Figure 1  architecture: scenario -> shared inventory -> TEA + LCA -> sensitivity
           and uncertainty
 Figure 2  shared-inventory consistency and internal verification, with the
           controlled duplicated-inventory counter-example on the same residual axis
-Figure 3  external validation: deviations from point references
+Figure 3  retrospective literature reconstruction and external benchmarking:
+          deviations from point references, by evidence class
 Figure 4  model evaluation: the same physical parameter set driving an economic
           and an environmental output differently, the propagated uncertainty on
           both, and a group-wise Sobol' decomposition of that uncertainty
@@ -26,6 +27,8 @@ from pathlib import Path
 import numpy as np
 
 from .figures import (
+    CLASS_LABEL,
+    CLASS_MARKER,
     C_FOREGROUND,
     C_JOINT,
     C_LCA,
@@ -279,21 +282,21 @@ def figure2_consistency(consistency_reports, verification_reports,
     return _save(fig, outdir, "jie_fig2_consistency", tight_bbox=True)
 
 
-# Figure 3 - external validation
+# Figure 3 - retrospective reconstruction and external benchmarking
 # ======================================================================
 
 def figure3_validation(rows, blocked, outdir: Path, excluded=None) -> list[Path]:
-    """Point reproductions as a model/source ratio against a line at 1.
+    """Point comparisons as a model/source ratio against a line at 1.
 
     The range checks used to occupy a second panel. After two records were
     excluded for untraceable provenance only one remains, and a panel for a
     single point is worse than a sentence: it is stated in the caption and in
     full in ``results/validation.txt``.
 
-    How many cases there are, how they split between blind and calibrated, what
-    the blind spreads are, and what happened to the range check and the excluded
-    records are all caption material and are not written on the axes. That is
-    why ``blocked`` and ``excluded`` are still accepted and no longer drawn: the
+    How many cases there are, how they split by evidence class, what the untuned
+    spreads are, and what happened to the range check and the excluded records
+    are all caption material and are not written on the axes. That is why
+    ``blocked`` and ``excluded`` are still accepted and no longer drawn: the
     counts belong to the caller's caption, and the reasons to
     ``results/validation.txt``.
 
@@ -303,11 +306,18 @@ def figure3_validation(rows, blocked, outdir: Path, excluded=None) -> list[Path]
     ``results/validation.txt`` and appears nowhere a reader is expected to read.
     """
     point_rows = [r for r in rows if r.comparison_kind == "point" and r.ratio]
-    point_rows = sorted(point_rows, key=lambda r: (r.validation_mode != "blind",
-                                                   r.metric, r.label))
+
+    order_of = list(CLASS_MARKER)
+
+    def order(r):
+        rank = (order_of.index(r.evidence_class) if r.evidence_class in order_of
+                else len(order_of))
+        return (rank, r.metric, r.label)
+
+    point_rows = sorted(point_rows, key=order)
 
     fig, ax = plt.subplots(figsize=(7.2, 0.34 * max(len(point_rows), 6) + 1.4))
-    marker = {"blind": "o", "calibrated": "s", "range": "^", "none": "D"}
+    marker = CLASS_MARKER
 
     ax.grid(axis="x", color="#e6e6e6", lw=0.5)
     ax.grid(axis="y", color="#eeeeee", lw=0.5, ls=":")
@@ -322,7 +332,7 @@ def figure3_validation(rows, blocked, outdir: Path, excluded=None) -> list[Path]
             any_bounds = True
             ax.plot(bounds, [i, i], color=color, lw=2.4, alpha=0.55,
                     solid_capstyle="butt", zorder=2)
-        ax.plot(r.ratio, i, marker.get(r.validation_mode, "o"), color=color,
+        ax.plot(r.ratio, i, marker.get(r.evidence_class, "o"), color=color,
                 markersize=6.5, markeredgecolor="white", markeredgewidth=0.6, zorder=3)
         labels.append(r.citation or r.study_id)
     # Two lines, not one: the citation is the tick label, so the layout reserves
@@ -350,9 +360,13 @@ def figure3_validation(rows, blocked, outdir: Path, excluded=None) -> list[Path]
     ax.set_ylim(len(point_rows) - 0.4, -0.95)      # inverted: row 0 on top
     ax.text(1.1, -0.85, "±10 %", fontsize=6.2, color=C_NEUTRAL, ha="left", va="center")
 
-    handles = [
-        Line2D([], [], marker="o", ls="", color=C_NEUTRAL, label="blind"),
-        Line2D([], [], marker="s", ls="", color=C_NEUTRAL, label="calibrated"),
+    # Only the classes actually on the axis are given a key: a legend entry for a
+    # class with no marker under it invites the reader to look for one.
+    present = [c for c in order_of
+               if c in CLASS_LABEL and any(r.evidence_class == c for r in point_rows)]
+    handles = [Line2D([], [], marker=CLASS_MARKER[c], ls="", color=C_NEUTRAL,
+                      label=CLASS_LABEL[c]) for c in present]
+    handles += [
         Line2D([], [], marker="o", ls="", color=C_TEA, label="cost endpoint"),
         Line2D([], [], marker="o", ls="", color=C_LCA, label="GWP endpoint"),
     ]

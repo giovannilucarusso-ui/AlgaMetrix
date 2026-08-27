@@ -43,7 +43,12 @@ from . import indices, reconstructions
 from .basis import PriceBasis, basis_of_source
 from .endpoints import PRIMARY_ENDPOINT
 from .indices import BasisTransfer
-from .schema import StudyRecord, compose_label
+from .schema import (
+    EVIDENCE_CLASSES,
+    StudyRecord,
+    compose_label,
+    independence_key,
+)
 from .studies import Dataset
 
 #: Source endpoints the engine can produce a like-for-like value for.
@@ -67,7 +72,10 @@ class ReproductionRow:
     scenario: str | None
     metric: str                 # "cost" | "gwp"
     endpoint: str
-    validation_mode: str
+    #: See :data:`algametrix.paper.schema.EVIDENCE_CLASSES`. What this
+    #: comparison depends on, carried with the row so that a figure or a summary
+    #: never pools classes by accident.
+    evidence_class: str
     comparison_kind: str        # "point" | "range" | "endpoint_mismatch" | "not_comparable"
     model: float | None
     reference: float | None
@@ -75,6 +83,9 @@ class ReproductionRow:
     ref_high: float | None = None
     unit: str = ""
     notes: list[str] = field(default_factory=list)
+    #: The publication group the source belongs to. Rows sharing it are several
+    #: scenarios of one independent source.
+    independence_group: str = ""
 
     # --- price basis (cost rows only; a GWP is basis-free) -----------------
     engine_basis: PriceBasis | None = None
@@ -138,6 +149,17 @@ class ReproductionRow:
         return self.source_basis.label if self.source_basis else "unknown basis"
 
     @property
+    def deviation_pct(self) -> float | None:
+        """``(model / reference - 1) x 100``, unrounded."""
+        r = self.ratio
+        return None if r is None else (r - 1) * 100.0
+
+    @property
+    def deviation_bounds_pct(self) -> tuple[float, float] | None:
+        b = self.ratio_bounds
+        return None if b is None else ((b[0] - 1) * 100.0, (b[1] - 1) * 100.0)
+
+    @property
     def verdict(self) -> str:
         if self.comparison_kind == "endpoint_mismatch":
             return "endpoint mismatch - not compared"
@@ -147,14 +169,21 @@ class ReproductionRow:
             inside = self.in_range
             return (f"in range {self.ref_low:g}-{self.ref_high:g}" if inside
                     else f"OUTSIDE range {self.ref_low:g}-{self.ref_high:g}")
-        r = self.ratio
-        if r is None:
+        pct = self.deviation_pct
+        if pct is None:
             return "n/a"
-        bounds = self.ratio_bounds
+        bounds = self.deviation_bounds_pct
         if bounds is None:
-            return f"{(r - 1) * 100:+.0f}%"
-        lo, hi = bounds
-        return f"{(lo - 1) * 100:+.0f}% to {(hi - 1) * 100:+.0f}%"
+            return f"{pct:+.0f}%"
+        return f"{bounds[0]:+.0f}% to {bounds[1]:+.0f}%"
+
+
+def format_deviation_range(values) -> str:
+    """``-14% to -1%``: the extremes of a set of deviations."""
+    vals = [v for v in values if v is not None]
+    if not vals:
+        return "no comparable deviation"
+    return f"{min(vals):+.0f}% to {max(vals):+.0f}%"
 
 
 def _cost_of(scn) -> float:
@@ -185,10 +214,11 @@ def cost_row(
     if endpoint not in _ENGINE_ENDPOINT:
         return ReproductionRow(
             rec.study_id, rec.short_citation, rec.scenario_label,
-            "cost", endpoint, rec.validation_mode or "none",
+            "cost", endpoint, rec.evidence_class or "none",
             "endpoint_mismatch", None, rec.reported_value,
             unit=rec.reported_unit or "",
             notes=["source endpoint is unknown; the engine has no like-for-like output"],
+            independence_group=independence_key(rec),
         )
 
     model_native, engine_endpoint = _engine_value(scn, endpoint)
@@ -199,12 +229,13 @@ def cost_row(
         study_id=rec.study_id, citation=rec.short_citation,
         scenario=rec.scenario_label, metric="cost",
         endpoint=f"{endpoint} vs engine {engine_endpoint}",
-        validation_mode=rec.validation_mode or "none",
+        evidence_class=rec.evidence_class or "none",
         comparison_kind="not_comparable", model=None, reference=rec.reported_value,
         ref_low=rec.reported_low, ref_high=rec.reported_high,
         unit=rec.reported_unit or "",
         engine_basis=engine_basis, source_basis=source_basis,
         model_native=model_native,
+        independence_group=independence_key(rec),
     )
 
     # --- move the engine value into the source's own basis -----------------
@@ -326,11 +357,12 @@ def gwp_row(rec: StudyRecord, lib: Library) -> ReproductionRow | None:
         study_id=rec.study_id, citation=rec.short_citation,
         scenario=rec.scenario_label, metric="gwp",
         endpoint=f"{rec.environmental_endpoint_type or 'unknown'} [{basis}]",
-        validation_mode=rec.validation_mode or "none",
+        evidence_class=rec.evidence_class or "none",
         comparison_kind=kind,
         model=model, reference=reference,
         ref_low=rec.reported_gwp_low, ref_high=rec.reported_gwp_high,
         unit="kg CO2-eq/kg",
+        independence_group=independence_key(rec),
     )
     row.model_native = model
     row.notes.append(
@@ -402,6 +434,116 @@ def build_rows(
             if row is not None:
                 rows.append(row)
     return rows
+
+
+# --------------------------------------------------------------------------
+# Counting the evidence by what it depends on
+# --------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class ClassCohort:
+    """The point comparisons of one evidence class, optionally of one metric.
+
+    Two numbers are kept apart deliberately: how many *scenarios* were compared,
+    and how many *independent sources* they came from. Three scenarios of one
+    paper are three comparisons and one source, and reporting only the first
+    trebles the apparent breadth of the evidence.
+    """
+
+    evidence_class: str
+    metric: str | None
+    rows: tuple[ReproductionRow, ...]
+
+    @property
+    def n(self) -> int:
+        return len(self.rows)
+
+    @property
+    def publications(self) -> tuple[str, ...]:
+        return tuple(sorted({r.independence_group for r in self.rows if r.independence_group}))
+
+    @property
+    def n_publications(self) -> int:
+        return len(self.publications)
+
+    @property
+    def deviations(self) -> list[float]:
+        """Every deviation in the cohort, including both ends of a bracketed row."""
+        out: list[float] = []
+        for r in self.rows:
+            bounds = r.deviation_bounds_pct
+            if bounds is not None:
+                out.extend(bounds)
+            elif r.deviation_pct is not None:
+                out.append(r.deviation_pct)
+        return out
+
+    @property
+    def span(self) -> tuple[float, float] | None:
+        d = self.deviations
+        return (min(d), max(d)) if d else None
+
+    @property
+    def range_label(self) -> str:
+        return format_deviation_range(self.deviations)
+
+    def describe(self) -> str:
+        scen = f"{self.n} scenario{'' if self.n == 1 else 's'}"
+        pubs = (f"{self.n_publications} publication"
+                f"{'' if self.n_publications == 1 else 's'}")
+        return f"{scen} from {pubs}, {self.range_label}"
+
+
+def point_rows(rows) -> list[ReproductionRow]:
+    """Only the rows that carry a deviation: no ranges, no refused comparisons."""
+    return [r for r in rows if r.comparison_kind == "point" and r.ratio is not None]
+
+
+def cohort(rows, evidence_class: str, metric: str | None = None) -> ClassCohort:
+    """The point comparisons of one evidence class, never pooled across classes."""
+    sel = [r for r in point_rows(rows)
+           if r.evidence_class == evidence_class
+           and (metric is None or r.metric == metric)]
+    return ClassCohort(evidence_class, metric, tuple(sel))
+
+
+@dataclass(frozen=True)
+class EvidenceSummary:
+    """What the literature layer amounts to, counted rather than described."""
+
+    n_point: int
+    by_class: dict[str, int]
+    untuned_cost: ClassCohort
+    untuned_gwp: ClassCohort
+
+    @property
+    def n_untuned(self) -> int:
+        return self.by_class.get("retrospective_untuned", 0)
+
+    def statement(self) -> list[str]:
+        parts = [f"{self.n_point} point comparison(s), by what each one depends on:"]
+        for cls, n in self.by_class.items():
+            parts.append(f"  {cls:24s}: {n}")
+        parts.append(
+            f"  retrospective untuned, production cost: {self.untuned_cost.describe()}")
+        parts.append(
+            f"  retrospective untuned, GWP            : {self.untuned_gwp.describe()}")
+        return parts
+
+
+def evidence_summary(rows) -> EvidenceSummary:
+    pts = point_rows(rows)
+    counts: dict[str, int] = {}
+    for cls in EVIDENCE_CLASSES:
+        n = sum(1 for r in pts if r.evidence_class == cls)
+        if n:
+            counts[cls] = n
+    return EvidenceSummary(
+        n_point=len(pts),
+        by_class=counts,
+        untuned_cost=cohort(rows, "retrospective_untuned", "cost"),
+        untuned_gwp=cohort(rows, "retrospective_untuned", "gwp"),
+    )
 
 
 def blocked_rows(dataset: Dataset) -> dict[str, str]:

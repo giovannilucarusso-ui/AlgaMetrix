@@ -65,7 +65,7 @@ from .uncertainty import MonteCarloResult, run_montecarlo
 # Single source of truth for the version: pyproject.toml reads it from here
 # (`[tool.setuptools.dynamic]`), so bumping this line is enough for the package
 # metadata, the desktop PDF report cover and the console `--version` alike.
-__version__ = "1.4.0"
+__version__ = "1.5.0"
 
 __all__ = [
     "Basis",

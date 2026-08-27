@@ -51,6 +51,25 @@ plt.rcParams.update({
     "savefig.bbox": "tight",
 })
 
+#: Marker per evidence class, strongest evidence first. The classes are the
+#: figure's argument: a calibrated row was configured to reproduce its target and
+#: a component-informed row was partly built from it, so neither can be read as
+#: the same kind of agreement as an untuned reconstruction. Sorting by the same
+#: order groups them on the axis without a separator or a second panel.
+CLASS_MARKER = {
+    "retrospective_untuned": "o",
+    "component_informed": "D",
+    "calibrated": "s",
+    "range": "^",
+    "none": ".",
+}
+CLASS_LABEL = {
+    "retrospective_untuned": "retrospective untuned",
+    "component_informed": "component-informed",
+    "calibrated": "calibrated",
+}
+_CLASS_ORDER = list(CLASS_MARKER)
+
 
 def _decade_ticks(lo: float, hi: float) -> list[float]:
     """1-2-5 ticks spanning [lo, hi]. A default log axis over less than a decade
@@ -196,7 +215,7 @@ def figure2_validation(rows, blocked, outdir: Path) -> list[Path]:
         1, 2, figsize=(7.2, 0.55 * max(len(point_rows), len(range_rows), 3) + 1.6),
         gridspec_kw={"width_ratios": [1.05, 1.0]},
     )
-    marker = {"blind": "o", "calibrated": "s", "range": "^", "none": "D"}
+    marker = CLASS_MARKER
 
     # --- panel a: point reproductions as a ratio -------------------------
     ax = axes[0]
@@ -213,7 +232,7 @@ def figure2_validation(rows, blocked, outdir: Path) -> list[Path]:
             any_bounds = True
             ax.plot(bounds, [i, i], color=color, lw=2.2, alpha=0.55,
                     solid_capstyle="butt", zorder=2)
-        ax.plot(r.ratio, i, marker.get(r.validation_mode, "o"), color=color,
+        ax.plot(r.ratio, i, marker.get(r.evidence_class, "o"), color=color,
                 markersize=6, markeredgecolor="white", markeredgewidth=0.6, zorder=3)
         # Citation over scenario: a row a reader cannot look up in a reference
         # list is not a validation they can check. The row's price basis is not
@@ -227,9 +246,11 @@ def figure2_validation(rows, blocked, outdir: Path) -> list[Path]:
     ax.set_title("a  point reproductions", loc="left")
     ax.set_xlim(0.5, 1.5)
     ax.invert_yaxis()
-    handles = [
-        Line2D([], [], marker="o", ls="", color=C_NEUTRAL, label="blind"),
-        Line2D([], [], marker="s", ls="", color=C_NEUTRAL, label="calibrated"),
+    present = [c for c in CLASS_MARKER
+               if c in CLASS_LABEL and any(r.evidence_class == c for r in point_rows)]
+    handles = [Line2D([], [], marker=CLASS_MARKER[c], ls="", color=C_NEUTRAL,
+                      label=CLASS_LABEL[c]) for c in present]
+    handles += [
         Line2D([], [], marker="o", ls="", color=C_TEA, label="cost endpoint"),
         Line2D([], [], marker="o", ls="", color=C_LCA, label="GWP endpoint"),
     ]

@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 
+from . import reproduction
 from .schema import fmt
 from .stats import Spread, format_spread
 
@@ -540,18 +541,20 @@ def reproductions(rows, blocked, excluded=None) -> str:
         "  time with those defaults expressed in the source's currency and the deviation",
         "  is given as the interval the two readings span.",
         "",
-        f"  {'study_id':24s} {'metric':6s} {'mode':11s} {'kind':10s} {'model':>10s} "
-        f"{'source':>10s} {'basis':14s} verdict",
+        f"  {'study_id':24s} {'metric':6s} {'evidence class':22s} {'kind':10s} "
+        f"{'model':>10s} {'source':>10s} {'basis':14s} verdict",
     ]
     for r in rows:
         model = f"{r.model:,.4g}" if r.model is not None else "n/a"
         ref = f"{r.reference:,.4g}" if r.reference is not None else "n/a"
         lines.append(
-            f"  {r.study_id:24s} {r.metric:6s} {r.validation_mode:11s} "
+            f"  {r.study_id:24s} {r.metric:6s} {r.evidence_class:22s} "
             f"{r.comparison_kind:10s} {model:>10s} {ref:>10s} {r.basis_label:14s} "
             f"{r.verdict}"
         )
         lines.append(f"      endpoint: {r.endpoint}")
+        if r.independence_group:
+            lines.append(f"      group   : {r.independence_group}")
         if r.engine_basis is not None:
             lines.append(f"      engine  : {r.engine_basis.label} [{r.engine_basis.kind}]"
                          + (f" - {r.engine_basis.provenance}"
@@ -565,10 +568,9 @@ def reproductions(rows, blocked, excluded=None) -> str:
             lines.append(f"      note    : {n}")
     lines.append("")
 
-    n_point = sum(1 for r in rows if r.comparison_kind == "point")
+    summary = reproduction.evidence_summary(rows)
+    n_point = summary.n_point
     n_range = sum(1 for r in rows if r.comparison_kind == "range")
-    n_blind = sum(1 for r in rows if r.validation_mode == "blind"
-                  and r.comparison_kind == "point")
     n_native = sum(1 for r in rows if r.metric == "cost" and r.transfer is not None
                    and r.transfer.is_identity)
     n_conv = sum(1 for r in rows if r.metric == "cost" and r.transfer is not None
@@ -577,7 +579,12 @@ def reproductions(rows, blocked, excluded=None) -> str:
     lines += [
         "SUMMARY",
         THIN,
-        f"  point reproductions        : {n_point}  (of which blind: {n_blind})",
+        "  Classes are NEVER pooled. Only a retrospective untuned row is a comparison",
+        "  the source's own reported endpoint did not feed; a component-informed or a",
+        "  calibrated row borrows part of its target and is reported on its own.",
+        "",
+    ] + [f"  {line}" for line in summary.statement()] + [
+        "",
         f"  range plausibility checks  : {n_range}",
         f"  not comparable             : {sum(1 for r in rows if r.comparison_kind not in ('point', 'range'))}",
         "",

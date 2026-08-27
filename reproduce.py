@@ -385,13 +385,16 @@ def stage_reproductions(run: Run) -> None:
     run.artifacts["reproduction_rows"] = rows
     run.artifacts["reproduction_blocked"] = blocked
     run.artifacts["reproduction_excluded"] = excluded
-    n_point = sum(1 for r in rows if r.comparison_kind == "point")
-    n_blind = sum(1 for r in rows
-                  if r.comparison_kind == "point" and r.validation_mode == "blind")
+    summary = reproduction.evidence_summary(rows)
+    run.artifacts["evidence_summary"] = summary
+    by_class = ", ".join(f"{n} {cls.replace('_', ' ')}"
+                         for cls, n in summary.by_class.items())
     run.notes.append(
-        f"{n_point} point reproduction(s) of which {n_blind} blind; {len(blocked)} "
-        f"blocked Tier-B studies; {len(excluded)} record(s) excluded for unsound "
-        f"provenance ({', '.join(sorted(excluded)) or 'none'})."
+        f"{summary.n_point} point comparison(s): {by_class}. Retrospective untuned "
+        f"production cost, {summary.untuned_cost.describe()}; retrospective untuned "
+        f"GWP, {summary.untuned_gwp.describe()}. {len(blocked)} blocked Tier-B "
+        f"studies; {len(excluded)} record(s) excluded for unsound provenance "
+        f"({', '.join(sorted(excluded)) or 'none'})."
     )
 
 
