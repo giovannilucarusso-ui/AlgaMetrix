@@ -68,7 +68,6 @@ CLASS_LABEL = {
     "component_informed": "component-informed",
     "calibrated": "calibrated",
 }
-_CLASS_ORDER = list(CLASS_MARKER)
 
 
 def _decade_ticks(lo: float, hi: float) -> list[float]:
