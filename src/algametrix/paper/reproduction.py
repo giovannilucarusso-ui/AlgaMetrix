@@ -4,11 +4,19 @@ Replaces the legacy ``results/validation.txt`` and ``results/lca_validation.txt`
 which listed reproductions whose scenario definitions are no longer in the
 repository.
 
-Three things are kept strictly apart here and were not before:
+Four things are kept strictly apart here and were not before:
 
+* what each comparison **depends on**. A row that was configured to reproduce
+  its reference, or one that built an input out of the source's own published
+  total, is not the same evidence as one the reported endpoint never fed. The
+  class travels with the row (see
+  :data:`algametrix.paper.schema.EVIDENCE_CLASSES`) and the classes are
+  never pooled into one reported range.
 * the **economic endpoint** being compared. Comparing the engine's production
   cost against a source's minimum selling price is an endpoint mismatch, and the
-  row says so instead of printing a percentage.
+  row says so instead of printing a percentage. Where an endpoint had to be
+  harmonized to be comparable at all, both readings travel with the row: what
+  the source printed, and what was compared.
 * **point predictions versus range checks.** A result that falls inside a
   published envelope is a plausibility check, not a prediction, and is reported
   with the envelope rather than as a deviation from its midpoint.
