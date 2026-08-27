@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from datetime import date
 
 from . import reproduction
-from .schema import fmt
+from .schema import fmt, independence_key
 from .stats import Spread, format_spread
 
 RULE = "=" * 78
@@ -93,7 +93,45 @@ def study_selection_audit(dataset, tier_disagreements) -> str:
     else:
         lines.append("  No disagreement between declared tier and the rule.\n")
 
-    lines += ["4. PER-STUDY RECORD", THIN,
+    lines += [
+        "4. EVIDENCE CLASS AND DECLARED DEPENDENCIES",
+        THIN,
+        "  What each comparison DEPENDS ON, not how well it did. None of these records",
+        "  is a prospective validation: every target was published before its scenario",
+        "  was built, which is why no class is called 'blind'. Records sharing an",
+        "  independence group are several scenarios of ONE publication, facility model",
+        "  and author group.",
+        "",
+        f"  {'study_id':26s} {'evidence class':22s} {'overlap':>7s}  independence group",
+    ]
+    for r in sorted(dataset, key=lambda r: r.study_id):
+        if (r.evidence_class or "none") == "none":
+            continue
+        lines.append(
+            f"  {r.study_id:26s} {fmt(r.evidence_class):22s} "
+            f"{fmt(r.author_overlap_with_algametrix):>7s}  {independence_key(r)}"
+        )
+    lines.append("")
+    shared = {}
+    for r in dataset:
+        if (r.evidence_class or "none") != "none":
+            shared.setdefault(independence_key(r), []).append(r.study_id)
+    multi = {k: v for k, v in shared.items() if len(v) > 1}
+    if multi:
+        lines.append("  Groups contributing more than one comparison - counted as one source:")
+        for key, ids in sorted(multi.items()):
+            lines.append(f"    {key:36s} {', '.join(sorted(ids))}")
+        lines.append("")
+    any_dep = False
+    for r in sorted(dataset, key=lambda r: r.study_id):
+        for d in r.dependency_notes:
+            any_dep = True
+            lines.append(f"  [{r.study_id}] {d}")
+    if not any_dep:
+        lines.append("  no dependency recorded on any record")
+    lines.append("")
+
+    lines += ["5. PER-STUDY RECORD", THIN,
               f"  {'study_id':26s} {'tier':4s} {'compl.':>7s}  {'exec':>5s}  citation"]
     for r in sorted(dataset, key=lambda r: r.study_id):
         lines.append(
@@ -103,7 +141,7 @@ def study_selection_audit(dataset, tier_disagreements) -> str:
         )
     lines.append("")
 
-    lines += ["5. PROVENANCE AND TRACEABILITY GAPS", THIN,
+    lines += ["6. PROVENANCE AND TRACEABILITY GAPS", THIN,
               "  Provenance (identified source) is REQUIRED to enter any main result.",
               "  Traceability (DOI and the value's location inside the source) is not",
               "  required, but every gap is listed so it is visible.",
@@ -124,7 +162,7 @@ def study_selection_audit(dataset, tier_disagreements) -> str:
             lines.append(f"  {r.study_id:26s} traceability gap: {', '.join(gaps)}")
     lines += [f"  {n_trace} of {len(dataset)} records lack full traceability metadata.", ""]
 
-    lines += ["6. OPEN TODOs FROM MISSING SOURCE INFORMATION", THIN]
+    lines += ["7. OPEN TODOs FROM MISSING SOURCE INFORMATION", THIN]
     total = 0
     for r in sorted(dataset, key=lambda r: r.study_id):
         for t in r.todos:
@@ -558,6 +596,8 @@ def reproductions(rows, blocked, excluded=None) -> str:
                          f"{r.reference:,.6g} after endpoint harmonization")
         if r.independence_group:
             lines.append(f"      group   : {r.independence_group}")
+        for d in r.dependencies:
+            lines.append(f"      depends : {d}")
         if r.engine_basis is not None:
             lines.append(f"      engine  : {r.engine_basis.label} [{r.engine_basis.kind}]"
                          + (f" - {r.engine_basis.provenance}"

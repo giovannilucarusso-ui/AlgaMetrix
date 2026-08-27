@@ -946,6 +946,9 @@ studies:
        inputs. Infrastructure is acknowledged but not characterised as a distinct
        contributor, so the boundary is close to the engine's but not identical."
   todos:
+    - "Author overlap with AlgaMetrix is not recorded: the citation gives only
+       the first author, and nobody has checked the full list against it. The
+       field stays unknown rather than being written as no."
     - "Packaging is inside the source's boundary and outside the engine's. Quantify it
        from the source's contribution analysis, or state the residual it leaves."
 
@@ -958,6 +961,7 @@ studies:
     24:991-1001. Correction: Mar Biotechnol 24 (2022), electricity per FU 137.9 -> 54.48 kWh."
   doi: 10.1007/s10126-022-10162-8
   publication_year: 2022
+  author_overlap_with_algametrix: false
   independence_group: tzachor_marine_biotechnology_2022
   data_location_in_source: "LCA results: CO2-eq contributions listed as construction
     materials 0.201, energy 0.460, nutrients 0.028, cleaning agent 0.004 (sum 0.693),
@@ -1066,7 +1070,10 @@ studies:
        Ported verbatim into paper/reconstructions.py; reproduces the published value."
     - "Engine reproduces the operational path only; the source's S1 total includes
        infrastructure and transport, which this engine does not model (~2 kg CO2-eq/kg)."
-  todos: []
+  todos:
+    - "Author overlap with AlgaMetrix is not recorded: the citation gives only
+       the first author, and nobody has checked the full list against it. The
+       field stays unknown rather than being written as no."
 
 - study_id: mckuin_schizo
   short_citation: "McKuin et al., 2022"
@@ -1116,7 +1123,10 @@ studies:
     - "Modelled in the published sugar-biorefinery context: sugarcane sucrose 0.45 and bagasse
        electricity 0.05 kg CO2-eq. The source reports 1.85 (BR) to 2.33 (US); the 2.33 US case
        is the encoded reference."
-  todos: []
+  todos:
+    - "Author overlap with AlgaMetrix is not recorded: the citation gives only
+       the first author, and nobody has checked the full list against it. The
+       field stays unknown rather than being written as no."
 
 - study_id: padi2023_spirulina
   short_citation: "Padi et al., 2023"

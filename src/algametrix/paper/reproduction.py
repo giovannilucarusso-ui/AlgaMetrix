@@ -86,6 +86,10 @@ class ReproductionRow:
     #: The publication group the source belongs to. Rows sharing it are several
     #: scenarios of one independent source.
     independence_group: str = ""
+    #: What this row takes from its source beyond the physical data, copied from
+    #: the record so the audit file states it next to the number rather than
+    #: leaving it in a dataset the reader has to go and open.
+    dependencies: list[str] = field(default_factory=list)
     #: The value the source actually prints, where :attr:`reference` is a
     #: harmonized endpoint rather than the published one. ``None`` when nothing
     #: was harmonized and the two would be the same number.
@@ -241,6 +245,7 @@ def cost_row(
             unit=rec.reported_unit or "",
             notes=["source endpoint is unknown; the engine has no like-for-like output"],
             independence_group=independence_key(rec),
+            dependencies=list(rec.dependency_notes),
         )
 
     model_native, engine_endpoint = _engine_value(scn, endpoint)
@@ -262,6 +267,7 @@ def cost_row(
         engine_basis=engine_basis, source_basis=source_basis,
         model_native=model_native,
         independence_group=independence_key(rec),
+        dependencies=list(rec.dependency_notes),
         raw_reference=rec.source_value if rec.endpoint_harmonized else None,
     )
     if rec.endpoint_harmonized:
@@ -397,6 +403,7 @@ def gwp_row(rec: StudyRecord, lib: Library) -> ReproductionRow | None:
         ref_low=rec.reported_gwp_low, ref_high=rec.reported_gwp_high,
         unit="kg CO2-eq/kg",
         independence_group=independence_key(rec),
+        dependencies=list(rec.dependency_notes),
     )
     row.model_native = model
     row.notes.append(

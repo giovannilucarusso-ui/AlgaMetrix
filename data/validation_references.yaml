@@ -1,7 +1,12 @@
 # Validation library — published Spirulina/microalgae TEA & LCA studies this model
 # has been checked against, with the paper's reported value next to our model's
-# output. Add one entry per (paper, metric) as new validations are done.
-# `type`: TEA | LCA.  `match`: short human verdict of the agreement.
+# output. Add one entry per (paper, metric) as new checks are done.
+# `type`: TEA | LCA | DSP.  `match`: short human verdict of the agreement.
+#
+# None of these is a prospective validation: every source was already published
+# when the scenario was built. The auditable version of this comparison, with the
+# evidence class of each row and what it depends on, is data/studies/studies.yaml
+# and docs/VALIDATION.md; this file is the short list the desktop app shows.
 
 # --- Padi et al. 2023 — the TEA calibration + reproduction reference ----------
 - paper: "Padi et al. 2023, Algal Research 74:103190"
@@ -31,7 +36,10 @@
   match: "+5%"
   url: "https://doi.org/10.1016/j.algal.2023.103190"
 
-# --- Frontiers 2026 — independent LCA validation (Italian organic spirulina) --
+# --- Frontiers 2026 — CALIBRATED LCA benchmark (Italian organic spirulina) ----
+# Not independent validation: the scenario compared here is the Padi et al. (2023)
+# reconstruction, which this study's design follows. See docs/VALIDATION.md for
+# the evidence classes and why the classes are never pooled.
 - paper: "Frontiers Sust. Food Syst. 2026 (organic spirulina, Italy)"
   type: LCA
   system: "Open raceway in greenhouse, seasonal (no heating), NaHCO3 5 kg/kg"

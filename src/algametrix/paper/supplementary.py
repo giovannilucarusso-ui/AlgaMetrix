@@ -63,9 +63,10 @@ def _sha256(path: Path) -> str:
 
 
 #: The paths whose content decides what this pipeline produces: the engine, the
-#: data it reads, and the scripts that drive it. Everything else in the
-#: repository - the results, the figures, this document, the prose - is output.
-INPUT_PATHS = ("src", "data", "reproduce.py", "scripts")
+#: data it reads, the scripts that drive it, and the three documentation files
+#: this document embeds verbatim in S4. Everything else in the repository - the
+#: results, the figures, this document itself - is output.
+INPUT_PATHS = ("src", "data", "docs", "reproduce.py", "scripts")
 
 
 def _git_commit(root: Path) -> str:
@@ -452,11 +453,13 @@ def build(run, outdir: Path, results_dir: Path, root: Path,
         "### A distinction this document keeps throughout",
         "",
         "**Verification** asks whether the software is self-consistent and whether "
-        "independent implementations of it agree. **Validation** asks whether it "
-        "reproduces something published. Sections S2, S3, S5 and S7 are verification; "
-        "only S4 is validation, and it is much weaker evidence. The two are never "
-        "pooled, and no verification result in this document is offered as evidence "
-        "that the model is right.",
+        "independent implementations of it agree. **Retrospective reconstruction** "
+        "asks whether it reproduces something published, after that number was "
+        "already available. Sections S2, S3, S5 and S7 are verification; only S4 "
+        "compares against published values, and it is much weaker evidence - and it "
+        "is not prospective validation, because no prediction here was fixed before "
+        "its target was read. The two are never pooled, and no verification result in "
+        "this document is offered as evidence that the model is right.",
         "",
         "### Contents",
         "",
@@ -465,8 +468,9 @@ def build(run, outdir: Path, results_dir: Path, root: Path,
         "| S1 | Model specification: symbols, governing equations, assumptions |",
         "| S2 | Verification suite and flow-by-flow TEA/LCA recovery, 27 scenarios |",
         "| S3 | Controlled duplicated-foreground counter-examples, both archetypes |",
-        "| S4 | External validation: protocol, price basis, carbon accounting, "
-        "exclusions, failed range check |",
+        "| S4 | Retrospective literature reconstruction and external benchmarking: "
+        "evidence classes, dependencies, price basis, carbon accounting, exclusions, "
+        "failed range check |",
         "| S5 | Global sensitivity: estimator and group-estimator validation, "
         "convergence, full Sobol' tables |",
         "| S6 | Monte-Carlo uncertainty: input distributions and full P10/P50/P90 |",
@@ -501,7 +505,7 @@ def build(run, outdir: Path, results_dir: Path, root: Path,
         "acidification and the two eutrophication categories are correspondingly "
         "narrower. **Section 7** records that 22 of the 23 shipped factors are "
         "order-of-magnitude values with no traceable dataset behind them, which is why "
-        "the external validation in S4 compares GWP and production cost and nothing "
+        "the literature comparison in S4 covers GWP and production cost and nothing "
         "else.",
         "",
     ]
@@ -633,7 +637,7 @@ def build(run, outdir: Path, results_dir: Path, root: Path,
         "",
     ]
     for title, path in (
-        ("S4.1 Validation protocol and classification", docs / "VALIDATION.md"),
+        ("S4.1 Comparison protocol and evidence classes", docs / "VALIDATION.md"),
         ("S4.2 Price-basis notes", docs / "PRICE_BASIS.md"),
         ("S4.3 Carbon-accounting notes", docs / "CARBON_ACCOUNTING.md"),
     ):

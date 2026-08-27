@@ -185,8 +185,10 @@ supplementary material publishes the *whole* cost model — Lang factors,
 depreciation period, interest, property tax, insurance, maintenance and overhead
 rates, and every input price — not only the answer.
 
-Each is reconstructed **blind**: the engine receives the physical data and the
-financial conventions and never the reported biomass cost. Transcription of the
+Each is reconstructed **retrospective untuned**: the engine receives the physical
+data and the financial conventions and never the reported biomass cost. Untuned
+is not blind — the paper's cost was already in print when the scenarios were
+built, and no prediction was registered before it was read. Transcription of the
 capital chain is verified independently of the outcome, by reproducing the
 paper's own published CAPEX per kg to within 0.5% for all three cases. The
 resulting deviations on total cost are −7% to −14%, and the report states the
@@ -196,11 +198,12 @@ cases buy a commercial nutrient solution whose consumption the paper does not
 publish.
 
 Independence is now counted rather than asserted. `author_overlap_with_algametrix`
-is a schema field; `paper/harmonization.py:independence_audit` reports the number
-of distinct publications behind a cohort, which members are the authors' own, and
-which records share one publication — and therefore one facility, one cost model
-and one author group — so cohort size is never mistaken for the amount of
-independent evidence.
+and `independence_group` are schema fields — the three cases above share the group
+`vazquez_stoten_2022`, so they are three comparisons and **one** independent
+source; `paper/harmonization.py:independence_audit` reports the number of distinct
+publications behind a cohort, which members are the authors' own, and which records
+share one publication — and therefore one facility, one cost model and one author
+group — so cohort size is never mistaken for the amount of independent evidence.
 
 Porting them required two engine fields that also existed only on the branch —
 `Scenario.other_opex_per_year` and its handling in `tea.py` — for the lump-sum

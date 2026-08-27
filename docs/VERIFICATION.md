@@ -26,16 +26,21 @@ archetype and its template) and are counted once, so the evidence base is not in
 
 | Axis | Distinct scenarios |
 |---|---:|
-| phototrophic / heterotrophic | 22 / 4 |
-| CO₂ gas / NaHCO₃ carbon source | 19 / 3 |
-| area basis / volume basis | 22 / 4 |
-| continuous / batch | 24 / 2 |
-| with drying / without | 14 / 12 |
+| phototrophic / heterotrophic | 23 / 4 |
+| CO₂ gas / NaHCO₃ carbon source | 20 / 3 |
+| area basis / volume basis | 23 / 4 |
+| continuous / batch | 25 / 2 |
+| with drying / without | 15 / 12 |
 | with downstream extraction | 5 |
 | with multi-product allocation | 5 |
 | with explicit media / utility line items | 5 |
 
-Provenance: 15 study reconstructions, 8 shipped templates, 3 sensitivity archetypes and 8
+The same table is printed, from the same function, at the head of
+[`results/shared_inventory_consistency.txt`](../results/shared_inventory_consistency.txt), and
+`tests/test_paper_totals.py` asserts the 27 / 23 / 4 split, so this page cannot drift away from
+the suite again.
+
+Provenance: 15 study reconstructions, 9 shipped templates, 3 sensitivity archetypes and 8
 variants that exist to reach code paths the others do not (bicarbonate feed, batch scheduling,
 electric drying, no drying, seasonally heated pond, and each biogenic-carbon convention).
 
@@ -87,8 +92,8 @@ incorporated into biomass and the remaining 2.0–2.2 kg CO₂-eq per kg product
 > leaves as biogenic CO₂, so under the biogenic 0/0 convention both sides are excluded from the
 > GWP — the same treatment `substrate_co2_supplied_per_kg` already receives. Counting it would
 > raise the heterotrophic gross GWP by 27–86 % and would break agreement with the published
-> values the blind GWP reproductions match, which is evidence that those sources use the same
-> convention.
+> values the retrospective untuned GWP reconstructions match, which is evidence that those
+> sources use the same convention.
 
 ---
 
@@ -223,8 +228,9 @@ surface.
 ## 4. What is *not* verified
 
 1. **The TEA has no independent re-implementation.** The SuperPro comparisons in
-   [VALIDATION.md](VALIDATION.md) are external validation against published vendor reports, not
-   an implementation benchmark.
+   [VALIDATION.md](VALIDATION.md) are *calibrated* benchmarks against published vendor
+   reference designs — the scenario is configured to reproduce the reference — so they are
+   neither an implementation benchmark nor independent validation.
 2. **The characterization factors are not verified**, only the arithmetic applied to them —
    which is why **C** is close to the identity. See the LCIA-factor limitation in the README.
 3. **Nothing dynamic is verified**, because nothing dynamic is modelled: the physical system is
