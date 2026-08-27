@@ -515,8 +515,8 @@ button reads [CITATION.cff](CITATION.cff) and will give you BibTeX or APA direct
 
 Each release is archived on Zenodo. **`10.5281/zenodo.21764183` is the concept DOI**: cite it when
 you mean "AlgaMetrix" and it will always resolve to the most recent version. To pin the exact
-version you ran, cite its own DOI instead. v1.4.0's snapshot DOI is added here once
-Zenodo mints it on publication; v1.3.0 is
+version you ran, cite its own DOI instead. v1.4.0 is
+[`10.5281/zenodo.22127351`](https://doi.org/10.5281/zenodo.22127351), v1.3.0 is
 [`10.5281/zenodo.22019311`](https://doi.org/10.5281/zenodo.22019311), v1.2.0 is
 [`10.5281/zenodo.21918511`](https://doi.org/10.5281/zenodo.21918511), v1.1.0 is
 [`10.5281/zenodo.21901542`](https://doi.org/10.5281/zenodo.21901542), v1.0.2 is
