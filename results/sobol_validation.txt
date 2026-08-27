@@ -34,7 +34,7 @@ BENCHMARK: ishigami   N=4096  evaluations=20480  seed=20260801
   max absolute error : 0.0011  -> PASS
   index violations   : none
   dropped rows       : 0
-  runtime            : 1.37 s
+  runtime            : 2.53 s
 
 ------------------------------------------------------------------------------
 BENCHMARK: additive_linear   N=4096  evaluations=24576  seed=20260801
@@ -52,7 +52,7 @@ BENCHMARK: additive_linear   N=4096  evaluations=24576  seed=20260801
   max absolute error : 0.0000  -> PASS
   index violations   : none
   dropped rows       : 0
-  runtime            : 0.25 s
+  runtime            : 0.48 s
 
 ------------------------------------------------------------------------------
 BENCHMARK: interaction_only   N=4096  evaluations=16384  seed=20260801
@@ -66,7 +66,7 @@ BENCHMARK: interaction_only   N=4096  evaluations=16384  seed=20260801
   max absolute error : 0.0001  -> PASS
   index violations   : none
   dropped rows       : 0
-  runtime            : 0.33 s
+  runtime            : 0.41 s
 
 ------------------------------------------------------------------------------
 GROUP BENCHMARK: group_interaction_inside   N=4096  evaluations=16384  seed=20260801
@@ -84,7 +84,7 @@ GROUP BENCHMARK: group_interaction_inside   N=4096  evaluations=16384  seed=2026
   max absolute error : 0.0000  -> PASS
   index violations   : none
   dropped rows       : 0
-  runtime            : 0.34 s
+  runtime            : 0.60 s
 
 ------------------------------------------------------------------------------
 GROUP BENCHMARK: group_interaction_between   N=4096  evaluations=16384  seed=20260801
@@ -102,7 +102,7 @@ GROUP BENCHMARK: group_interaction_between   N=4096  evaluations=16384  seed=202
   max absolute error : 0.0000  -> PASS
   index violations   : none
   dropped rows       : 0
-  runtime            : 0.33 s
+  runtime            : 0.64 s
 
 ==============================================================================
 OVERALL: PASS

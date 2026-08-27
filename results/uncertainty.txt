@@ -98,7 +98,7 @@ Open raceway pond (Chlorella)   [library_default]
 Heterotrophic fermenter (Schizochytrium)   [study_reconstruction]
   provenance: reconstructions.heterotrophic_powder -> templates 'Heterotrophic microalgae powder'
 ==============================================================================
-  note: Blind reproduction of Russo et al. (2022); authors' own study, disclosed.
+  note: Calibrated against the SuperPro reference published with Russo et al. (2022); the authors' own study, disclosed.
 
   Production cost (EUR/kg)    nominal = 17.31
     mode                            P10          P50          P90   P90/P10     abs band

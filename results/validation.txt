@@ -19,76 +19,120 @@ HOW TO READ THIS
   time with those defaults expressed in the source's currency and the deviation
   is given as the interval the two readings span.
 
-  study_id                 metric mode        kind            model     source basis          verdict
-  frontiers2026_spirulina  gwp    calibrated  point           14.24      15.05 kg CO2-eq/kg   -5%
+  study_id                 metric evidence class         kind            model     source basis          verdict
+  frontiers2026_spirulina  gwp    calibrated             point           14.24      15.05 kg CO2-eq/kg   -5%
       endpoint: gwp_cradle_to_gate [gross (before any biogenic adjustment; convention-free)]
+      group   : ahmed_frontiers_2026
+      depends : CALIBRATED: the registered builder reconstructs the Padi et al. (2023) Scenario-I bicarbonate Spirulina plant that this study's design follows, so the scenario was not built from this source's own data and the -5% is not an independent endpoint test.
       note    : engine gross 14.236, biogenic adjustment +0.000, net 14.236 under source_specific_credit
       note    : source gross 15.050, source biogenic adjustment +0.000, source net 15.050. The comparison is made on the GROSS figure, which carries no biogenic-carbon convention and is therefore comparable whatever either side chose
       note    : source convention no_biogenic_credit; engine convention source_specific_credit - not matched, but immaterial here: the comparison above is made on the gross figures, which carry no convention
-  gwp_iceland_spirulina    gwp    blind       point            1.31      1.262 kg CO2-eq/kg   +4%
+  gwp_iceland_spirulina    gwp    retrospective_untuned  point            1.31      1.262 kg CO2-eq/kg   +4%
       endpoint: gwp_cradle_to_gate [gross (before any biogenic adjustment; convention-free)]
+      group   : tzachor_marine_biotechnology_2022
+      depends : The source side is DERIVED, not printed: the paper reports per kg wet biomass at 61% water and includes facility construction, and every figure compared here is obtained from its published components by one declared division onto the engine's per-kg-dry operational basis. This is the weakest of the retrospective untuned GWP points.
       note    : engine gross 1.310, biogenic adjustment -1.873, net -0.562 under source_specific_credit
       note    : source gross 1.262, source biogenic adjustment -1.800, source net -0.538. The comparison is made on the GROSS figure, which carries no biogenic-carbon convention and is therefore comparable whatever either side chose
       note    : basis: The source reports per kg WET biomass at 61% water content and includes facility construction; the engine has no infrastructure term and works per kg DRY. Operational gross per kg wet = 0.693 - 0.201 (construction) = 0.492; divided by the 0.39 dry fraction gives 1.2615 per kg dry. The published biofixation credit -0.702 per kg wet gives -1.800 per kg dry. Net = 1.2615 - 1.800 = -0.5385. Every figure here is derived from the source's own published components by one declared division; NONE of them is a value the source prints, so this row is a comparison against a DERIVED quantity and is weaker than a comparison against a printed one.
       note    : source convention source_specific_credit; engine convention source_specific_credit - MATCHED
-  mckuin_schizo            gwp    blind       point           2.385       2.33 kg CO2-eq/kg   +2%
+  mckuin_schizo            gwp    retrospective_untuned  point           2.385       2.33 kg CO2-eq/kg   +2%
       endpoint: gwp_cradle_to_gate [net, engine convention source_specific_credit]
+      group   : mckuin_elementa_2022
+      depends : The source does not state a biogenic-carbon convention. The engine's own adjustment on this scenario is 0.000 on a gross of 2.385, so no convention could materially move the comparison; it is made on the net figure with that stated.
       note    : engine gross 2.385, biogenic adjustment +0.000, net 2.385 under source_specific_credit
       note    : the source's biogenic-carbon convention is unrecorded, but the engine's own adjustment is +0.000 on a gross of 2.385, i.e. immaterial, so the convention cannot materially move this comparison
-  padi2023_spirulina       cost   calibrated  range           18.08       13.2 EUR (year unknown) OUTSIDE range 13.2-17.3
+  padi2023_spirulina       cost   range                  range           18.08       13.2 EUR (year unknown) OUTSIDE range 13.2-17.3
       endpoint: minimum_product_selling_price vs engine MEPP (NPV = 0)
+      group   : padi_algal_research_2023
+      depends : RANGE check only: the target is a published envelope, and the engine's MEPP is compared against it as a plausibility check. It is never converted into a deviation from an envelope midpoint, and it FAILS - retained as a negative result rather than dropped.
       engine  : EUR (year unknown) [mixed_price_set] - salt-based N/P prices and labour from Padi et al. (2023), EUR
       transfer: EUR (year unknown) -> EUR (year unknown) [currency_aligned_year_unknown]
       note    : both sides are in EUR, so the comparison is dimensionless, but at least one price year is unknown: the two are not aligned to a common price level
       note    : engine value 18.08 EUR (year unknown) converted to 18.08 EUR (year unknown) before the comparison [currency_aligned_year_unknown]
       note    : MIXED price set (electricity_price, heat_price, bicarbonate_price, water_price, land_price, harvest_capex_per_kgyr, drying_capex_per_kgyr left at the shipped library default). The library basis and EUR (year unknown) differ in no known respect, so re-running changes nothing and the mixing is NOT bounded - the price year of neither side is established
       note    : source price year unknown: the two sides are in the same currency but have not been shown to be at the same price level
-  russo2022_aury           cost   blind       point           17.31      16.46 USD 2022       +5% to +6%
+  russo2022_aury           cost   calibrated             point           17.31      16.46 USD 2022       +5% to +6%
       endpoint: production_cost vs engine production cost
+      group   : russo_btr_2022
+      depends : AUTHOR OVERLAP: an author of AlgaMetrix is an author of the source (author_overlap_with_algametrix: true). A self-reproduction.
+      depends : CALIBRATED: the scenario is the shipped heterotrophic template, whose parameters were set against the SuperPro reference case published with the source (data/reference_superpro_heterotrophic.csv). It is a benchmark against a reference implementation under matched assumptions, not a retrospective untuned reconstruction, and the +5% to +6% interval must not be read as independent validation.
       engine  : USD 2022 [mixed_price_set] - substrate and labour prices as published by Russo et al. (2022), USD 2022 (data/reference_superpro_heterotrophic.csv)
       bracket : 17.31 - 17.47 USD 2022 over the two currency readings
       note    : like-for-like: the engine was run on a price set in USD 2022, the same basis the source reports in - no conversion applied
       note    : MIXED price set: 9 price(s) left at the shipped library default (electricity_price, heat_price, co2_price, nitrogen_price, phosphorus_price, water_price, land_price, harvest_capex_per_kgyr, drying_capex_per_kgyr). Re-running with those defaults expressed in USD 2022 (x1.0531) gives 17.47 instead of 17.31; the deviation is reported as the interval this spans
-  spiralg2019              gwp    blind       point           12.61       14.1 kg CO2-eq/kg   -11%
+  spiralg2019              gwp    retrospective_untuned  point           12.61       14.1 kg CO2-eq/kg   -11%
       endpoint: gwp_cradle_to_gate [net, engine convention no_biogenic_credit]
+      group   : braud_btr_2025
+      depends : BOUNDARY DIFFERENCE: the published total includes infrastructure and transport terms (about 2 kg CO2-eq/kg) that the operational AlgaMetrix boundary does not represent, which accounts for most of the -11%. Informative, not strictly like-for-like.
       note    : engine gross 12.614, biogenic adjustment +0.000, net 12.614 under no_biogenic_credit
       note    : source convention no_biogenic_credit; engine convention no_biogenic_credit - MATCHED
-  superpro_algaloil        cost   calibrated  point           1.711        1.7 USD 2015       -2% to +1%
+  superpro_algaloil        cost   calibrated             point           1.711        1.7 USD 2015       -2% to +1%
       endpoint: production_cost vs engine production cost
+      group   : intelligen_algal_oil
+      depends : CALIBRATED: the scenario reproduces the vendor's own reference design and is fed the reference's own prices, so agreement tests implementation against a reference tool under matched assumptions, not predictive accuracy.
       engine  : USD 2015 [mixed_price_set] - electricity, nitrogen, water, CO2, land, labour and the harvest/drying capital factors from the Intelligen algal-oil case, USD 2015 (data/reference_superpro_phototrophic.csv header; doi 10.13140/RG.2.2.12639.48805)
       bracket : 1.673 - 1.711 USD 2015 over the two currency readings
       note    : like-for-like: the engine was run on a price set in USD 2015, the same basis the source reports in - no conversion applied
       note    : MIXED price set: 4 price(s) left at the shipped library default (heat_price, bicarbonate_price, phosphorus_price, substrate_price). Re-running with those defaults expressed in USD 2015 (x0.7508) gives 1.673 instead of 1.711; the deviation is reported as the interval this spans
-  superpro_omega3          cost   calibrated  point           17.55      16.57 USD 2021       -1% to +6%
+  superpro_omega3          cost   calibrated             point           17.55      16.57 USD 2021       -1% to +6%
       endpoint: production_cost vs engine production cost
+      group   : intelligen_omega3
+      depends : CALIBRATED: the scenario reproduces the vendor's own reference design and is fed the reference's own prices, so agreement tests implementation against a reference tool under matched assumptions, not predictive accuracy.
       engine  : USD 2021 [mixed_price_set] - labour and product prices from the Intelligen omega-3 case, USD 2021 (data/reference_superpro_omega3.csv header; doi 10.13140/RG.2.2.32102.34885)
       bracket : 16.35 - 17.55 USD 2021 over the two currency readings
       note    : like-for-like: the engine was run on a price set in USD 2021, the same basis the source reports in - no conversion applied
       note    : MIXED price set: 10 price(s) left at the shipped library default (electricity_price, heat_price, co2_price, nitrogen_price, phosphorus_price, water_price, substrate_price, land_price, harvest_capex_per_kgyr, drying_capex_per_kgyr). Re-running with those defaults expressed in USD 2021 (x0.8954) gives 16.35 instead of 17.55; the deviation is reported as the interval this spans
-  tredici2016              cost   blind       point           12.29       12.4 EUR 2016       -1%
-      endpoint: production_cost vs engine production cost
+  tredici2016              cost   retrospective_untuned  point           12.29      12.11 EUR 2016       +1.5%
+      endpoint: production_cost [endpoint-harmonized] vs engine production cost
+      source  : 12.4 as published; 12.1148 after endpoint harmonization
+      group   : tredici_algal_research_2016
+      depends : ENDPOINT HARMONIZED. The published EUR 12.40/kg folds in EUR 10,236/yr of financing interest; the AlgaMetrix production cost carries no financing charge and no required return on capital. The comparison is made against the harmonized endpoint, and the raw published value is kept in source_value.
       engine  : EUR 2016 [source_price_set] - every price fed as published by Tredici et al. (2016), EUR 2016
+      note    : ENDPOINT HARMONIZED: the source prints 12.4 EUR/kg dry biomass; the value compared is 12.1148 EUR/kg dry biomass. The source's plant carries EUR 446,367/yr of total annual cost over 36,000 kg/yr of biomass, which is the published EUR 12.40/kg, and EUR 10,236/yr of that total is financing interest (5% on a 10-year loan over 60% of the investment). The AlgaMetrix production cost includes neither a financing charge nor a required return on capital, so the two endpoints do not include the same things and their quotient is not a model error. Removing the interest term puts the source on the engine's endpoint: (446367 - 10236) / 36000 = 12.114750 EUR2016 per kg, which is the value compared. The raw published 12.40 is kept in source_value and reported alongside.
       note    : like-for-like: the engine was run on a price set in EUR 2016, the same basis the source reports in - no conversion applied
-  vazquez2022              cost   blind       point           104.3      108.3 EUR 2021       -4%
+  vazquez2022              cost   component_informed     point           104.3      108.3 EUR 2021       -4%
       endpoint: production_cost vs engine production cost
+      group   : vazquez_algal_research_2022
+      depends : COMPONENT-INFORMED, not an independent endpoint test. Two engine inputs are built from the source's own published aggregate outcome, its total annual OPEX of EUR 2,228,066: labour = 0.3879 x paper_opex, and the other-OPEX line (thermal utilities 0.0863, consumables 0.0055, wastewater 0.0031) = 0.0949 x paper_opex.
+      depends : 0.3879 + 0.0949 = 0.4828, so 48.28% of the numerator of the compared production cost is taken from the published total rather than derived from the mass balance. The reported -4% is therefore partly a self-comparison and is never pooled with the retrospective untuned cases.
+      depends : Same first author as the three vazquez_stoten_2022 records, but a different publication, facility, country, strain and reactor system.
       engine  : EUR 2021 [source_price_set] - every price fed as published by Vazquez-Romero et al. (2022), EUR 2021
       note    : like-for-like: the engine was run on a price set in EUR 2021, the same basis the source reports in - no conversion applied
-  vazquez2022b_nas         cost   blind       point           46.09      53.32 EUR 2021       -14%
+  vazquez2022b_nas         cost   retrospective_untuned  point           46.09      53.32 EUR 2021       -14%
       endpoint: production_cost vs engine production cost
+      group   : vazquez_stoten_2022
+      depends : One of three scenarios from a single publication, facility model and author group (independence_group vazquez_stoten_2022). Three scenarios, ONE independent source.
+      depends : Same first author as vazquez2022 (Algal Research); a different publication, facility, country, strain and reactor system.
       engine  : EUR 2021 [source_price_set] - every price fed from Vazquez-Romero et al. (2022) supplementary tables 3, 5 and 7; the paper's own sources are dated 2021
       note    : like-for-like: the engine was run on a price set in EUR 2021, the same basis the source reports in - no conversion applied
-  vazquez2022b_nas_10ha    cost   blind       point           33.59      36.21 EUR 2021       -7%
+  vazquez2022b_nas_10ha    cost   retrospective_untuned  point           33.59      36.21 EUR 2021       -7%
       endpoint: production_cost vs engine production cost
+      group   : vazquez_stoten_2022
+      depends : One of three scenarios from a single publication, facility model and author group (independence_group vazquez_stoten_2022). Three scenarios, ONE independent source.
+      depends : Same first author as vazquez2022 (Algal Research); a different publication, facility, country, strain and reactor system.
       engine  : EUR 2021 [source_price_set] - every price fed from Vazquez-Romero et al. (2022) supplementary tables 3, 5 and 7; the paper's own sources are dated 2021
       note    : like-for-like: the engine was run on a price set in EUR 2021, the same basis the source reports in - no conversion applied
-  vazquez2022b_tiso_pht    cost   blind       point           93.18      105.2 EUR 2021       -11%
+  vazquez2022b_tiso_pht    cost   retrospective_untuned  point           93.18      105.2 EUR 2021       -11%
       endpoint: production_cost vs engine production cost
+      group   : vazquez_stoten_2022
+      depends : One of three scenarios from a single publication, facility model and author group (independence_group vazquez_stoten_2022). Three scenarios, ONE independent source.
+      depends : Same first author as vazquez2022 (Algal Research); a different publication, facility, country, strain and reactor system.
       engine  : EUR 2021 [source_price_set] - every price fed from Vazquez-Romero et al. (2022) supplementary tables 3, 5 and 7; the paper's own sources are dated 2021
       note    : like-for-like: the engine was run on a price set in EUR 2021, the same basis the source reports in - no conversion applied
 
 SUMMARY
 ------------------------------------------------------------------------------
-  point reproductions        : 12  (of which blind: 9)
+  Classes are NEVER pooled. Only a retrospective untuned row is a comparison
+  the source's own reported endpoint did not feed; a component-informed or a
+  calibrated row borrows part of its target and is reported on its own.
+
+  12 point comparison(s), by what each one depends on:
+    retrospective_untuned   : 7
+    component_informed      : 1
+    calibrated              : 4
+    retrospective untuned, production cost: 4 scenarios from 2 publications, -14% to +1.5%
+    retrospective untuned, GWP            : 3 scenarios from 3 publications, -11% to +4%
+
   range plausibility checks  : 1
   not comparable             : 0
 

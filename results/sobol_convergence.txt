@@ -16,11 +16,11 @@ DECLARED CONVERGENCE CRITERIA
 Open raceway pond (Chlorella) - Mode A - Production cost (EUR/kg)
 ------------------------------------------------------------------------------
        N    evals  runtime   maxCIw  maxShift  rank==max violations
-     512     4608     2.59   0.1578    0.0092       True          0
-    1024     9216     5.13   0.1186    0.0002       True          0
-    2048    18432    10.06   0.0901    0.0009       True          0
-    4096    36864    20.44   0.0618    0.0000       True          0
-    8192    73728    40.67   0.0378    0.0000       True          0
+     512     4608     3.48   0.1578    0.0092       True          0
+    1024     9216     5.99   0.1186    0.0002       True          0
+    2048    18432    13.68   0.0901    0.0009       True          0
+    4096    36864    31.86   0.0618    0.0000       True          0
+    8192    73728    56.09   0.0378    0.0000       True          0
   chosen: N=2048
   param                              S1            S1 95% CI       ST            ST 95% CI
   Productivity                   0.8809 [ +0.4851, +1.2781]   0.8858 [ +0.8386, +0.9287]
@@ -35,11 +35,11 @@ Open raceway pond (Chlorella) - Mode A - Production cost (EUR/kg)
 Heterotrophic fermenter (Schizochytrium) - Mode A - Production cost (EUR/kg)
 ------------------------------------------------------------------------------
        N    evals  runtime   maxCIw  maxShift  rank==max violations
-     512     4608     1.11   0.1585    0.0092       True          0
-    1024     9216     2.10   0.1177    0.0004       True          0
-    2048    18432     4.27   0.0875    0.0012       True          0
-    4096    36864     9.21   0.0588    0.0000       True          0
-    8192    73728    27.74   0.0401    0.0000       True          0
+     512     4608     3.33   0.1585    0.0092       True          0
+    1024     9216     8.35   0.1177    0.0004       True          0
+    2048    18432    18.33   0.0875    0.0012       True          0
+    4096    36864    35.75   0.0588    0.0000       True          0
+    8192    73728    76.03   0.0401    0.0000       True          0
   chosen: N=4096
   param                              S1            S1 95% CI       ST            ST 95% CI
   Productivity                   0.8517 [ +0.5761, +1.1861]   0.8568 [ +0.8260, +0.8848]
@@ -54,11 +54,11 @@ Heterotrophic fermenter (Schizochytrium) - Mode A - Production cost (EUR/kg)
 LED-assisted tubular PBR (P. tricornutum) - Mode A - Production cost (EUR/kg)
 ------------------------------------------------------------------------------
        N    evals  runtime   maxCIw  maxShift  rank==max violations
-     512     4608     0.86   0.1406    0.0023       True          0
-    1024     9216     1.56   0.1090    0.0026       True          0
-    2048    18432     3.20   0.0683    0.0002       True          0
-    4096    36864     6.91   0.0543    0.0000       True          0
-    8192    73728    19.02   0.0377    0.0000       True          0
+     512     4608     3.14   0.1406    0.0023       True          0
+    1024     9216     7.99   0.1090    0.0026       True          0
+    2048    18432    15.37   0.0683    0.0002       True          0
+    4096    36864    28.05   0.0543    0.0000       True          0
+    8192    73728    64.11   0.0377    0.0000       True          0
   chosen: N=1024
   param                              S1            S1 95% CI       ST            ST 95% CI
   Cultivation electricity        0.6965 [ +0.2998, +1.1107]   0.6989 [ +0.6482, +0.7572]

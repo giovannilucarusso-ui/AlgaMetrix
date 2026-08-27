@@ -5,6 +5,9 @@
   "tolerance": 1e-09,
   "max_relative_difference": 4.859986788004829e-15,
   "passed": true,
+  "scenarios": 27,
+  "indicator_comparisons": 189,
+  "non_zero_comparisons": 180,
   "per_scenario": {
     "rec_algal_oil": 3.1666384921715633e-16,
     "rec_astaxanthin": 5.262466166603264e-16,
