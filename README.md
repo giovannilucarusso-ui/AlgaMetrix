@@ -5,9 +5,10 @@
 [![python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue.svg)](pyproject.toml)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21764183.svg)](https://doi.org/10.5281/zenodo.21764183)
 
-### [⬇ Download for Windows](https://github.com/giovannilucarusso-ui/AlgaMetrix/releases/latest)
+### [⬇ Download for Windows or macOS](https://github.com/giovannilucarusso-ui/AlgaMetrix/releases/latest)
 
-No Python needed — unzip and run `AlgaMetrix.exe`. Other ways to install are
+No Python needed. On Windows, unzip and run `AlgaMetrix.exe`; on macOS, unzip and
+drag `AlgaMetrix.app` into Applications. Other ways to install are
 [below](#install).
 
 **Open-source techno-economic analysis (TEA) and life-cycle assessment (LCA) for microalgae and aquatic protist biomass.**
@@ -106,10 +107,12 @@ latter is how alkaliphilic *Arthrospira* (Spirulina) is actually grown at pH 9�
 Three different people arrive at this repository, and they do not need the same
 things. Pick the line that describes you.
 
-### 1. I just want to use the Windows app
+### 1. I just want to use the desktop app
 
-No Python, no command line, no administrator rights, no installer. Windows 10 or
-11, 64-bit.
+No Python, no command line, no administrator rights, no installer. Every release
+carries a Windows build and two macOS builds; take the one for your machine.
+
+#### On Windows 10 or 11, 64-bit
 
 1. Open the [latest release](https://github.com/giovannilucarusso-ui/AlgaMetrix/releases/latest)
    and, under **Assets**, download **`AlgaMetrix-windows.zip`** (about 117 MB).
@@ -129,14 +132,14 @@ No Python, no command line, no administrator rights, no installer. Windows 10 or
    not have. Click **More info** → **Run anyway**. Step 6 is how you check you
    are trusting the right file rather than taking that dialog's word for it.
 6. Optional but recommended — verify what you downloaded against the
-   `SHA256SUMS.txt` published beside the zip. In PowerShell, in the folder
+   `SHA256SUMS-windows.txt` published beside the zip. In PowerShell, in the folder
    holding the download:
 
    ```powershell
    Get-FileHash AlgaMetrix-windows.zip -Algorithm SHA256 | Format-List
    ```
 
-   The `Hash` it prints must match the line in `SHA256SUMS.txt`. Both were
+   The `Hash` it prints must match the line in `SHA256SUMS-windows.txt`. Both were
    produced by [the public build workflow](.github/workflows/windows-release.yml)
    from the tagged source, on GitHub's runners, with a log anybody can read.
 
@@ -155,8 +158,67 @@ which you can delete too. Nothing is written to the registry.
 **If it does not start**, the most likely causes, in order: the zip was not
 unblocked (step 2); the .exe was moved away from `_internal` (step 4); or an
 antivirus quarantined it, which happens to unsigned PyInstaller builds. Each
-release also ships `smoke.txt`, the output of the automated start-up test that
-ran against that exact build before it was published.
+release also ships `smoke-windows.txt`, the output of the automated start-up test
+that ran against that exact build before it was published.
+
+#### On macOS 11 (Big Sur) or later
+
+1. Open the [latest release](https://github.com/giovannilucarusso-ui/AlgaMetrix/releases/latest)
+   and, under **Assets**, download the zip **for your chip**:
+
+   | Your Mac | File |
+   |---|---|
+   | Apple Silicon — M1, M2, M3, M4 | `AlgaMetrix-macos-arm64.zip` |
+   | Intel | `AlgaMetrix-macos-x86_64.zip` |
+
+   Not sure which you have:  → *About This Mac*. "Chip" means Apple Silicon,
+   "Processor" means Intel. The wrong file will not run, and macOS will not
+   explain why, so it is worth the ten seconds.
+2. Double-click the zip. macOS unpacks it into **`AlgaMetrix.app`**, which is a
+   single item, not a folder to open — everything is inside it.
+3. Drag `AlgaMetrix.app` into your **Applications** folder. Anywhere you own also
+   works; the Downloads folder does not, because macOS runs applications from
+   there under extra restrictions.
+4. **First launch: right-click the app → *Open* → *Open*.** Do not double-click
+   it the first time. The build is not signed with an Apple Developer ID —
+   that needs a paid certificate this project does not have — so Gatekeeper
+   refuses a plain double-click and says the app "cannot be opened because the
+   developer cannot be verified". Opening it from the right-click menu once is
+   the documented way to accept it; every launch after that is a normal
+   double-click.
+
+   On recent macOS the *Open* item may not appear. Then: *System Settings* →
+   *Privacy & Security*, scroll to the bottom, and click **Open Anyway** beside
+   the message about AlgaMetrix. If neither works, clearing the download flag
+   does, in Terminal:
+
+   ```bash
+   xattr -dr com.apple.quarantine /Applications/AlgaMetrix.app
+   ```
+5. Optional but recommended — verify what you downloaded against the
+   `SHA256SUMS-macos-<arch>.txt` published beside the zip. In Terminal, in the
+   folder holding the download:
+
+   ```bash
+   shasum -a 256 AlgaMetrix-macos-arm64.zip
+   ```
+
+   What it prints must match the line in the checksum file. Both were produced
+   by [the public build workflow](.github/workflows/macos-release.yml) from the
+   tagged source, on GitHub's runners, with a log anybody can read.
+
+**To uninstall**, drag `AlgaMetrix.app` to the Trash. The only thing left
+anywhere else is a small preferences file, `.algae_tea_lca.json` in your home
+folder, which you can delete too.
+
+**If it does not start**: check step 1 first — an Intel build on Apple Silicon
+fails with a message that names neither problem. Each release also ships
+`smoke-macos-<arch>.txt`, the output of the automated start-up test that ran
+against that exact bundle before it was published.
+
+> The macOS builds are produced and start-up-tested by GitHub's macOS runners,
+> not on a Mac in this lab. If one misbehaves on real hardware, please open an
+> issue with the message you see and the output of `sw_vers`.
 
 ### 2. I want the Python engine
 
@@ -422,22 +484,43 @@ print(results.tea.production_cost_eur_per_kg)
 print(results.lca.gwp_kg_co2eq_per_kg)
 ```
 
-## Building a standalone Windows .exe
+## Building the desktop app yourself
 
-To distribute the app to users without a Python installation:
+To distribute the app to users without a Python installation, or to check what
+the published builds contain. One command on both platforms — everything the
+build decides lives in [`AlgaMetrix.spec`](AlgaMetrix.spec):
 
 ```bash
-pip install pyinstaller
-python -m PyInstaller --noconfirm --windowed --name AlgaMetrix ^
-    --paths src --paths . --add-data "data;data" ^
-    --collect-submodules algametrix --collect-submodules desktop ^
-    --hidden-import openpyxl ^
-    --exclude-module streamlit --exclude-module plotly ^
-    run_desktop.py
+pip install -r requirements-dev.txt
+pyinstaller --noconfirm --clean AlgaMetrix.spec
 ```
 
-The app appears in `dist/AlgaMetrix/` — run `AlgaMetrix.exe`. The editable `data/` YAML files are
-bundled alongside it. (On macOS/Linux replace `;` with `:` in `--add-data`.)
+On **Windows** the app appears in `dist/AlgaMetrix/` — run `AlgaMetrix.exe`, and
+keep the `_internal` folder beside it. On **macOS** it appears as
+`dist/AlgaMetrix.app`, a bundle you can drag into Applications. The editable
+`data/` YAML files ride along inside either one.
+
+PyInstaller builds for the machine it runs on: a Mac bundle can only be made on
+a Mac, and an Apple Silicon Mac produces an arm64 build that will not run on an
+Intel one. That is why the published macOS builds come in two files, from
+[`macos-release.yml`](.github/workflows/macos-release.yml), which builds each
+architecture on its own runner, ad-hoc-signs the bundle, starts it once to check
+it computes, and publishes a checksum. The Windows equivalent is
+[`windows-release.yml`](.github/workflows/windows-release.yml).
+
+Neither build is code-signed with a vendor certificate, so both operating
+systems warn on first launch — see the [Windows](#on-windows-10-or-11-64-bit)
+and [macOS](#on-macos-11-big-sur-or-later) notes above for the way through.
+
+The macOS icon is generated from the Windows one, so a single piece of artwork
+serves both:
+
+```bash
+python scripts/make_icns.py     # desktop/assets/algametrix.ico -> .icns
+```
+
+It is committed, and the macOS workflow re-runs it and fails if the result
+differs from what is in the repository.
 
 ## Languages
 
@@ -474,9 +557,11 @@ src/algametrix/   the engine
 desktop/                  PySide6 desktop UI (primary)
 app/streamlit_app.py      optional web UI
 examples/                 scripted scenarios
-scripts/                  fetch_indices.py, brightway_crosscheck.py
+scripts/                  fetch_indices.py, brightway_crosscheck.py, make_icns.py
 reproduce.py              regenerates every result and figure from one command
 tests/                    unit tests for the engine, the verification and the evidence layer
+AlgaMetrix.spec           the PyInstaller build, Windows and macOS from one file
+.github/workflows/        tests (Linux), windows-release, macos-release (arm64 + Intel)
 ```
 
 ## Roadmap
@@ -492,6 +577,8 @@ tests/                    unit tests for the engine, the verification and the ev
 - [x] Monte-Carlo uncertainty analysis (P10/P50/P90)
 - [x] Side-by-side scenario comparison in the UI
 - [x] Desktop app with save/load scenarios and results export
+- [x] Downloadable builds for Windows and macOS (Apple Silicon and Intel), each
+      start-up-tested and checksummed by a public workflow
 - [x] Validation against SuperPro Designer (3 calibrated bundled cases + CSV/Excel import)
 - [x] Open-literature benchmark check (NREL / peer-reviewed ranges, with sources)
 - [x] Batch scheduling (batch size, cycle time, batches/yr) alongside continuous mode

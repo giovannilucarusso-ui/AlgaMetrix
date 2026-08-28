@@ -56,17 +56,20 @@ jobs:
           $exe = "dist\AlgaMetrix\AlgaMetrix.exe"
           if (-not (Test-Path $exe)) { throw "PyInstaller produced no executable" }
           $p = Start-Process -FilePath $exe `
-               -ArgumentList "--self-test","--self-test-out","$PWD\smoke.txt" `
+               -ArgumentList "--self-test","--self-test-out","$PWD\smoke-windows.txt" `
                -Wait -PassThru
-          if (Test-Path smoke.txt) { Get-Content smoke.txt }
+          if (Test-Path smoke-windows.txt) { Get-Content smoke-windows.txt }
           if ($p.ExitCode -ne 0) { throw "the executable failed its self-test" }
 
       - name: Package and checksum
+        # The checksum and the start-up report carry the platform in their names.
+        # A release now holds a Windows build and two macOS builds, and three
+        # files called SHA256SUMS.txt would overwrite each other on the way up.
         run: |
           Compress-Archive -Path dist\AlgaMetrix\* -DestinationPath AlgaMetrix-windows.zip
           $hash = (Get-FileHash AlgaMetrix-windows.zip -Algorithm SHA256).Hash
-          "$hash  AlgaMetrix-windows.zip" | Out-File -Encoding ascii SHA256SUMS.txt
-          Get-Content SHA256SUMS.txt
+          "$hash  AlgaMetrix-windows.zip" | Out-File -Encoding ascii SHA256SUMS-windows.txt
+          Get-Content SHA256SUMS-windows.txt
 
       - name: Upload the build
         uses: actions/upload-artifact@v4
@@ -74,18 +77,18 @@ jobs:
           name: AlgaMetrix-windows
           path: |
             AlgaMetrix-windows.zip
-            SHA256SUMS.txt
-            smoke.txt
+            SHA256SUMS-windows.txt
+            smoke-windows.txt
 
       - name: Attach to the release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          # smoke.txt goes out with the build it describes: it is the output of
+          # smoke-windows.txt goes out with the build it describes: it is the output of
           # the start-up test that ran against this exact executable, and a
           # reader who wants to know whether the thing they downloaded was
           # checked should not have to dig through a workflow log to find out.
           files: |
             AlgaMetrix-windows.zip
-            SHA256SUMS.txt
-            smoke.txt
+            SHA256SUMS-windows.txt
+            smoke-windows.txt

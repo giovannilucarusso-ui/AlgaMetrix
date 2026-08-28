@@ -1,0 +1,129 @@
+name: macos-build
+
+# The same argument as the Windows build: a researcher who does not use Python
+# cannot install this tool from a source tarball. This produces what a Mac user
+# can actually double-click - AlgaMetrix.app - smoke-tested before it is
+# published, with a checksum so what arrives can be compared with what was built.
+#
+# Two builds, not one. PySide6 ships no universal2 wheel, so an app built on
+# Apple Silicon does not run on an Intel Mac and the reverse is true as well.
+# Each runner produces the binary for its own architecture and the file says
+# which one it is, rather than leaving half the Mac users to find out by
+# downloading the wrong thing.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "AlgaMetrix.spec"
+      - "desktop/**"
+      - "run_desktop.py"
+      - "scripts/make_icns.py"
+      - ".github/workflows/macos-release.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-14
+            arch: arm64          # Apple Silicon: M1 and later
+          - runner: macos-13
+            arch: x86_64         # Intel
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install the desktop client and the build tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Check the interpreter matches the architecture being built
+        # setup-python resolving to the wrong architecture would produce a
+        # bundle named arm64 that only runs on Intel, and nothing later in this
+        # job would notice.
+        run: |
+          got=$(python -c "import platform; print(platform.machine())")
+          echo "interpreter reports $got, this job builds ${{ matrix.arch }}"
+          test "$got" = "${{ matrix.arch }}"
+
+      - name: Run the test suite
+        # Nothing ships that the tests have not passed. The desktop and wizard
+        # tests need a Qt platform; off-screen is the one a runner has.
+        # tests/test_icon_assets.py is the one that matters most here: it checks
+        # that the committed .icns still holds the pixels of the .ico, so the
+        # bundle built below cannot come to show a different mark from the
+        # Windows build.
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m pytest tests -q
+
+      - name: Build the application bundle
+        run: pyinstaller --noconfirm --clean AlgaMetrix.spec
+
+      - name: Sign the bundle ad hoc
+        # Not a Developer ID signature - this project has no certificate, and an
+        # ad-hoc signature does not make Gatekeeper trust the app. What it does
+        # is make the bundle internally consistent, which Apple Silicon requires
+        # before it will run anything at all. PyInstaller signs the executable it
+        # writes; this re-signs the whole bundle so every dylib it collected is
+        # covered by one signature.
+        run: |
+          codesign --force --deep --sign - dist/AlgaMetrix.app
+          codesign --verify --deep --strict --verbose=2 dist/AlgaMetrix.app
+
+      - name: Smoke-test the bundle
+        # Start the built application, construct the whole window, run the engine
+        # once and read the exit code. A build that imports but cannot compute
+        # fails here rather than in the hands of whoever downloaded it. The
+        # executable inside the bundle is run directly: `open` returns as soon as
+        # the app is launched and would tell us nothing.
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          binary="dist/AlgaMetrix.app/Contents/MacOS/AlgaMetrix"
+          test -x "$binary" || { echo "PyInstaller produced no bundle executable"; exit 1; }
+          "$binary" --self-test --self-test-out "$PWD/smoke-macos-${{ matrix.arch }}.txt"
+          cat smoke-macos-${{ matrix.arch }}.txt
+
+      - name: Package and checksum
+        # ditto, not zip: an .app is a tree of symlinks into Qt's frameworks, and
+        # `zip -r` flattens them into copies that macOS then refuses to launch.
+        run: |
+          name="AlgaMetrix-macos-${{ matrix.arch }}.zip"
+          ditto -c -k --sequesterRsrc --keepParent dist/AlgaMetrix.app "$name"
+          shasum -a 256 "$name" > SHA256SUMS-macos-${{ matrix.arch }}.txt
+          cat SHA256SUMS-macos-${{ matrix.arch }}.txt
+
+      - name: Upload the build
+        uses: actions/upload-artifact@v4
+        with:
+          name: AlgaMetrix-macos-${{ matrix.arch }}
+          path: |
+            AlgaMetrix-macos-${{ matrix.arch }}.zip
+            SHA256SUMS-macos-${{ matrix.arch }}.txt
+            smoke-macos-${{ matrix.arch }}.txt
+
+      - name: Attach to the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          # smoke-macos-<arch>.txt goes out with the build it describes: it is the output of
+          # the start-up test that ran against this exact bundle, and a reader
+          # who wants to know whether the thing they downloaded was checked
+          # should not have to dig through a workflow log to find out.
+          files: |
+            AlgaMetrix-macos-${{ matrix.arch }}.zip
+            SHA256SUMS-macos-${{ matrix.arch }}.txt
+            smoke-macos-${{ matrix.arch }}.txt
