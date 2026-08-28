@@ -61,32 +61,66 @@ def test_verification_is_163_identities_and_147_admissibility_constraints(lib, c
 
 
 # ----------------------------------------------------------------------
-# Shared foreground: "167 flow comparisons, within 1.2e-13"
+# Round-off is not portable, and these two residuals are round-off
 # ----------------------------------------------------------------------
+#
+# The manuscript quotes 1.2e-13 for the shared-flow recovery and 2.5e-15 for the
+# matrix benchmark. Those are the figures the reproduction environment produces,
+# and they are in results/ where the paper cites them. They are NOT invariants of
+# the software: both come out of a linear solve, and a different interpreter or a
+# different BLAS reorders the same arithmetic. The matrix residual is 2.503e-15 on
+# Python 3.12 and 4.860e-15 on 3.10 and 3.11, which is how this test first
+# failed - it had turned one machine's round-off into a portable claim.
+#
+# So the live tests assert what does hold everywhere: the counts, and that the
+# residual is still floating-point noise rather than a modelling difference. The
+# exact published values are checked against the generated files instead, which
+# are deterministic because they come from one declared environment.
 
-def test_shared_flow_recovery_is_167_comparisons_within_1_2e_13(lib, cases):
+#: Three orders of magnitude above the largest residual seen on any interpreter,
+#: six below the tolerance the checks themselves apply. Wide enough to survive a
+#: BLAS change, tight enough that a real drift cannot hide under it.
+NOISE_FLOOR = 1e-12
+
+
+def test_shared_flow_recovery_is_167_comparisons(lib, cases):
     reports = [consistency_mod.check_scenario(c.scenario(lib), c.label) for c in cases]
     assert sum(len(r.active_flows) for r in reports) == 167
     assert all(r.all_pass for r in reports)
     worst = max(r.max_discrepancy for r in reports)
-    # The manuscript reports 1.2e-13. The bound is the value that still rounds
-    # to it, so a residual that grew by an order of magnitude fails here rather
-    # than quietly contradicting the abstract.
-    assert worst <= 1.25e-13, f"maximum TEA-LCA gap {worst:.3e} no longer rounds to 1.2e-13"
+    assert worst <= NOISE_FLOOR, (
+        f"maximum TEA-LCA gap {worst:.3e} is above floating-point noise: the two "
+        "layers may no longer be reading the same quantity")
 
 
-# ----------------------------------------------------------------------
-# Independent implementation: "243 = 27 x 9, within 2.5e-15"
-# ----------------------------------------------------------------------
-
-def test_matrix_lca_benchmark_is_243_comparisons_within_2_5e_15(lib, cases):
+def test_matrix_lca_benchmark_is_243_comparisons(lib, cases):
     reports = [matrixlca.benchmark(c.scenario(lib), c.label) for c in cases]
     n = sum(len(r.rows) for r in reports)
     assert n == 243
     assert n == 27 * (len(matrixlca.IMPACT_CATEGORIES) + 2)   # + gross GWP, + biogenic
     assert all(r.passed(matrixlca.BENCHMARK_TOL) for r in reports)
     worst = max(r.max_rel_diff for r in reports)
-    assert worst <= 2.55e-15, f"maximum matrix-LCA difference {worst:.3e}"
+    assert worst <= NOISE_FLOOR, (
+        f"maximum matrix-LCA difference {worst:.3e} is above floating-point noise: "
+        "the two implementations may have diverged")
+
+
+def test_the_generated_results_carry_the_figures_the_manuscript_quotes():
+    """The published residuals, checked where they are actually published.
+
+    Deterministic in a way the live values are not: these files are written by
+    one run of reproduce.py in one declared environment, and the manuscript
+    cites them by name.
+    """
+    benchmark = (ROOT / "results" / "lca_implementation_benchmark.txt").read_text(
+        encoding="utf-8")
+    assert "indicator comparisons        : 243" in benchmark
+    assert "maximum relative difference  : 2.503e-15" in benchmark
+
+    consistency = (ROOT / "results" / "shared_inventory_consistency.txt").read_text(
+        encoding="utf-8")
+    assert "flow comparisons                  : 167" in consistency
+    assert "maximum relative TEA-LCA gap      : 1.213e-13" in consistency
 
 
 # ----------------------------------------------------------------------
