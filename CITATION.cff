@@ -29,6 +29,9 @@ identifiers:
   # A snapshot DOI is added only once Zenodo has minted it, which happens when
   # the GitHub release is published. Never write one here in advance.
   - type: doi
+    value: 10.5281/zenodo.22143048
+    description: "Archived snapshot of version 1.5.0"
+  - type: doi
     value: 10.5281/zenodo.22127351
     description: "Archived snapshot of version 1.4.0"
   - type: doi
