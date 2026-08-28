@@ -171,9 +171,9 @@ that ran against that exact build before it was published.
    | Apple Silicon — M1, M2, M3, M4 | `AlgaMetrix-macos-arm64.zip` |
    | Intel | `AlgaMetrix-macos-x86_64.zip` |
 
-   Not sure which you have:  → *About This Mac*. "Chip" means Apple Silicon,
-   "Processor" means Intel. The wrong file will not run, and macOS will not
-   explain why, so it is worth the ten seconds.
+   Not sure which you have: the **Apple menu** → *About This Mac*. "Chip" means
+   Apple Silicon, "Processor" means Intel. The wrong file will not run, and
+   macOS will not explain why, so it is worth the ten seconds.
 2. Double-click the zip. macOS unpacks it into **`AlgaMetrix.app`**, which is a
    single item, not a folder to open — everything is inside it.
 3. Drag `AlgaMetrix.app` into your **Applications** folder. Anywhere you own also
