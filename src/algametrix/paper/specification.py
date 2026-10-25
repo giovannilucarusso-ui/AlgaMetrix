@@ -498,17 +498,23 @@ def _equations_profitability() -> list[Equation]:
         ),
         Equation(
             "tea.cashflow",
-            r"\mathrm{CF} = \Pi_\mathrm{net} + D, \qquad "
-            r"\mathbf{cf} = \left(-C_\mathrm{TI},\ \mathrm{CF},\ \dots,\ "
-            r"\mathrm{CF} + f_\mathrm{wc}C_\mathrm{DFC}\right)",
-            "Annual cash flow, with depreciation added back as a non-cash charge, and "
-            "the cash-flow series used for NPV and IRR: one investment outflow at "
-            r"$t=0$, then $n$ equal annual inflows, with the working capital recovered "
-            "in the final year. There is no construction period, no salvage value, no "
-            "escalation and no ramp-up.",
-            "tea.run_tea",
-            stated=lambda s, inv, tea, lca: tea.net_profit + tea.depreciation,
-            engine=lambda s, inv, tea, lca: tea.annual_cash_flow,
+            r"\mathrm{cf}_t = \Pi_t - \tau\max(\Pi_t, 0) + D_t, \qquad "
+            r"\Pi_t = \Pi_\mathrm{gross} + D - D_t, \qquad "
+            r"\mathbf{cf} = \left(-C_\mathrm{TI},\ \mathrm{cf}_1,\ \dots,\ "
+            r"\mathrm{cf}_n + f_\mathrm{wc}C_\mathrm{DFC}\right)",
+            "After-tax cash flow of operating year $t$, with that year's depreciation "
+            "added back as a non-cash charge, and the series used for NPV and IRR: one "
+            r"investment outflow at $t=0$, then $n$ annual inflows, with the working "
+            r"capital recovered in the final year. $D_t = C_\mathrm{DFC}/n_\mathrm{dep}$ "
+            "while the asset is being written off and zero afterwards (a fractional "
+            "period is charged in its last year), so once depreciation ends tax falls "
+            r"on the whole profit. $\Pi_\mathrm{gross}$ and $D$ are the gross profit "
+            "and depreciation defined above, which describe a year inside the "
+            "depreciation period. There is no construction period, no salvage value, "
+            "no escalation and no ramp-up.",
+            "tea.depreciation_schedule / tea.run_tea",
+            stated=lambda s, inv, tea, lca: sum(_stated_cash_flows(s, tea)[1:]),
+            engine=lambda s, inv, tea, lca: sum(tea.cash_flows[1:]),
         ),
         Equation(
             "tea.npv",
@@ -521,13 +527,16 @@ def _equations_profitability() -> list[Equation]:
             stated=lambda s, inv, tea, lca: _stated_npv(s, tea),
             engine=lambda s, inv, tea, lca: tea.npv,
             core=True,
-            core_gloss="Net present value and internal rate of return, on a flat cash-flow series over the evaluation horizon.",
+            core_gloss="Net present value and internal rate of return, on the year-by-year cash-flow series over the evaluation horizon.",
         ),
         Equation(
             "tea.roi",
             r"\mathrm{ROI} = \frac{\Pi_\mathrm{net}}{C_\mathrm{TI}}, \qquad "
-            r"t_\mathrm{pb} = \frac{C_\mathrm{TI}}{\mathrm{CF}}",
-            "Return on investment and simple payback period, both undiscounted.",
+            r"t_\mathrm{pb} = \frac{C_\mathrm{TI}}{\mathrm{CF}}, \qquad "
+            r"\mathrm{CF} = \Pi_\mathrm{net} + D",
+            "Return on investment and simple payback period, both undiscounted. Both "
+            "describe a year inside the depreciation period, where the annual cash "
+            r"flow $\mathrm{CF}$ equals $\mathrm{cf}_t$.",
             "tea.run_tea",
             stated=lambda s, inv, tea, lca: tea.net_profit / tea.total_investment,
             engine=lambda s, inv, tea, lca: tea.roi,
@@ -761,12 +770,24 @@ def _stated_aoc(s, inv, tea) -> float:
             + s.other_opex_per_year)
 
 
-def _stated_npv(s, tea) -> float:
-    n = int(round(s.economics.plant_lifetime))
-    flows = [-tea.total_investment] + [tea.annual_cash_flow] * n
+def _stated_cash_flows(s, tea) -> list[float]:
+    eco = s.economics
+    n = int(round(eco.plant_lifetime))
+    n_dep = eco.depreciation_years
+    d = tea.dfc / n_dep if n_dep > 0 else 0.0
+    flows = [-tea.total_investment]
+    for t in range(1, n + 1):
+        # Full charge in years 1..floor(n_dep), the remainder in the next, then none.
+        d_t = d * min(1.0, max(0.0, n_dep - (t - 1)))
+        profit_t = tea.gross_profit + d - d_t
+        flows.append(profit_t - eco.tax_rate * max(profit_t, 0.0) + d_t)
     flows[-1] += tea.working_capital
+    return flows
+
+
+def _stated_npv(s, tea) -> float:
     i = s.economics.discount_rate
-    return sum(cf / (1.0 + i) ** t for t, cf in enumerate(flows))
+    return sum(cf / (1.0 + i) ** t for t, cf in enumerate(_stated_cash_flows(s, tea)))
 
 
 def _stated_gwp_gross(s, inv) -> float:
@@ -1137,12 +1158,13 @@ ASSUMPTIONS: list[tuple[str, str]] = [
      "comparable, without adjustment, to a minimum selling price that includes a "
      "required return. Return on capital is evaluated separately through NPV, IRR "
      "and ROI."),
-    ("The cash-flow series is flat",
-     "One investment outflow at t = 0 followed by n identical annual cash flows, "
-     "with working capital recovered in the final year. No construction period, no "
-     "production ramp-up, no salvage value, no price or cost escalation, and no "
-     "loss carry-forward: tax is charged on positive gross profit only, year by "
-     "year."),
+    ("The cash-flow series is simple",
+     "One investment outflow at t = 0 followed by n annual cash flows that change "
+     "only when depreciation ends: straight-line depreciation is deducted for the "
+     "depreciation period and not after it. Working capital is recovered in the "
+     "final year. No construction period, no production ramp-up, no salvage value, "
+     "no price or cost escalation, and no loss carry-forward: tax is charged on "
+     "positive gross profit only, year by year."),
     ("Impacts are linear in the inventory",
      "Every impact category is a contraction of the inventory with fixed "
      "characterization factors, so no background process responds to the scale or "

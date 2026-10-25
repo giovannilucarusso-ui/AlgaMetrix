@@ -15,7 +15,7 @@ from algametrix.library import load_library
 from algametrix.models import Material, Scenario
 from algametrix.scenario import run_scenario
 from algametrix.sensitivity import PARAMETERS, run_sweep
-from algametrix.tea import irr, npv
+from algametrix.tea import depreciation_schedule, irr, npv
 
 
 @pytest.fixture(scope="module")
@@ -82,6 +82,59 @@ def test_npv_irr_consistency():
     rate = irr(cash_flows)
     assert rate is not None
     assert npv(rate, cash_flows) == pytest.approx(0.0, abs=1.0)
+
+
+def test_depreciation_stops_when_the_asset_is_written_off():
+    assert depreciation_schedule(100.0, 2.5, 5) == pytest.approx([40.0, 40.0, 20.0, 0.0, 0.0])
+    assert sum(depreciation_schedule(100.0, 10, 20)) == pytest.approx(100.0)
+    # A period longer than the plant life leaves part of the asset undepreciated.
+    assert sum(depreciation_schedule(100.0, 25, 20)) == pytest.approx(80.0)
+    assert depreciation_schedule(100.0, 0, 3) == [0.0, 0.0, 0.0]
+
+
+def test_npv_and_irr_are_computed_on_the_reported_series(lib):
+    t = run_scenario(base_scenario(lib, price=50.0)).tea
+    eco = lib.economics
+    assert len(t.cash_flows) == int(round(eco.plant_lifetime)) + 1
+    assert t.cash_flows[0] == pytest.approx(-t.total_investment)
+    assert t.npv == pytest.approx(npv(eco.discount_rate, t.cash_flows), rel=1e-9)
+    assert t.irr is not None
+    assert npv(t.irr, t.cash_flows) == pytest.approx(0.0, abs=1e-6 * t.total_investment)
+
+
+def test_the_tax_shield_ends_with_the_depreciation_period(lib):
+    scn = base_scenario(lib, price=50.0)
+    scn.economics = replace(lib.economics, plant_lifetime=20, depreciation_years=10)
+    eco = scn.economics
+    t = run_scenario(scn).tea
+    shield = eco.tax_rate * t.dfc / eco.depreciation_years
+    assert t.gross_profit > 0                  # so the deduction is used in full
+    assert t.cash_flows[10] - t.cash_flows[11] == pytest.approx(shield, rel=1e-9)
+    # Up to 1.5 the shield ran for all 20 years, which overstated the NPV by its
+    # present value in years 11 to 20.
+    flat = [-t.total_investment] + [t.annual_cash_flow] * 20
+    flat[-1] += t.working_capital
+    lost = sum(shield / (1 + eco.discount_rate) ** year for year in range(11, 21))
+    assert npv(eco.discount_rate, flat) - t.npv == pytest.approx(lost, rel=1e-9)
+
+
+def test_depreciation_over_the_whole_plant_life_gives_a_flat_series(lib):
+    """The one case the constant series of 1.5 and earlier got right."""
+    scn = base_scenario(lib, price=50.0)
+    scn.economics = replace(lib.economics, plant_lifetime=20, depreciation_years=20)
+    t = run_scenario(scn).tea
+    assert t.cash_flows[1:-1] == pytest.approx([t.annual_cash_flow] * 19, rel=1e-9)
+    assert t.cash_flows[-1] == pytest.approx(t.annual_cash_flow + t.working_capital, rel=1e-9)
+
+
+def test_without_tax_the_depreciation_period_does_not_move_npv(lib):
+    """Depreciation is not a cash flow; it only matters through the tax it saves."""
+    values = []
+    for years in (5, 10, 20):
+        scn = base_scenario(lib, price=50.0)
+        scn.economics = replace(lib.economics, tax_rate=0.0, depreciation_years=years)
+        values.append(run_scenario(scn).tea.npv)
+    assert values == pytest.approx([values[0]] * len(values), rel=1e-9)
 
 
 def test_sensitivity_sweep_scale(lib):

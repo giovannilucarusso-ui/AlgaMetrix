@@ -9,7 +9,9 @@ Combines an :class:`~algametrix.inventory.Inventory` with the
 * an annual operating cost (AOC) split into raw materials, utilities, labour and
   facility-dependent cost (straight-line depreciation + maintenance + insurance), and
 * the minimum biomass production cost (EUR/kg), and
-* a profitability analysis — revenues, gross/net profit, ROI, payback, NPV, IRR.
+* a profitability analysis — revenues, gross/net profit, ROI, payback, NPV, IRR,
+  with NPV and IRR on a year-by-year cash flow in which depreciation stops at
+  the end of its period.
 
 The category structure mirrors a SuperPro Economic Evaluation Report so results
 can be validated against it (see :mod:`algametrix.validation`).
@@ -36,6 +38,19 @@ def capital_recovery_factor(rate: float, lifetime: float) -> float:
 def npv(rate: float, cash_flows: list[float]) -> float:
     """Net present value of ``cash_flows`` (index 0 = now) at ``rate``."""
     return sum(cf / (1.0 + rate) ** t for t, cf in enumerate(cash_flows))
+
+
+def depreciation_schedule(dfc: float, depreciation_years: float, lifetime: int) -> list[float]:
+    """Straight-line depreciation charged in each operating year, 1 to ``lifetime``.
+
+    ``dfc / depreciation_years`` while the asset is being written off and zero
+    after that. A fractional period charges the remainder in its last year, so
+    the charges add up to ``dfc`` whenever the period fits in the lifetime.
+    """
+    if depreciation_years <= 0:
+        return [0.0] * lifetime
+    annual = dfc / depreciation_years
+    return [annual * min(1.0, max(0.0, depreciation_years - t)) for t in range(lifetime)]
 
 
 def irr(cash_flows: list[float]) -> float | None:
@@ -74,7 +89,8 @@ class TEAResult:
     utilities_cost: float
     production_cost_eur_per_kg: float       # AOC / production
     net_production_cost_eur_per_kg: float   # (AOC - co-product revenue) / production
-    # profitability
+    # profitability. Profit, tax and cash flow are those of a year inside the
+    # depreciation period, the year the production cost also describes.
     revenues: float
     gross_profit: float
     taxes: float
@@ -93,6 +109,9 @@ class TEAResult:
     capex_breakdown: dict = field(default_factory=dict)
     opex_breakdown: dict = field(default_factory=dict)
     opex_categories: dict = field(default_factory=dict)
+    # The series NPV and IRR are computed on: the investment at t = 0, then one
+    # after-tax cash flow per operating year.
+    cash_flows: list = field(default_factory=list)
 
     @property
     def total_capex(self) -> float:
@@ -248,8 +267,15 @@ def run_tea(scenario: Scenario, inv: Inventory) -> TEAResult:
     roi = net_profit / total_investment if total_investment > 0 else 0.0
     payback = total_investment / annual_cash_flow if annual_cash_flow > 0 else float("inf")
 
+    # Year by year: once the asset is written off there is no depreciation left
+    # to deduct, and tax falls on the whole profit. Before 1.6 the deduction ran
+    # for the full plant life, which overstated the cash flow whenever the
+    # depreciation period was shorter than the plant life.
     n = int(round(eco.plant_lifetime))
-    cash_flows = [-total_investment] + [annual_cash_flow] * n
+    cash_flows = [-total_investment]
+    for dep_t in depreciation_schedule(dfc, eco.depreciation_years, n):
+        profit_t = gross_profit + depreciation - dep_t
+        cash_flows.append(profit_t - eco.tax_rate * max(profit_t, 0.0) + dep_t)
     cash_flows[-1] += working_capital  # recover working capital at end of life
     npv_value = npv(eco.discount_rate, cash_flows)
     irr_value = irr(cash_flows)
@@ -280,4 +306,5 @@ def run_tea(scenario: Scenario, inv: Inventory) -> TEAResult:
         capex_breakdown={k: v for k, v in capex_breakdown.items() if v},
         opex_breakdown={k: v for k, v in opex_breakdown.items() if v},
         opex_categories={k: v for k, v in opex_categories.items() if v},
+        cash_flows=cash_flows,
     )
