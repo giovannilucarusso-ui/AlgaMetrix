@@ -168,14 +168,14 @@ value, not the reconstruction.
 
 | Study | System | Basis compared | Model | Source | Deviation |
 |---|---|---|---|---|:---:|
-| McKuin et al. 2022 | *Schizochytrium*, fermenter | net; engine adjustment 0.000, convention-free in practice | 2.385 | 2.33 | +2% |
+| McKuin et al. 2022 | *Schizochytrium*, fermenter, Brazil | net; engine adjustment 0.000, convention-free in practice | 1.830 | 1.85 | −1% |
 | Tzachor et al. 2022 | Spirulina, geothermal LED PBR | **gross**; conventions verified and matched | 1.310 | 1.262 | +4% |
 | Braud et al. 2025 (SpiralG) | Spirulina raceway, NaHCO₃ | net; conventions matched | 12.61 | 14.10 | −11% |
 
 **Range: −11% to +4%**, over 3 scenarios from 3 publications. Functional unit: 1 kg dry biomass,
 kg CO₂-eq/kg. The Ahmed et al. 2026 GWP case is calibrated and is reported in §3, not here.
 
-Three things a reader needs in order to use these numbers:
+Four things a reader needs in order to use these numbers:
 
 1. **The conventions have been checked against the sources, and the comparisons moved onto bases
    that do not depend on them.** Tzachor et al. apply an explicit −0.702 kg CO₂-eq/kg credit for
@@ -191,7 +191,14 @@ Three things a reader needs in order to use these numbers:
 2. **SpiralG is not like-for-like.** The engine reproduces the operational path only; the published
    total also includes infrastructure and transport (~2 kg CO₂-eq/kg), which accounts for most of
    the −11%.
-3. Four biogenic-carbon conventions are implemented and gross and net are always reported together,
+3. **McKuin is the Brazilian plant, rebuilt from the source's own inventory.** Until 1.6.0 the
+   builder was the one ported from an earlier branch: it described the Brazilian plant but was
+   compared with the U.S. result (2.33), and it left out the yeast extract and sterilization
+   steam the source includes. It is now built from SI Tables S1–S4, S23, S24 and S36 of McKuin
+   et al. (2022) and compared with the Brazilian whole-cell figure, 1.85, whose 95 % interval is
+   1.82–1.88; the engine's 1.830 falls inside it. Sodium sulfate has no emission factor in Table
+   S36 and enters at zero; a factor of about 0.25 kg CO₂-eq/kg would close the −1 %.
+4. Four biogenic-carbon conventions are implemented and gross and net are always reported together,
    so the choice can be undone — see [CARBON_ACCOUNTING.md](CARBON_ACCOUNTING.md).
 
 ## 6. Internal verification

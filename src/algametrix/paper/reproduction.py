@@ -476,7 +476,7 @@ def build_rows(
 ) -> list[ReproductionRow]:
     lib = lib or load_library()
     if shares is None:
-        shares = indices.component_share_bounds(reconstructions.available())
+        shares = indices.component_share_bounds(reconstructions.cost_builders())
     rows: list[ReproductionRow] = []
     for rec in sorted((r for r in dataset if r.is_executable), key=lambda r: r.study_id):
         for row in (cost_row(rec, lib, registry, shares), gwp_row(rec, lib)):

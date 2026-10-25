@@ -283,6 +283,24 @@ def test_component_shares_come_from_the_engine_and_sum_to_one():
     assert abs(sum(shares.median.values()) - 1.0) < 1e-9
 
 
+def test_gwp_only_builders_stay_out_of_the_cost_shares(dataset):
+    """Their prices are library defaults nobody checked; their split describes no study.
+
+    The flag has to match the dataset: a builder is GWP-only exactly when every
+    record that uses it compares a GWP and none compares a cost.
+    """
+    uses: dict[str, set[str]] = {}
+    for rec in dataset:
+        if rec.reconstruction_builder:
+            kind = "cost" if rec.economic_endpoint_type else "gwp"
+            uses.setdefault(rec.reconstruction_builder, set()).add(kind)
+    gwp_only = {name for name, kinds in uses.items() if kinds == {"gwp"}}
+    assert gwp_only == reconstructions.GWP_ONLY
+    shares = indices.component_share_bounds(reconstructions.cost_builders())
+    assert not set(shares.per_builder) & reconstructions.GWP_ONLY
+    assert set(shares.per_builder) == set(reconstructions.cost_builders())
+
+
 def test_every_index_is_available_and_carries_provenance():
     reg = indices.default_registry()
     for name in ("CEPCI", "labour_cost_index", "general_opex_index", "energy_price_series"):

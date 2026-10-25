@@ -775,7 +775,9 @@ def component_share_bounds(builder_names: list[str]) -> ShareSet:
     regenerate, not to a literature figure nobody can check.
 
     It is **not** a claim about the unreconstructed studies' cost structure, which
-    is exactly why every value derived from it is reported as an interval.
+    is exactly why every value derived from it is reported as an interval. The
+    paper layer passes :func:`reconstructions.cost_builders`, which leaves out
+    the builders that exist for a GWP comparison only.
     """
     import statistics
 

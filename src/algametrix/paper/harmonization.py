@@ -155,7 +155,7 @@ def run_analysis_a(
     endpoints.assert_single_endpoint(list(cohort))
     endpoints.assert_single_functional_unit(list(cohort))
 
-    shares = indices.component_share_bounds(reconstructions.available())
+    shares = indices.component_share_bounds(reconstructions.cost_builders())
 
     stage1: list[tuple[str, float]] = []
     stage2: list[tuple[str, float]] = []
@@ -339,7 +339,7 @@ def run_analysis_b(
     prof = profile or common_profile(lib)
     cohort, blocked = reconstructable_cost_cohort(dataset)
 
-    shares = indices.component_share_bounds(reconstructions.available())
+    shares = indices.component_share_bounds(reconstructions.cost_builders())
     common_basis = PriceBasis(
         currency=reg.common_currency, price_year=target_price_year,
         kind="library_default_price_set",

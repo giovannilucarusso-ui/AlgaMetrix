@@ -50,18 +50,20 @@ def test_the_suite_is_27_scenarios_23_phototrophic_and_4_heterotrophic(lib, case
 
 
 # ----------------------------------------------------------------------
-# Internal verification: "167 construction identities, 149 admissibility"
+# Internal verification: "171 construction identities, 151 admissibility"
 # ----------------------------------------------------------------------
 #
 # 163 and 147 before 1.6.0. A recipe material that declares N or P gets two
 # identities per nutrient (the split of the demand and the recipe's own balance)
 # and one constraint (purchased >= 0). The fermenter's yeast extract declares N,
-# in rec_heterotrophic_powder and var_batch: +4 and +2.
+# in rec_heterotrophic_powder and var_batch: +4 and +2. The rebuilt McKuin
+# medium declares N (urea, yeast extract) and P (monopotassium phosphate): +4
+# and +2.
 
-def test_verification_is_167_identities_and_149_admissibility_constraints(lib, cases):
+def test_verification_is_171_identities_and_151_admissibility_constraints(lib, cases):
     reports = [verify(c.scenario(lib)) for c in cases]
-    assert sum(len(r.balances) for r in reports) == 167
-    assert sum(len(r.invariants) for r in reports) == 149
+    assert sum(len(r.balances) for r in reports) == 171
+    assert sum(len(r.invariants) for r in reports) == 151
     assert all(r.all_pass for r in reports)
 
 
@@ -88,10 +90,13 @@ def test_verification_is_167_identities_and_149_admissibility_constraints(lib, c
 NOISE_FLOOR = 1e-12
 
 
-def test_shared_flow_recovery_is_165_comparisons(lib, cases):
+def test_shared_flow_recovery_is_172_comparisons(lib, cases):
     # 167 before 1.6.0. The two yeast-extract cases no longer buy nitrogen (-2).
+    # rec_mckuin_schizo loses purchased N and P and the template's salts and
+    # cooling water (-5) and gains the ten medium components and two water
+    # utilities of its source (+12).
     reports = [consistency_mod.check_scenario(c.scenario(lib), c.label) for c in cases]
-    assert sum(len(r.active_flows) for r in reports) == 165
+    assert sum(len(r.active_flows) for r in reports) == 172
     assert all(r.all_pass for r in reports)
     worst = max(r.max_discrepancy for r in reports)
     assert worst <= NOISE_FLOOR, (
@@ -201,6 +206,19 @@ def test_untuned_gwp_is_three_scenarios_from_minus_11_to_plus_4(rows):
     c = reproduction.cohort(rows, "retrospective_untuned", "gwp")
     assert c.n == 3
     assert c.range_label == "-11% to +4%"
+
+
+def test_mckuin_is_the_brazil_case_rebuilt_from_its_own_inventory(rows):
+    """1.85 is the Brazilian whole-cell figure; 2.33 belongs to the U.S. plant.
+
+    Rebuilt from SI Tables S23, S24 and S36, the engine gives 1.830, inside the
+    published 95% interval of 1.82 to 1.88.
+    """
+    row = next(r for r in rows if r.study_id == "mckuin_schizo" and r.metric == "gwp")
+    assert row.reference == pytest.approx(1.85)
+    assert row.model == pytest.approx(1.8303, abs=5e-5)
+    assert 1.82 <= row.model <= 1.88
+    assert row.verdict == "-1.1%"
 
 
 def test_the_component_informed_case_is_reported_on_its_own(rows):

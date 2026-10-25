@@ -162,18 +162,25 @@ The module that held the study dataset and the scenario reconstructions
 on `main`**. It lives on the feature branch `m2-harmonization` (PR #1), which was
 never merged, while its *outputs* were copied onto `main` as files.
 
-Reconstructions therefore reach `main` by two routes, both recorded in
+Reconstructions therefore reach `main` by four routes, all recorded in
 `paper/reconstructions.py:BUILDER_PROVENANCE`:
 
 | route | studies |
 |---|---|
 | recovered from shipped templates and example scripts on `main` | `scp_protein`, `russo2022_aury`, `superpro_algaloil`, `superpro_omega3`, `phycocyanin`, `astaxanthin`, `frontiers2026_spirulina`, `padi2023_spirulina` |
-| ported verbatim from `m2-harmonization:reference_studies.py` | `tredici2016`, `vazquez2022`, `iceland_spirulina`, `spiralg2019`, `mckuin_schizo` |
+| ported verbatim from `m2-harmonization:reference_studies.py` | `tredici2016`, `vazquez2022`, `iceland_spirulina`, `spiralg2019` |
 | built from a source's own published data in this revision | `vazquez2022b_nas`, `vazquez2022b_tiso_pht`, `vazquez2022b_nas_10ha` |
+| rebuilt in 1.6.0 from the source's supplementary inventory | `mckuin_schizo` |
 
 Each ported builder reproduces its published legacy value exactly (12.29, 104.26,
-−0.56, 12.61, 2.39 respectively). That equality is how the port is verified: no
+−0.56, 12.61 respectively). That equality is how the port is verified: no
 scenario was fitted to a known answer.
+
+`mckuin_schizo` was ported the same way until 1.6.0 and reproduced its legacy 2.39.
+That builder described the Brazilian plant but was compared with the U.S. result, and
+it left out the yeast extract and sterilization steam the source includes. It is now
+built from SI Tables S1–S4, S23, S24 and S36 of McKuin et al. (2022) and gives 1.830
+against the Brazilian 1.85.
 
 ### 9a. Studies added to widen the matched cohort
 

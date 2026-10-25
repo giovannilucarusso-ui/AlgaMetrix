@@ -1077,16 +1077,17 @@ studies:
 
 - study_id: mckuin_schizo
   short_citation: "McKuin et al., 2022"
-  scenario_label: "Schizochytrium, whole cell"
+  scenario_label: "Schizochytrium, whole cell (Brazil)"
   # Verified against Crossref 2026-08-04. The article number was previously recorded as
   # 00083, which is a different McKuin paper (Nannochloropsis sp. and fishmeal, Elementa
   # 11(1):00083, 2023, doi 10.1525/elementa.2022.00083). The Schizochytrium study this
   # record reproduces is 10(1):00098.
-  full_citation: "McKuin et al. 2022, Elementa: Science of the Anthropocene 10(1):00098 (Schizochytrium, whole cell)"
+  full_citation: "McKuin et al. 2022, Elementa: Science of the Anthropocene 10(1):00098 (Schizochytrium, whole cell, Brazil)"
   doi: 10.1525/elementa.2021.00098
   publication_year: 2022
   independence_group: mckuin_elementa_2022
-  data_location_in_source: null
+  data_location_in_source: "Section 3.1: 1.85 [1.82, 1.88] kg CO2e per kg whole-cell
+    Schizochytrium, Brazil. Inventory in SI Tables S1-S4, S23 and S24; factors in SI Table S36."
   eligibility_status: included
   eligibility_reason: "Published cradle-to-gate GWP for heterotrophic thraustochytrid biomass."
   study_type: lca
@@ -1095,11 +1096,11 @@ studies:
   trophic_mode: heterotrophic
   technology_scale: null
   plant_maturity: null
-  geographical_context: null
+  geographical_context: Brazil
   functional_unit: 1 kg dry biomass
   system_boundary: cradle-to-gate
   environmental_endpoint_type: gwp_cradle_to_gate
-  reported_gwp: 2.33
+  reported_gwp: 1.85
   reported_gwp_unit: kg CO2-eq/kg dry biomass
   biogenic_carbon_convention: null
   published_gwp_available: true
@@ -1114,15 +1115,25 @@ studies:
   published_opex_available: true
   dependency_notes:
     - "The source does not state a biogenic-carbon convention. The engine's own adjustment on
-       this scenario is 0.000 on a gross of 2.385, so no convention could materially move the
+       this scenario is 0.000 on a gross of 1.830, so no convention could materially move the
        comparison; it is made on the net figure with that stated."
   assumptions_required:
-    - "Scenario definition recovered from the unmerged feature branch
-       `m2-harmonization` (PR #1), where it was committed but never merged into main.
-       Ported verbatim into paper/reconstructions.py; reproduces the published value."
-    - "Modelled in the published sugar-biorefinery context: sugarcane sucrose 0.45 and bagasse
-       electricity 0.05 kg CO2-eq. The source reports 1.85 (BR) to 2.33 (US); the 2.33 US case
-       is the encoded reference."
+    - "Rebuilt in 1.6.0 from the source's SI: every flow is an annual median of Table S23 or
+       S24 and every factor the GWP column of Table S36 (Brazil, attributional), per kg of
+       harvested biomass (2.07E6 kg x 0.95). The same reading gives back the published water
+       consumption (0.3768 against 0.377 m3/kg) and land use (1.693 against 1.69 m2/kg). It
+       replaces the builder ported from m2-harmonization, which ran the heterotrophic
+       template on assumed sugarcane and bagasse factors against the U.S. figure of 2.33."
+    - "Nitrogen and phosphorus come from the medium as listed: urea, yeast extract and
+       monopotassium phosphate declare their N and P, which cover the stoichiometric demand,
+       so no fertiliser is bought on top of them."
+    - "Sodium sulfate (1.54E5 kg/yr in Table S23) has no factor in Table S36 and enters at
+       zero. A factor of about 0.25 kg CO2-eq/kg would account for the whole -1% residual;
+       the source does not say what it used."
+    - "Urea is characterized per kg of urea with the 3.44 kg CO2-eq factor that Table S36
+       labels 'Urea, as N'. Applied per kg of N instead, the result would be 1.69; the
+       source's own totals imply the per-kg-urea reading, so it is reproduced, not corrected."
+    - "The engine's 1.830 lies inside the published 95% interval, 1.82 to 1.88."
   todos:
     - "Author overlap with AlgaMetrix is not recorded: the citation gives only
        the first author, and nobody has checked the full list against it. The

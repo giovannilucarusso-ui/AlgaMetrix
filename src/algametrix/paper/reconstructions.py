@@ -13,9 +13,10 @@ can see where the scenario definition came from.
    Five builders (``tredici2016``, ``vazquez2022``, ``iceland_spirulina``,
    ``spiralg2019``, ``mckuin_schizo``) existed only on the feature branch
    ``m2-harmonization`` (PR #1), which was never merged into ``main`` even though
-   their *outputs* were copied onto ``main`` as files. They are ported here
+   their *outputs* were copied onto ``main`` as files. Four are ported here
    verbatim from that branch rather than re-derived, so their numbers remain the
-   published ones. See ``docs/STUDY_SELECTION.md``.
+   published ones. ``mckuin_schizo`` was rebuilt in 1.6.0 from the source's own
+   supplementary inventory. See ``docs/STUDY_SELECTION.md``.
 """
 
 from __future__ import annotations
@@ -33,9 +34,11 @@ from ..models import (
     Economics,
     Harvesting,
     LCIAFactors,
+    Material,
     Organism,
     Scenario,
     TrophicMode,
+    Utility,
 )
 from ..templates import build_template
 from .basis import LIBRARY_PRICE_BASIS, PriceBasis
@@ -52,12 +55,21 @@ BUILDER_PROVENANCE: dict[str, str] = {}
 #: comparable with a published number rather than merely numerically similar.
 BUILDER_PRICE_BASIS: dict[str, PriceBasis] = {}
 
+#: Builders that exist for a GWP comparison only. Their foreground was set to
+#: match a source's inventory and their prices are library or template defaults
+#: that nothing was checked against, so their cost split describes no study and
+#: stays out of every cost statistic (see :func:`cost_builders`).
+GWP_ONLY: set[str] = set()
 
-def register(name: str, provenance: str, basis: PriceBasis = LIBRARY_PRICE_BASIS):
+
+def register(name: str, provenance: str, basis: PriceBasis = LIBRARY_PRICE_BASIS,
+             gwp_only: bool = False):
     def deco(fn: Builder) -> Builder:
         _REGISTRY[name] = fn
         BUILDER_PROVENANCE[name] = provenance
         BUILDER_PRICE_BASIS[name] = basis
+        if gwp_only:
+            GWP_ONLY.add(name)
         return fn
     return deco
 
@@ -322,7 +334,7 @@ def _vazquez2022(lib: Library) -> Scenario:
     )
 
 
-@register("iceland_spirulina", f"{_BRANCH}:_build_iceland_spirulina")
+@register("iceland_spirulina", f"{_BRANCH}:_build_iceland_spirulina", gwp_only=True)
 def _iceland_spirulina(lib: Library) -> Scenario:
     """Hellisheidi/VAXA geothermal Spirulina - LED PBR on a geothermal grid.
 
@@ -347,7 +359,7 @@ def _iceland_spirulina(lib: Library) -> Scenario:
     )
 
 
-@register("spiralg2019", f"{_BRANCH}:_build_spiralg2019")
+@register("spiralg2019", f"{_BRANCH}:_build_spiralg2019", gwp_only=True)
 def _spiralg2019(lib: Library) -> Scenario:
     """SpiralG pilot Spirulina biorefinery, subsystem S1, 2019 inventory.
 
@@ -367,7 +379,48 @@ def _spiralg2019(lib: Library) -> Scenario:
     )
 
 
-@register("mckuin_schizo", f"{_BRANCH}:_build_mckuin_schizo",
+# --------------------------------------------------------------------------
+# McKuin et al. (2022), Elementa 10(1):00098 - Brazil, attributional
+# --------------------------------------------------------------------------
+# Rebuilt in 1.6.0 from the source's supplementary inventory. The ported builder
+# it replaces ran the fermenter template on sugarcane and bagasse factors and
+# was compared with the U.S. figure (2.33), whose plant runs on beet sucrose and
+# grid power. It also bought the template's stoichiometric N and P on top of a
+# medium that already carries them in its urea and phosphate.
+#
+# Every quantity below is an annual median from SI Table S23 (cultivation) or
+# Table S24 (harvest and rotary drying, Brazil), and every factor is the GWP
+# column of SI Table S36 (Brazil, attributional). Per kg of product means per kg
+# of harvested biomass, 2.07E6 kg x 0.95 centrifuge recovery. On that basis the
+# same tables give back the paper's water consumption (0.3768 against 0.377
+# m3/kg) and land use (1.693 against 1.69 m2/kg), which is how the reading of
+# the inventory was checked. The published GWP sets nothing.
+
+_MCKUIN_GROSS_KG = 2.07e6                 # biomass out of the fermenter, Table S23
+_MCKUIN_RECOVERY = 0.95                   # decanter-bowl centrifuge, Table S4
+_MCKUIN_PRODUCT_KG = _MCKUIN_GROSS_KG * _MCKUIN_RECOVERY   # 1.97E6 in Table S24
+
+#: Table S23 medium: name, kg/yr, kg CO2-eq/kg from Table S36, N and P mass
+#: fractions. Urea is characterized per kg of urea, which is how the source
+#: applies its "Urea, as N" factor. Sodium sulfate has no factor in Table S36
+#: and enters at zero.
+_MCKUIN_MEDIUM = (
+    ("Yeast extract", 1.55e5, 3.16e-3, 0.11, 0.0),
+    ("Sodium chloride", 6.17e4, 0.309, 0.0, 0.0),
+    ("Monopotassium phosphate", 1.23e5, 1.57, 0.0, 30.974 / 136.086),
+    ("Magnesium sulfate", 1.54e5, 0.485, 0.0, 0.0),
+    ("Calcium chloride", 1.54e4, 0.828, 0.0, 0.0),
+    ("Sodium bicarbonate", 1.54e4, 1.14, 0.0, 0.0),
+    ("Antifoam (DOWFAX DF 104)", 4.11e4, 4.38, 0.0, 0.0),
+    ("Sodium sulfate", 1.54e5, 0.0, 0.0, 0.0),
+    ("Urea", 1.45e5, 3.44, 2 * 14.007 / 60.056, 0.0),
+    ("Potassium chloride", 1.03e4, 0.493, 0.0, 0.0),
+)
+
+
+@register("mckuin_schizo",
+          "McKuin et al. (2022) SI Tables S1-S4, S23, S24 and S36 (Brazil, attributional); "
+          "rebuilt in 1.6.0, replacing the builder ported from m2-harmonization",
           basis=PriceBasis(
               currency="USD", price_year=None, kind="mixed_price_set",
               provenance="substrate price from McKuin et al. (2022), USD; the labour "
@@ -377,27 +430,61 @@ def _spiralg2019(lib: Library) -> Scenario:
                               "phosphorus_price", "water_price"),
               notes="GWP-only comparison: no economic value from this source enters any "
                     "cost statistic, so the basis is recorded but never exercised",
-          ))
+          ),
+          gwp_only=True)
 def _mckuin_schizo(lib: Library) -> Scenario:
-    """McKuin et al. 2022 - whole-cell Schizochytrium in a sugar-biorefinery context.
+    """McKuin et al. 2022 - whole-cell Schizochytrium, Brazil, attributional.
 
-    Sugarcane sucrose (0.45 kg CO2-eq/kg) and bagasse electricity (0.05
-    kg CO2-eq/kWh); yeast extract and sterilization steam removed because the
-    published system is bagasse-powered. Distinct from the `heterotrophic_powder`
-    builder, which reconstructs Russo et al. (2022) on grid power and corn glucose.
+    Cane sucrose from a biorefinery with bagasse power and heat, decanter
+    centrifuge, rotary drying to 95 % dry weight. Compared with the paper's
+    1.85 kg CO2-eq per kg of whole-cell biomass. GWP only: the medium carries no
+    prices and no factors for the other categories.
     """
-    system = replace(lib.systems["Stirred-tank fermenter (heterotrophic)"],
-                     capex_per_unit=10_000.0)
-    lcia = replace(lib.lcia, substrate_gwp=0.45, elec_gwp=0.05, heat_gwp=0.01)
+    per_kg = 1.0 / _MCKUIN_PRODUCT_KG
+    water_m3 = 1.46e7 / 1000.0 + 4.47e5      # medium (S23) + salinity dilution (S24)
+    system = replace(
+        lib.systems["Stirred-tank fermenter (heterotrophic)"],
+        # Table S1: 155.2 m3, 330 d/yr, 141.4 g/L every 85.8 h. Back-to-back cycles
+        # give 2.03E6 kg/yr against the 2.07E6 median of Table S23; the annual
+        # output does not enter any per-kg flow below.
+        productivity=141.4 / (85.8 / 24.0), operating_days=330.0, biomass_conc=141.4,
+        elec_kwh_per_kg=1.53e5 / _MCKUIN_GROSS_KG,             # pump, sparger, impeller
+        cultivation_heat_mj_per_kg=4.79e5 / _MCKUIN_GROSS_KG,  # sterilization, thermal control
+        cultivation_heat_fuel="natural_gas",                   # the heat account
+        water_m3_per_kg=water_m3 / _MCKUIN_GROSS_KG,
+        substrate_yield=_MCKUIN_GROSS_KG / 4.25e6,             # sucrose, Table S23
+        substrate_name="sucrose",
+        substrate_carbon_fraction=12 * 12.011 / 342.297,
+        capex_per_unit=10_000.0,
+        materials=[], utilities=[],
+    )
+    harvesting = Harvesting(name="Decanter-bowl centrifuge", recovery=_MCKUIN_RECOVERY,
+                            elec_kwh_per_kg=3.40e4 / _MCKUIN_GROSS_KG,   # Table S24
+                            final_solids=0.20)
+    # Table S4: 3.65 MJ per litre of water left after the centrifuge.
+    drying = Drying(name="Rotary dryer", enabled=True, final_solids=0.95,
+                    thermal_mj_per_kg_water=3.65, elec_kwh_per_kg=0.0)
+    lcia = replace(lib.lcia,
+                   elec_gwp=8.96e-2 * 3.6,    # Table S36 gives it per MJ
+                   heat_gwp=2.59e-3,          # bagasse cogeneration
+                   substrate_gwp=0.496)       # cane sucrose, Brazilian biorefinery
+    materials = [Material(name=name, amount_per_kg=kg * per_kg, price=0.0, gwp=gwp,
+                          nitrogen_fraction=n, phosphorus_fraction=p)
+                 for name, kg, gwp, n, p in _MCKUIN_MEDIUM]
+    utilities = [
+        # The water itself is the system's water above; this line carries only
+        # its supply burden, 7.53E-4 kg CO2-eq per kg in Table S36.
+        Utility(name="Tap water supply", amount_per_kg=water_m3 * per_kg, unit="m3",
+                price=0.0, gwp=0.753, water=0.0),
+        Utility(name="Wastewater treatment", amount_per_kg=4.81e5 * per_kg, unit="m3",
+                price=0.0, gwp=1.50e-2),
+    ]
     economics = replace(lib.economics, labor_cost_per_year=743_000.0, substrate_price=0.4)
     return Scenario(
         organism=lib.organisms["Schizochytrium sp."], system=system,
-        harvesting=lib.harvesting["Settling + centrifugation"],
-        drying=lib.drying["Spray drying"],
-        economics=economics, lcia=lcia, scale=150.0,
-        materials=[m for m in system.materials if "yeast" not in m.name.lower()],
-        utilities=[u for u in system.utilities if "steril" not in u.name.lower()],
-        product_price=20.0,
+        harvesting=harvesting, drying=drying,
+        economics=economics, lcia=lcia, scale=155.2,
+        materials=materials, utilities=utilities, product_price=20.0,
     )
 
 
@@ -626,6 +713,11 @@ MISSING_SCENARIOS: dict[str, str] = {}
 
 def available() -> list[str]:
     return sorted(_REGISTRY)
+
+
+def cost_builders() -> list[str]:
+    """Every builder whose cost side can enter a cost statistic: all but GWP_ONLY."""
+    return sorted(n for n in _REGISTRY if n not in GWP_ONLY)
 
 
 def has_builder(name: str | None) -> bool:
