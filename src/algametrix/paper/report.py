@@ -681,10 +681,12 @@ def sobol_validation(outcomes, salib_present: bool, tolerance: float,
     lines += [
         "ESTIMATORS",
         THIN,
-        "  S_i  = (1/N) sum f(B)[f(AB_i) - f(A)] / Var(Y)      Saltelli et al. 2010",
-        "  ST_i = (1/2N) sum [f(A) - f(AB_i)]^2 / Var(Y)       Jansen",
+        "  S_i  = (1/N) sum [f(B) - f0][f(AB_i) - f(A)] / Var(Y)   Saltelli et al. 2010, centred",
+        "  ST_i = (1/2N) sum [f(A) - f(AB_i)]^2 / Var(Y)            Jansen",
         "  A and B: two halves of one scrambled Sobol' sequence in 2k dimensions.",
-        "  Var(Y) over the pooled A and B outputs. N(k+2) evaluations.",
+        "  f0 and Var(Y) over the pooled A and B outputs. N(k+2) evaluations.",
+        "  Centring f(B) on f0 (since 1.6) leaves the expected S_i unchanged and narrows",
+        "  its interval when the output mean is large compared with its spread.",
         "",
         "  The GROUP estimator (sobol.analyze_groups) is the same pair of formulas with a",
         "  whole block of columns swapped at a time, so S[G] = Var(E[Y|X_G])/Var(Y). It is",
@@ -763,10 +765,15 @@ def sobol_validation(outcomes, salib_present: bool, tolerance: float,
                          f"[{e.ci_low:+8.4f},{e.ci_high:+8.4f}] {o.st_abs_error[i]:9.4f}")
         # The remainder is the quantity the group decomposition reports and the
         # only one with no per-parameter analogue, so it is checked explicitly.
-        lines.append(f"  {'rest':6s} {o.interactions_exact:10.4f} "
-                     f"{o.result.interactions:10.4f} {'':20s} "
+        fo, to = o.result.interactions_first_order, o.result.interactions_total_order
+        lines.append(f"  {'rest':6s} {o.interactions_exact:10.4f} {fo.value:10.4f} "
+                     f"[{fo.ci_low:+8.4f},{fo.ci_high:+8.4f}] "
                      f"{o.interactions_abs_error:9.4f}   "
-                     "(variance carried by interactions BETWEEN groups)")
+                     "(1 - sum S: variance carried by interactions BETWEEN groups)")
+        lines.append(f"  {'rest T':6s} {o.interactions_total_exact:10.4f} {to.value:10.4f} "
+                     f"[{to.ci_low:+8.4f},{to.ci_high:+8.4f}] "
+                     f"{o.interactions_total_abs_error:9.4f}   "
+                     "(sum ST - 1: the same, if no interaction spans three groups)")
         ok = o.max_abs_error <= tolerance and not o.result.violations()
         all_ok = all_ok and ok
         lines += [f"  max absolute error : {o.max_abs_error:.4f}  -> "
@@ -779,7 +786,9 @@ def sobol_validation(outcomes, salib_present: bool, tolerance: float,
     return "\n".join(lines)
 
 
-def sobol_convergence(blocks, criteria: dict) -> str:
+def sobol_convergence(blocks, criteria: dict, size_notes: dict | None = None) -> str:
+    """``size_notes`` maps a block title to the (N, misses) of each size the
+    sensitivity runs passed over."""
     lines = header("SOBOL CONVERGENCE", "smallest sample size meeting declared criteria")
     lines += ["DECLARED CONVERGENCE CRITERIA", THIN]
     for k, v in criteria.items():
@@ -799,6 +808,10 @@ def sobol_convergence(blocks, criteria: dict) -> str:
             )
         lines.append(f"  chosen: N={chosen.n_base}" if chosen else
                      "  chosen: NONE met the criteria at any tested size")
+        for n, misses in (size_notes or {}).get(title, []):
+            used = "used, as the largest size tested" if n == rows[-1].n_base else "not used"
+            lines.append(f"  N={n} {used}: at that size the sensitivity runs missed")
+            lines += [f"    {m}" for m in misses]
         if chosen:
             lines.append(f"  {'param':28s} {'S1':>8s} {'S1 95% CI':>20s} "
                          f"{'ST':>8s} {'ST 95% CI':>20s}")
@@ -881,8 +894,12 @@ def uncertainty(blocks, convergence_blocks, parameter_metadata, seed: int, n_cho
         "  among its own members; ST_G adds every interaction with parameters outside it.",
         "  First-order group indices sum to at most 1 and the remainder is the share of",
         "  variance carried by interactions BETWEEN groups. Nothing is assumed additive.",
-        "  Estimated by the Saltelli/Jansen estimator with a whole block of columns",
-        "  swapped at a time (sobol.analyze_groups), over UNIFORM supports.",
+        "  The remainder is estimated twice on the same sample, as 1 - sum S_G and as",
+        "  sum ST_G - 1. The two agree when no interaction spans all three groups; they",
+        "  check each other but are not independent. Every interval, the remainder's",
+        "  included, comes from one bootstrap that resamples the rows jointly.",
+        "  Estimated by the centred Saltelli and the Jansen estimators with a whole block",
+        "  of columns swapped at a time (sobol.analyze_groups), over UNIFORM supports.",
         "",
         "  CONDITIONAL-VARIANCE RATIOS - screening only. Each is the variance of one",
         "  Monte-Carlo run in which a single group varies and the others are PINNED at",
@@ -942,9 +959,11 @@ def uncertainty(blocks, convergence_blocks, parameter_metadata, seed: int, n_cho
                         f"      {g:24s} {s.value:9.4f} "
                         f"[{s.ci_low:+8.4f},{s.ci_high:+8.4f}] {st.value:9.4f} "
                         f"[{st.ci_low:+8.4f},{st.ci_high:+8.4f}]")
+                fo, to = group.interactions_first_order, group.interactions_total_order
                 lines.append(
-                    f"      {'between-group interactions':24s} "
-                    f"{group.interactions:9.4f}   (= 1 - sum of first-order group indices)")
+                    f"      {'between-group':24s} {fo.value:9.4f} "
+                    f"[{fo.ci_low:+8.4f},{fo.ci_high:+8.4f}] {to.value:9.4f} "
+                    f"[{to.ci_low:+8.4f},{to.ci_high:+8.4f}]   (1 - sum S | sum ST - 1)")
                 if group.violations():
                     lines.append(f"      !! {'; '.join(group.violations())}")
             lines.append(

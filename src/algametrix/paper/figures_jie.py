@@ -504,6 +504,14 @@ def figure4_evaluation(sobol_blocks, mc_blocks, group_sobol, mode_key,
             if inter > 0.004:
                 ax.barh(k, inter, height=0.5, left=left, color="#b9b9b9", alpha=0.95,
                         zorder=2)
+            # 95% interval of the between-group term, on the edge where its bar
+            # starts: a larger term moves that edge to the left.
+            est = gr.interactions_first_order
+            if est is not None:
+                ax.errorbar(left, k, xerr=[[max(est.ci_high - est.value, 0.0)],
+                                           [max(est.value - est.ci_low, 0.0)]],
+                            fmt="none", ecolor="#333333", elinewidth=0.7, capsize=1.6,
+                            zorder=4)
         ax.set_yticks(range(len(labels)))
         ax.set_yticklabels(labels, fontsize=6.4)
         ax.tick_params(axis="y", length=0)

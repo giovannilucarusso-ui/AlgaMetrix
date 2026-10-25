@@ -228,6 +228,21 @@ def test_sobol_reproduces_analytical_indices(factory):
     assert out.result.violations() == []
 
 
+def test_first_order_estimate_does_not_move_with_the_output_mean():
+    """S1 is computed on centred outputs, so adding a constant changes nothing.
+
+    The uncentred form of Saltelli (2010) fails this: its error grows with the
+    output mean, which is what made the cost and GWP intervals wide up to 1.5.
+    """
+    b = sobol.additive_linear()
+    base = sobol.analyze(b.parameters, b.model, 1024, SEED, bootstrap=50)
+    shifted = sobol.analyze(b.parameters, lambda X: b.model(X) + 1e4, 1024, SEED,
+                            bootstrap=50)
+    for e0, e1 in zip(base.s1, shifted.s1):
+        assert e1.value == pytest.approx(e0.value, abs=1e-9)
+        assert (e1.ci_low, e1.ci_high) == pytest.approx((e0.ci_low, e0.ci_high), abs=1e-9)
+
+
 def test_sobol_matches_the_reference_library_when_available():
     """Cross-check against SALib.
 
@@ -311,6 +326,17 @@ def test_convergence_utilities_select_a_size():
     assert rows[-1].max_abs_shift_vs_largest == pytest.approx(0.0)
     chosen = sobol.smallest_converged(rows, max_ci_width=0.5, max_shift=0.05)
     assert chosen is not None and chosen.n_base <= 512
+
+
+def test_interval_failures_agree_with_the_convergence_criteria():
+    b = sobol.additive_linear()
+    rows = sobol.convergence_study(b.parameters, b.model, (128, 256, 512), SEED,
+                                   bootstrap=20)
+    for row in rows:
+        for width in (row.max_ci_width_dominant * 0.99, row.max_ci_width_dominant * 1.01):
+            missed = sobol.interval_failures(row.result, width)
+            assert any("ST interval" in m for m in missed) == (
+                row.max_ci_width_dominant > width)
 
 
 def test_engine_sobol_indices_are_in_range(lib):

@@ -14,8 +14,8 @@ What is implemented
 The standard Saltelli cross-sampling design with the estimators recommended by
 Saltelli et al. (2010), *Comput. Phys. Commun.* 181:259-270:
 
-    S_i  = (1/N) sum_j  f(B)_j [ f(AB_i)_j - f(A)_j ]  / Var(Y)      (Eq. b)
-    ST_i = (1/2N) sum_j [ f(A)_j - f(AB_i)_j ]^2       / Var(Y)      (Jansen)
+    S_i  = (1/N) sum_j [ f(B)_j - f0 ] [ f(AB_i)_j - f(A)_j ] / Var(Y)   (Eq. b, centred)
+    ST_i = (1/2N) sum_j [ f(A)_j - f(AB_i)_j ]^2              / Var(Y)   (Jansen)
 
 with
 
@@ -23,11 +23,18 @@ with
   should be a power of two;
 * AB_i equal to A with column i replaced by column i of B;
 * N(k+2) model evaluations in total;
-* Var(Y) taken over the pooled A and B outputs;
+* f0 and Var(Y) taken over the pooled A and B outputs;
 * bootstrap confidence intervals by resampling the N rows jointly, which keeps
   the A/B/AB pairing intact;
 * rows containing a non-finite output dropped jointly across all matrices, with
   the count reported rather than silently absorbed.
+
+f(B) has been centred on f0 since 1.6; Eq. (b) as published uses f(B) itself.
+The expected value is the same, because f(AB_i) - f(A) has mean zero, but the
+uncentred form has a variance that grows with f0 squared. For production cost
+and GWP, whose means are much larger than their spread, that made the intervals
+of the group indices two to eight times wider. ST is a difference and does not
+change.
 
 Every result carries the sample size, the seed, the number of dropped rows and a
 bootstrap interval. Estimates are *not* clipped into [0, 1]: a negative estimate
@@ -192,20 +199,45 @@ def _evaluate(model: Callable[[np.ndarray], np.ndarray], X: np.ndarray) -> np.nd
 # --------------------------------------------------------------------------
 
 def _indices(fA: np.ndarray, fB: np.ndarray, fAB: np.ndarray) -> tuple[np.ndarray, np.ndarray, float]:
-    """Saltelli (2010) S1 and Jansen ST from paired evaluations.
+    """Saltelli (2010) S1 on centred outputs, and Jansen ST, from paired evaluations.
 
-    ``fAB`` has shape ``(N, k)``. Variance is taken over the pooled A and B
-    outputs, which is the estimator SALib uses and is less noisy than using A
-    alone.
+    ``fAB`` has shape ``(N, k)``. The mean used for centring and the variance
+    are taken over the pooled A and B outputs; for the variance this is the
+    estimator SALib uses and is less noisy than using A alone.
     """
     pooled = np.concatenate([fA, fB])
     var = float(np.var(pooled, ddof=0))
     if var <= 0:
         k = fAB.shape[1]
         return np.zeros(k), np.zeros(k), 0.0
-    s1 = np.mean(fB[:, None] * (fAB - fA[:, None]), axis=0) / var
+    f0 = float(np.mean(pooled))
+    s1 = np.mean((fB - f0)[:, None] * (fAB - fA[:, None]), axis=0) / var
     st = 0.5 * np.mean((fA[:, None] - fAB) ** 2, axis=0) / var
     return s1, st, var
+
+
+def _bootstrap_replicates(
+    fA: np.ndarray, fB: np.ndarray, fAB: np.ndarray, replicates: int, seed: int,
+) -> tuple[np.ndarray, np.ndarray]:
+    """S1 and ST recomputed on ``replicates`` sets of jointly resampled rows.
+
+    Each set takes the same rows from A, B and every AB_i, so a sum or a
+    difference of indices taken within one replicate keeps their covariance.
+    """
+    rng = np.random.default_rng(seed + 1)
+    n, k = fAB.shape
+    s1_boot = np.empty((replicates, k))
+    st_boot = np.empty((replicates, k))
+    for b in range(replicates):
+        idx = rng.integers(0, n, size=n)
+        s1_boot[b], st_boot[b], _ = _indices(fA[idx], fB[idx], fAB[idx])
+    return s1_boot, st_boot
+
+
+def _percentile_ci(draws: np.ndarray, alpha: float = 0.05) -> tuple[np.ndarray, np.ndarray]:
+    """Percentile interval over the replicates, i.e. along the first axis."""
+    return (np.percentile(draws, 100 * alpha / 2, axis=0),
+            np.percentile(draws, 100 * (1 - alpha / 2), axis=0))
 
 
 def _bootstrap_ci(
@@ -217,22 +249,10 @@ def _bootstrap_ci(
     alpha: float = 0.05,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Percentile bootstrap over jointly resampled rows."""
-    rng = np.random.default_rng(seed + 1)
-    n, k = fAB.shape
-    s1_boot = np.empty((replicates, k))
-    st_boot = np.empty((replicates, k))
-    for b in range(replicates):
-        idx = rng.integers(0, n, size=n)
-        s1_b, st_b, _ = _indices(fA[idx], fB[idx], fAB[idx])
-        s1_boot[b] = s1_b
-        st_boot[b] = st_b
-    lo, hi = 100 * alpha / 2, 100 * (1 - alpha / 2)
-    return (
-        np.percentile(s1_boot, lo, axis=0),
-        np.percentile(s1_boot, hi, axis=0),
-        np.percentile(st_boot, lo, axis=0),
-        np.percentile(st_boot, hi, axis=0),
-    )
+    s1_boot, st_boot = _bootstrap_replicates(fA, fB, fAB, replicates, seed)
+    s1_lo, s1_hi = _percentile_ci(s1_boot, alpha)
+    st_lo, st_hi = _percentile_ci(st_boot, alpha)
+    return s1_lo, s1_hi, st_lo, st_hi
 
 
 def analyze(
@@ -337,6 +357,12 @@ class GroupSobolResult:
     dropped_rows: int = 0
     runtime_s: float = 0.0
     bootstrap: int = DEFAULT_BOOTSTRAP
+    # The between-group term estimated twice on the same sample, as 1 - sum(S)
+    # and as sum(ST) - 1, each with an interval from the same resampled rows as
+    # the indices. The two agree when no interaction spans three groups. Coming
+    # from one sample, they check each other but are not independent.
+    interactions_first_order: IndexEstimate | None = None
+    interactions_total_order: IndexEstimate | None = None
 
     @property
     def first_order_sum(self) -> float:
@@ -416,7 +442,11 @@ def analyze_groups(
         )
 
     s, st, var = _indices(fA, fB, fAB)
-    s_lo, s_hi, st_lo, st_hi = _bootstrap_ci(fA, fB, fAB, bootstrap, seed)
+    s_boot, st_boot = _bootstrap_replicates(fA, fB, fAB, bootstrap, seed)
+    s_lo, s_hi = _percentile_ci(s_boot)
+    st_lo, st_hi = _percentile_ci(st_boot)
+    rest_s_lo, rest_s_hi = _percentile_ci(1.0 - s_boot.sum(axis=1))
+    rest_st_lo, rest_st_hi = _percentile_ci(st_boot.sum(axis=1) - 1.0)
 
     return GroupSobolResult(
         output=output_name,
@@ -434,6 +464,10 @@ def analyze_groups(
         dropped_rows=dropped,
         runtime_s=time.perf_counter() - t0,
         bootstrap=bootstrap,
+        interactions_first_order=IndexEstimate(
+            "1 - sum(S)", float(1.0 - s.sum()), float(rest_s_lo), float(rest_s_hi)),
+        interactions_total_order=IndexEstimate(
+            "sum(ST) - 1", float(st.sum() - 1.0), float(rest_st_lo), float(rest_st_hi)),
     )
 
 
@@ -627,9 +661,18 @@ class GroupBenchmarkOutcome:
         return abs(self.result.interactions - self.interactions_exact)
 
     @property
+    def interactions_total_exact(self) -> float:
+        """Exact sum(ST) - 1, the remainder as the total-order indices give it."""
+        return float(sum(self.st_exact)) - 1.0
+
+    @property
+    def interactions_total_abs_error(self) -> float:
+        return abs(self.result.interactions_total_order.value - self.interactions_total_exact)
+
+    @property
     def max_abs_error(self) -> float:
         return max(self.s_abs_error + self.st_abs_error
-                   + [self.interactions_abs_error])
+                   + [self.interactions_abs_error, self.interactions_total_abs_error])
 
 
 def run_group_benchmark(
@@ -830,3 +873,26 @@ def smallest_converged(
             continue
         return row
     return None
+
+
+def interval_failures(
+    result: SobolResult,
+    max_ci_width: float,
+    tol: float = INDEX_TOLERANCE,
+    dominant_top_n: int = 2,
+) -> list[str]:
+    """Which of the first three criteria of ``smallest_converged`` a run misses.
+
+    Those three can be checked on one run; the shift and the ranking need the
+    largest run of a convergence study. The study looks at one output, so the
+    sensitivity runs use this to check every other output at the size it chose.
+    """
+    failures = []
+    if result.violations(tol):
+        failures.append("impossible point estimate")
+    if any(e.ci_low < -tol for e in result.s1):
+        failures.append(f"S1 lower bound below -{tol:g}")
+    top = result.ranked()[:dominant_top_n]
+    if max((st.ci_width for _, _, st in top), default=0.0) > max_ci_width:
+        failures.append(f"ST interval of a top-{dominant_top_n} driver wider than {max_ci_width:g}")
+    return failures

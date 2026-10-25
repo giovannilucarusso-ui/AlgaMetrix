@@ -544,25 +544,33 @@ def stage_sobol(run: Run) -> None:
         "bootstrap 95% CI width on ST for the top-2 drivers": f"< {SOBOL_MAX_CI_WIDTH}",
         "|ST - ST(largest run)|": f"< {SOBOL_MAX_SHIFT}",
         "ranking of drivers identical to the largest run": "required",
+        "the first three, on every reported output": "else the next size up",
         "absolute error on analytical benchmark indices": f"< {SOBOL_BENCHMARK_TOLERANCE}",
     }
-    _write(RESULTS / "sobol_convergence.txt", report.sobol_convergence(conv_blocks, criteria))
 
     print("[sobol] sensitivity on the archetypes")
     blocks = []
-    for arch in archetypes.ARCHETYPES:
+    size_notes: dict[str, list[tuple[int, list[str]]]] = {}
+    for i, arch in enumerate(archetypes.ARCHETYPES):
         scn = arch.build(run.lib)
-        n_base = chosen_by_key[arch.key]
-        modes: dict[str, list] = {}
-        for mode in (parameters.MODE_A_SHARED_FOREGROUND, parameters.MODE_B_FULL_DECISION):
-            params = parameters.mode_parameters(mode, scn)
-            results = []
-            for output in SENSITIVITY_OUTPUTS:
-                results.append(sobol.analyze(
-                    sobol_parameters(scn, params), make_model(scn, params, output),
-                    n_base, MASTER_SEED, output, bootstrap=200,
-                ))
-            modes[mode] = results
+        # The convergence study looks at one output. If any output reported
+        # here misses the criteria that need no larger run, every output is
+        # run again at the next size up.
+        missed = []
+        for n_base in [n for n in sorted(sizes) if n >= chosen_by_key[arch.key]]:
+            modes = _sensitivity_runs(scn, n_base)
+            misses = [
+                f"{res.output}, {mode}: {'; '.join(why)}"
+                for mode, results in modes.items() for res in results
+                if (why := sobol.interval_failures(res, SOBOL_MAX_CI_WIDTH))
+            ]
+            if not misses:
+                break
+            missed.append((n_base, misses))
+        title, rows, chosen = conv_blocks[i]
+        if chosen is not None and chosen.n_base != n_base:
+            conv_blocks[i] = (title, rows, next(r for r in rows if r.n_base == n_base))
+        size_notes[title] = missed
         blocks.append({
             "archetype_label": arch.label,
             "archetype_kind": arch.kind,
@@ -570,6 +578,8 @@ def stage_sobol(run: Run) -> None:
             "archetype_notes": arch.notes,
             "modes": modes,
         })
+    _write(RESULTS / "sobol_convergence.txt",
+           report.sobol_convergence(conv_blocks, criteria, size_notes))
     _write(RESULTS / "sensitivity.txt",
            report.sensitivity(blocks, parameters.MODE_DESCRIPTIONS, passed, MASTER_SEED))
     run.artifacts["sobol_blocks"] = blocks
@@ -581,6 +591,20 @@ def stage_sobol(run: Run) -> None:
     run.notes.append(
         "Mode-A dominant driver by output and archetype: " + "; ".join(flips)
     )
+
+
+def _sensitivity_runs(scn, n_base: int) -> dict[str, list]:
+    modes: dict[str, list] = {}
+    for mode in (parameters.MODE_A_SHARED_FOREGROUND, parameters.MODE_B_FULL_DECISION):
+        params = parameters.mode_parameters(mode, scn)
+        results = []
+        for output in SENSITIVITY_OUTPUTS:
+            results.append(sobol.analyze(
+                sobol_parameters(scn, params), make_model(scn, params, output),
+                n_base, MASTER_SEED, output, bootstrap=200,
+            ))
+        modes[mode] = results
+    return modes
 
 
 def _driver_flip(blocks) -> list[str]:
@@ -674,7 +698,9 @@ def stage_uncertainty(run: Run) -> None:
         + "; ".join(
             f"{label} / {metric}: "
             + ", ".join(f"{g} S={s.value:.2f}" for g, (s, _st) in gr.by_group().items())
-            + f", between-group interactions {gr.interactions:.2f}"
+            + f", between-group interactions {gr.interactions:.3f} "
+            f"[{gr.interactions_first_order.ci_low:.3f}, "
+            f"{gr.interactions_first_order.ci_high:.3f}]"
             for (label, metric), gr in group_sobol.items()
         )
     )

@@ -414,6 +414,24 @@ def test_group_estimator_benchmarks_recover_the_exact_remainder():
     assert between.interactions_exact == pytest.approx(1 / 19, abs=1e-12)
 
 
+def test_the_between_group_term_is_estimated_twice_with_intervals():
+    """1 - sum(S) and sum(ST) - 1 on the benchmark whose remainder is 1/19.
+
+    With two groups both are the same quantity. Their intervals come from the
+    bootstrap that gives the indices theirs, so they must contain the exact value.
+    """
+    from algametrix.paper import sobol
+
+    o = sobol.run_group_benchmark(sobol.group_interaction_between(), 2048, 20260801,
+                                  bootstrap=200)
+    fo, to = o.result.interactions_first_order, o.result.interactions_total_order
+    assert fo.value == pytest.approx(o.result.interactions, abs=1e-12)
+    assert to.value == pytest.approx(sum(e.value for e in o.result.st) - 1.0, abs=1e-12)
+    for est in (fo, to):
+        assert est.value == pytest.approx(1 / 19, abs=0.02)
+        assert est.ci_low < 1 / 19 < est.ci_high
+
+
 def test_group_sobol_first_order_indices_do_not_exceed_one():
     """The property that makes it a decomposition, asserted on the real engine."""
     from algametrix.library import load_library
