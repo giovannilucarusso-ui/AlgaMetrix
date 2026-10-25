@@ -264,18 +264,29 @@ Standard     : ISO 14044:2006 Environmental management - Life cycle assessment -
 8  Completeness over the scenarios of this paper
 -----------------------------------------------
 
-  27 scenarios. 9 declared flows carry no factor in at least one category,
+  27 scenarios. 20 declared flows carry no factor in at least one category,
   so they contribute nothing to it - which understates that category by an unknown
   amount rather than by zero.
 
-  flow                 kind      scenarios  categories with no factor
-  -------------------  --------  ---------  --------------------------------------------
-  Chilled water        utility   3          water, land, eutroph_n, eutroph_p, acid
-  Cooling water        utility   3          gwp, water, land, eutroph_n, eutroph_p, acid
-  Ethanol/CO2          solvent   1          water, land, eutroph_n, eutroph_p
-  Flocculant           material  1          water, land, eutroph_n, eutroph_p, acid
-  Hexane               solvent   3          water, land, eutroph_n, eutroph_p
-  Methanol             material  1          water, land, eutroph_n, eutroph_p, acid
-  Sea salts (NaCl)     material  3          water, land, eutroph_n, eutroph_p, acid
-  Sterilization steam  utility   2          water, land, eutroph_n, eutroph_p, acid
-  Yeast extract        material  2          water, land, eutroph_n, eutroph_p, acid
+  flow                      kind      scenarios  categories with no factor
+  ------------------------  --------  ---------  -------------------------------------------------
+  Antifoam (DOWFAX DF 104)  material  1          ced, water, land, eutroph_n, eutroph_p, acid
+  Calcium chloride          material  1          ced, water, land, eutroph_n, eutroph_p, acid
+  Chilled water             utility   2          water, land, eutroph_n, eutroph_p, acid
+  Cooling water             utility   2          gwp, water, land, eutroph_n, eutroph_p, acid
+  Ethanol/CO2               solvent   1          water, land, eutroph_n, eutroph_p
+  Flocculant                material  1          water, land, eutroph_n, eutroph_p, acid
+  Hexane                    solvent   3          water, land, eutroph_n, eutroph_p
+  Magnesium sulfate         material  1          ced, water, land, eutroph_n, eutroph_p, acid
+  Methanol                  material  1          water, land, eutroph_n, eutroph_p, acid
+  Monopotassium phosphate   material  1          ced, water, land, eutroph_n, eutroph_p, acid
+  Potassium chloride        material  1          ced, water, land, eutroph_n, eutroph_p, acid
+  Sea salts (NaCl)          material  2          water, land, eutroph_n, eutroph_p, acid
+  Sodium bicarbonate        material  1          ced, water, land, eutroph_n, eutroph_p, acid
+  Sodium chloride           material  1          ced, water, land, eutroph_n, eutroph_p, acid
+  Sodium sulfate            material  1          gwp, ced, water, land, eutroph_n, eutroph_p, acid
+  Sterilization steam       utility   2          water, land, eutroph_n, eutroph_p, acid
+  Tap water supply          utility   1          ced, water, land, eutroph_n, eutroph_p, acid
+  Urea                      material  1          ced, water, land, eutroph_n, eutroph_p, acid
+  Wastewater treatment      utility   1          ced, water, land, eutroph_n, eutroph_p, acid
+  Yeast extract             material  3          ced, water, land, eutroph_n, eutroph_p, acid

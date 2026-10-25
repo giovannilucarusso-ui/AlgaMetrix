@@ -130,7 +130,7 @@ def test_the_generated_results_carry_the_figures_the_manuscript_quotes():
 
     consistency = (ROOT / "results" / "shared_inventory_consistency.txt").read_text(
         encoding="utf-8")
-    assert "flow comparisons                  : 167" in consistency
+    assert "flow comparisons                  : 172" in consistency
     assert "maximum relative TEA-LCA gap      : 1.213e-13" in consistency
 
 
