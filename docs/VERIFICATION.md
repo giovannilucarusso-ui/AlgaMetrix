@@ -152,7 +152,7 @@ so the check is not vacuous.
 
 ### Result
 
-**27 scenarios, 167 flow comparisons, all PASS.** Maximum relative TEA–LCA discrepancy
+**27 scenarios, 172 flow comparisons, all PASS.** Maximum relative TEA–LCA discrepancy
 **1.2 × 10⁻¹³**; maximum gap between a recovered quantity and the inventory field itself
 **1.2 × 10⁻¹³**. The residual is round-off in the two evaluations of the central difference and
 is bounded by double precision.

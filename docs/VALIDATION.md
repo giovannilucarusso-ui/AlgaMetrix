@@ -119,9 +119,9 @@ validation and is not evidence of predictive accuracy.**
 
 | Case | Script | Model | Source | Basis | Deviation |
 |---|---|---|---|---|:---:|
-| Algal oil in raceway ponds (Carmichael & Petrides 2020) | `phototrophic_algal_oil.py` | 1.673–1.711 | 1.70 | USD 2015 | −2% to +1% |
-| Omega-3 fermentation (Flevaris et al. 2021) | `omega3_fermentation.py` | 16.35–17.55 | 16.57 | USD 2021 | −1% to +6% |
-| Heterotrophic fermenter (Russo et al. 2022) | `heterotrophic_powder` | 17.31–17.47 | 16.46 | USD 2022 | +5% to +6% |
+| Algal oil in raceway ponds (Carmichael & Petrides 2020) | `phototrophic_algal_oil.py` | 1.674–1.711 | 1.70 | USD 2015 | −2% to +1% |
+| Omega-3 fermentation (Flevaris et al. 2021) | `omega3_fermentation.py` | 16.43–17.55 | 16.57 | USD 2021 | −1% to +6% |
+| Heterotrophic fermenter (Russo et al. 2022) | `heterotrophic_powder` | 17.26–17.42 | 16.46 | USD 2022 | +5% to +6% |
 | Spirulina raceway GWP (Ahmed et al. 2026) | `spirulina_padi` | 14.24 | 15.05 | kg CO₂-eq/kg | −5% |
 
 The two SuperPro cases are mixed price sets, hence the intervals.
@@ -209,8 +209,8 @@ implementation, and all three sit at floating-point resolution because they are 
 
 | Check | File | Scale | Max relative residual |
 |---|---|---|---|
-| Construction identities (163) and physical-admissibility constraints (147) | [`results/verification.txt`](../results/verification.txt) | 27 scenarios | 1.2 × 10⁻¹⁶ |
-| **Shared-inventory consistency**: the quantity the TEA priced vs the quantity the LCA characterized, each recovered independently from the published results | [`results/shared_inventory_consistency.txt`](../results/shared_inventory_consistency.txt) | 167 flow comparisons | 1.2 × 10⁻¹³ |
+| Construction identities (171) and physical-admissibility constraints (151) | [`results/verification.txt`](../results/verification.txt) | 27 scenarios | 1.2 × 10⁻¹⁶ |
+| **Shared-inventory consistency**: the quantity the TEA priced vs the quantity the LCA characterized, each recovered independently from the published results | [`results/shared_inventory_consistency.txt`](../results/shared_inventory_consistency.txt) | 172 flow comparisons | 1.2 × 10⁻¹³ |
 | **LCA implementation**: sequential engine vs an independent matrix-formalism implementation (`A s = f`) | [`results/lca_implementation_benchmark.txt`](../results/lca_implementation_benchmark.txt) | 243 indicator comparisons | 2.5 × 10⁻¹⁵ |
 
 Optionally, the same matrices solved by Brightway's `bw2calc` agree to 4.9 × 10⁻¹⁵ over 189
