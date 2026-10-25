@@ -169,10 +169,10 @@ value, not the reconstruction.
 | Study | System | Basis compared | Model | Source | Deviation |
 |---|---|---|---|---|:---:|
 | McKuin et al. 2022 | *Schizochytrium*, fermenter, Brazil | net; engine adjustment 0.000, convention-free in practice | 1.830 | 1.85 | −1% |
-| Tzachor et al. 2022 | Spirulina, geothermal LED PBR | **gross**; conventions verified and matched | 1.310 | 1.262 | +4% |
-| Braud et al. 2025 (SpiralG) | Spirulina raceway, NaHCO₃ | net; conventions matched | 12.61 | 14.10 | −11% |
+| Tzachor et al. 2022 | Spirulina, geothermal LED PBR | **gross**; conventions verified and matched | 1.180 | 1.262 | −6% |
+| Braud et al. 2025 (SpiralG) | Spirulina raceway, NaHCO₃ | net; conventions matched | 12.95 | 14.10 | −8% |
 
-**Range: −11% to +4%**, over 3 scenarios from 3 publications. Functional unit: 1 kg dry biomass,
+**Range: −8% to −1.1%**, over 3 scenarios from 3 publications. Functional unit: 1 kg dry biomass,
 kg CO₂-eq/kg. The Ahmed et al. 2026 GWP case is calibrated and is reported in §3, not here.
 
 Four things a reader needs in order to use these numbers:
@@ -186,11 +186,35 @@ Four things a reader needs in order to use these numbers:
    side is *derived* from the paper's own components by one declared division, not printed by it,
    which makes this row weaker than a comparison against a published value. The published
    correction to that paper (electricity per FU 137.9 → 54.48 kWh) was checked; the reconstruction
-   already uses the corrected figure. Ahmed et al. apply no credit at all, and the engine applies
-   none to a bicarbonate-fed scenario, so both sides are gross.
-2. **SpiralG is not like-for-like.** The engine reproduces the operational path only; the published
-   total also includes infrastructure and transport (~2 kg CO₂-eq/kg), which accounts for most of
-   the −11%.
+   uses the corrected figure, 139.7 kWh per kg of dry product. Until 1.6.0 the engine divided that
+   figure by the harvest recovery a second time (155.2 kWh/kg, +4% instead of −6%). Of the −6.5%
+   that remains, −6.0 points are the source's nutrient and cleaning-agent terms, 0.082 kg CO₂-eq
+   per kg dry, which the builder carries only as nitrogen and phosphorus at a placeholder
+   0.05 kg CO₂-eq/kg (0.007); the rest is the source's energy term, 0.460 per kg wet against
+   54.48 kWh × 0.0084 = 0.458.
+   Ahmed et al. apply no credit at all, and the engine applies none to a bicarbonate-fed scenario,
+   so both sides are gross.
+2. **SpiralG is compared on the source's own operational boundary.** The 14.1 is subsystem S1 in
+   2019 *without* infrastructure, operation and transport (Braud et al., section 3.1.2); with
+   infrastructure and operation the paper's Table 4 gives 15.17. Its Table 5 lists the twelve
+   contributions behind the 14.1, and the inventory it cites is on Zenodo
+   ([10.5281/zenodo.14718129](https://doi.org/10.5281/zenodo.14718129), sheet S1_period1; the
+   October 2025 version changes only the period-2 sheets). The builder takes the electricity of
+   S1.A1–A5 from the inventory, 14.88 kWh per kg. The source names its bicarbonate dataset but not
+   its factor, so the factor comes from AGRIBALYSE 3.2
+   ([10.57745/XTENSJ](https://doi.org/10.57745/XTENSJ), item 11507, production stage):
+   1.27 kg CO₂-eq/kg. Table 5 implies 1.287 (155.83 kg CO₂-eq for 121.11 kg); that figure is used
+   only as a check, because taking an input from the published result would make the row
+   component-informed. Until 1.6.0 the builder used 16.2 kWh/kg, operation included and divided by
+   the harvest recovery, and 0.87 kg CO₂-eq/kg, the library's order-of-magnitude default; the two
+   errors partly cancelled. Of the −8.1% that remains, −4.5 points are nitrogen (the builder's
+   9.6 kg CO₂-eq per kg N against the 18.1 implied by the source's potassium nitrate, on a
+   stoichiometric demand 23% above the nitrate's nitrogen), −2.8 points are inputs the builder
+   leaves out (tap water, other salts, packaging, wastewater and plastic waste), −0.5 points are
+   the bicarbonate factor, −0.2 points are the rounding of the printed 14.1 (Table 5 adds up to
+   14.07) and the grid factor, 0.430 against the 0.431 of Table 5, makes up the last −0.1. The
+   bicarbonate factor is the most sensitive background choice in this row: the AGRIBALYSE 4
+   tables on data.ademe.fr (May 2026) give 0.97 kg CO₂-eq/kg, which would put it at −17%.
 3. **McKuin is the Brazilian plant, rebuilt from the source's own inventory.** Until 1.6.0 the
    builder was the one ported from an earlier branch: it described the Brazilian plant but was
    compared with the U.S. result (2.33), and it left out the yeast extract and sterilization
@@ -255,7 +279,7 @@ Indicative product prices for sanity-checking selling prices are in
 | | |
 |---|---|
 | Point comparisons | **12** |
-| — retrospective untuned | **7** (4 production cost from 2 publications, −14% to +1.5%; 3 GWP from 3 publications, −11% to +4%) |
+| — retrospective untuned | **7** (4 production cost from 2 publications, −14% to +1.5%; 3 GWP from 3 publications, −8% to −1.1%) |
 | — component-informed | **1** (−4%, 48.28 % of its numerator taken from the target) |
 | — calibrated | **4** (2 vendor SuperPro cases, 1 self-citation, 1 GWP) |
 | Range plausibility checks | 1 (**outside** its envelope) |

@@ -13,10 +13,14 @@ can see where the scenario definition came from.
    Five builders (``tredici2016``, ``vazquez2022``, ``iceland_spirulina``,
    ``spiralg2019``, ``mckuin_schizo``) existed only on the feature branch
    ``m2-harmonization`` (PR #1), which was never merged into ``main`` even though
-   their *outputs* were copied onto ``main`` as files. Four are ported here
-   verbatim from that branch rather than re-derived, so their numbers remain the
-   published ones. ``mckuin_schizo`` was rebuilt in 1.6.0 from the source's own
-   supplementary inventory. See ``docs/STUDY_SELECTION.md``.
+   their *outputs* were copied onto ``main`` as files. ``tredici2016`` and
+   ``vazquez2022`` are ported here verbatim from that branch rather than
+   re-derived, so their numbers remain the published ones. ``mckuin_schizo`` was
+   rebuilt in 1.6.0 from the source's own supplementary inventory, and
+   ``iceland_spirulina`` and ``spiralg2019`` were corrected in 1.6.0: both had
+   their electricity charged twice for harvest losses. SpiralG now also takes its
+   electricity from the source's own inventory and its bicarbonate factor from
+   AGRIBALYSE 3.2. See ``docs/STUDY_SELECTION.md``.
 """
 
 from __future__ import annotations
@@ -334,7 +338,9 @@ def _vazquez2022(lib: Library) -> Scenario:
     )
 
 
-@register("iceland_spirulina", f"{_BRANCH}:_build_iceland_spirulina", gwp_only=True)
+@register("iceland_spirulina",
+          f"{_BRANCH}:_build_iceland_spirulina; electricity put on the "
+          "per-kg-grown basis in 1.6.0", gwp_only=True)
 def _iceland_spirulina(lib: Library) -> Scenario:
     """Hellisheidi/VAXA geothermal Spirulina - LED PBR on a geothermal grid.
 
@@ -342,39 +348,80 @@ def _iceland_spirulina(lib: Library) -> Scenario:
     wet and includes construction, which this engine does not model. Native grid:
     0.0084 kg CO2-eq/kWh; CO2 is a geothermal by-product (supply burden 0).
     """
+    harvesting = replace(lib.harvesting["Vibrating screen filter"], elec_kwh_per_kg=0.0)
     organism = replace(lib.organisms["Arthrospira platensis (Spirulina)"], carbon=0.46)
     system = replace(
         lib.systems["Flat-panel photobioreactor"],
-        elec_kwh_per_kg=139.7,               # paper total electricity, LED-dominated
+        # The source's 54.48 kWh per kg of wet product at 39% solids (as
+        # corrected) is 139.7 kWh per kg of dry product, the total of its Table 4.
+        # The engine charges cultivation electricity per kg grown and divides it
+        # by the harvest recovery, so the figure goes in per kg grown. Until 1.6.0
+        # it went in as 139.7 and the product carried 155.2.
+        elec_kwh_per_kg=139.7 * harvesting.recovery,
         cultivation_heat_mj_per_kg=0.0,      # geothermal waste heat
         carbon_source=CarbonSource.CO2,
     )
     lcia = replace(lib.lcia, elec_gwp=0.0084, co2_supply_gwp=0.0,
                    nitrogen_gwp=0.05, phosphorus_gwp=0.05, heat_gwp=0.0)
     return Scenario(
-        organism=organism, system=system,
-        harvesting=replace(lib.harvesting["Vibrating screen filter"], elec_kwh_per_kg=0.0),
+        organism=organism, system=system, harvesting=harvesting,
         drying=lib.drying["No drying (wet paste)"],
         economics=lib.economics, lcia=lcia, scale=100_000.0, product_price=15.0,
     )
 
 
-@register("spiralg2019", f"{_BRANCH}:_build_spiralg2019", gwp_only=True)
+# Braud et al. (2025), Bioresource Technology Reports 29:102027 - SpiralG, S1.
+# The paper compares the two periods on S1 without infrastructure, operation and
+# transport: 14.1 kg CO2-eq per kg DW-eq of dry spaghettini in period 1 (section
+# 3.1.2). The 15.17 of its Table 4 includes infrastructure and operation. Its
+# Table 5 lists the twelve S1 contributions behind the 14.1: 404.83 kg CO2-eq
+# for the 28.78 kg DW-eq of FU1.
+#
+# Quantities come from the inventory the paper cites, Zenodo
+# 10.5281/zenodo.14718129, sheet S1_period1, which is scaled to the same 28.78
+# kg. The October 2025 version of that record (10.5281/zenodo.17311472) corrects
+# typing errors in the period-2 sheets and adds SD1-SD3; its S1_period1 is
+# identical cell by cell.
+
+_SPIRALG_FU_KG = 28.78
+#: Electricity of S1.A1 cultivation, A2 filtration, A3 dewatering, A4 shaping and
+#: A5 drying. S1.A0 operation (38.20 kWh) is outside the 14.1.
+_SPIRALG_ELEC_KWH = 62.1465 + 37.2359 + 2.2153 + 0.1824 + 326.4400
+#: The source names its bicarbonate dataset ("market for sodium bicarbonate", GLO,
+#: ecoinvent 3.6 cut-off) but does not print its factor. The factor comes from an
+#: independent open dataset, AGRIBALYSE 3.2 (ADEME, doi:10.57745/XTENSJ; ecoinvent
+#: 3.9.1 background, EF 3.1), item 11507 "Sodium bicarbonate": 1.27 kg CO2-eq/kg at
+#: the production stage, with packaging, transport and retail left out. Table 5 of
+#: the source implies 1.287 (155.83 kg CO2-eq for the 121.11 kg of S1.A1). That is
+#: part of the published result, so it is used only as a check.
+_SPIRALG_NAHCO3_GWP = 1.27
+
+
+@register("spiralg2019",
+          f"{_BRANCH}:_build_spiralg2019; electricity from Zenodo "
+          "10.5281/zenodo.14718129 and the bicarbonate factor from AGRIBALYSE 3.2 in 1.6.0",
+          gwp_only=True)
 def _spiralg2019(lib: Library) -> Scenario:
     """SpiralG pilot Spirulina biorefinery, subsystem S1, 2019 inventory.
 
-    Published LCI (Zenodo 17311472), Brightway2 / ecoinvent 3.6. Native grid:
-    Italian pilot, 0.43 kg CO2-eq/kWh. No biogenic credit, as published.
+    Brightway2 / ecoinvent 3.6 in the source. Native grid: Italian pilot, 0.43 kg
+    CO2-eq/kWh (section 3.5; Table 5 gives 184.62 for 428.22 kWh, 0.431). No
+    biogenic credit, as published.
     """
+    harvesting = replace(lib.harvesting["Vibrating screen filter"], elec_kwh_per_kg=0.0)
     system = replace(lib.systems["Open raceway pond (Spirulina, NaHCO3)"],
+                     # With the 0.90 recovery this buys 4.206 kg NaHCO3 per kg of
+                     # product; the inventory has 121.11 / 28.78 = 4.208.
                      co2_utilization=0.85, cultivation_heat_mj_per_kg=0.0,
-                     elec_kwh_per_kg=16.2)
-    lcia = replace(lib.lcia, elec_gwp=0.43, bicarbonate_gwp=0.87, nitrogen_gwp=9.6,
-                   heat_gwp=0.0, count_biogenic_uptake=False)
+                     # 14.88 kWh per kg of product, entered per kg grown as in
+                     # _iceland_spirulina. Until 1.6.0 this was 16.2, operation
+                     # included, and the product carried 18.0.
+                     elec_kwh_per_kg=_SPIRALG_ELEC_KWH / _SPIRALG_FU_KG * harvesting.recovery)
+    lcia = replace(lib.lcia, elec_gwp=0.43, bicarbonate_gwp=_SPIRALG_NAHCO3_GWP,
+                   nitrogen_gwp=9.6, heat_gwp=0.0, count_biogenic_uptake=False)
     return Scenario(
         organism=lib.organisms["Arthrospira platensis (Spirulina)"], system=system,
-        harvesting=replace(lib.harvesting["Vibrating screen filter"], elec_kwh_per_kg=0.0),
-        drying=lib.drying["No drying (wet paste)"],
+        harvesting=harvesting, drying=lib.drying["No drying (wet paste)"],
         economics=lib.economics, lcia=lcia, scale=100_000.0, product_price=15.0,
     )
 

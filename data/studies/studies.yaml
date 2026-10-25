@@ -1013,7 +1013,8 @@ studies:
   assumptions_required:
     - "Scenario definition recovered from the unmerged feature branch
        `m2-harmonization` (PR #1), where it was committed but never merged into main.
-       Ported verbatim into paper/reconstructions.py; reproduces the published value."
+       Ported into paper/reconstructions.py, where it reproduced the branch's legacy
+       output (-0.56 net) until its electricity was corrected in 1.6.0 (see below)."
     - "The paper reports per kg WET biomass including construction (-0.008); the engine has no
        infrastructure term and works per kg DRY, so the comparison is per-kg-dry OPERATIONAL.
        See gwp_basis_conversion for the arithmetic."
@@ -1024,10 +1025,18 @@ studies:
        to this scenario. The two sides are therefore on a MATCHED convention, and the
        convention-free gross comparison is available as well."
     - "CORRECTION CHECKED 2026-08-07: the published correction changes the electricity per
-       functional unit from 137.9 to 54.48 kWh and nothing else. The reconstruction already
-       uses the corrected figure: 54.48 / 0.39 = 139.7 kWh per kg dry biomass, which is the
-       elec_kwh_per_kg in reconstructions._iceland_spirulina."
-  todos: []
+       functional unit from 137.9 to 54.48 kWh and nothing else. The reconstruction uses the
+       corrected figure: 54.48 / 0.39 = 139.7 kWh per kg of dry product."
+    - "ELECTRICITY BASIS, corrected 2026-10-25: the engine charges cultivation electricity per
+       kg grown and divides it by the harvest recovery (0.90 for the vibrating screen). The
+       139.7 is already per kg of product, so it now enters as 139.7 x 0.90. Until then the
+       product carried 155.2 kWh/kg and the gross row read +3.9% instead of -6.5%."
+  todos:
+    - "Nutrients and cleaning agent: Table 4 gives nitrogen fertilizer 0.009, phosphorus
+       fertilizer 0.020, iron sulfate 0.000 and lye 0.004 kg CO2-eq per kg wet, 0.082 per kg
+       dry in all. The builder carries only N and P at a placeholder 0.05 kg CO2-eq/kg (0.007
+       per kg dry), which is -6.0 of the -6.5 points. The other -0.5 is the source's energy
+       term (0.460 per kg wet against 54.48 x 0.0084 = 0.458)."
 
 - study_id: spiralg2019
   short_citation: "Braud et al., 2025"
@@ -1036,7 +1045,11 @@ studies:
   doi: 10.1016/j.biteb.2025.102027
   publication_year: 2025
   independence_group: braud_btr_2025
-  data_location_in_source: null
+  data_location_in_source: "Section 3.1.2: S1 GWP 14.1 kg CO2-eq per kg DW-eq of dry
+    spaghettini in period 1, excluding infrastructure, operation and transport (Table 4
+    gives 15.17 with infrastructure and operation). Table 5: the twelve S1 contributions
+    behind it, 404.83 kg CO2-eq per FU1 of 28.78 kg DW-eq. Inventory: Zenodo
+    10.5281/zenodo.14718129, sheet S1_period1, scaled to the same 28.78 kg."
   eligibility_status: included
   eligibility_reason: "Published pilot-scale cradle-to-gate GWP with a documented Brightway2/ecoinvent background."
   study_type: lca
@@ -1067,19 +1080,51 @@ studies:
   published_opex_available: false
   biogenic_carbon_convention: no_biogenic_credit
   dependency_notes:
-    - "BOUNDARY DIFFERENCE: the published total includes infrastructure and transport terms
-       (about 2 kg CO2-eq/kg) that the operational AlgaMetrix boundary does not represent,
-       which accounts for most of the -11%. Informative, not strictly like-for-like."
+    - "SAME BOUNDARY on both sides: the 14.1 leaves out infrastructure, operation and
+       transport (section 3.1.2), and so does the engine. Until 2026-10-25 this note said
+       the published value included infrastructure and transport; the paper says it does not."
   assumptions_required:
     - "Scenario definition recovered from the unmerged feature branch
        `m2-harmonization` (PR #1), where it was committed but never merged into main.
-       Ported verbatim into paper/reconstructions.py; reproduces the published value."
-    - "Engine reproduces the operational path only; the source's S1 total includes
-       infrastructure and transport, which this engine does not model (~2 kg CO2-eq/kg)."
+       Ported into paper/reconstructions.py, where it reproduced the branch's legacy
+       output (12.61) until its electricity and bicarbonate factor were corrected in 1.6.0."
+    - "ZENODO RECORD, checked 2026-10-25: the paper cites 10.5281/zenodo.14718129 (January
+       2025). The October 2025 version, 10.5281/zenodo.17311472, corrects typing errors in
+       S1_period2 and S3_period2 and adds the SD1-SD3 documents; S1_period1 is identical in
+       both, cell by cell. Both versions belong to the concept record 10.5281/zenodo.14718128."
+    - "ELECTRICITY: S1.A1-A5 of S1_period1, 428.22 kWh for 28.78 kg = 14.88 kWh per kg of
+       product. S1.A0 operation (38.20 kWh) is outside the 14.1. The engine charges
+       cultivation electricity per kg grown and divides it by the harvest recovery (0.90), so
+       it enters as 14.88 x 0.90. Until 1.6.0 it entered as 16.2 (operation included) and the
+       product carried 18.0. Grid 0.43 kg CO2-eq/kWh as the paper states (section 3.5);
+       Table 5 gives 184.62 for 428.22 kWh, 0.431."
+    - "BICARBONATE: the carbon balance (C 0.46, utilization 0.85, recovery 0.90) buys 4.206 kg
+       NaHCO3 per kg of product; the inventory has 121.11 / 28.78 = 4.208. The source names its
+       dataset ('market for sodium bicarbonate', GLO, ecoinvent 3.6 cut-off, ReCiPe 2008 (H))
+       but not its factor. The factor is AGRIBALYSE 3.2 (ADEME, doi:10.57745/XTENSJ, food
+       products table of August 2025, sheet 'Detail etape', item 11507 'Sodium bicarbonate'):
+       1.27 kg CO2-eq/kg at the production stage, out of 1.61 with packaging, transport and
+       retail. It is used because it is archived with a DOI and its background is documented
+       (ecoinvent 3.9.1, EF 3.1). The AGRIBALYSE 4 tables on data.ademe.fr (May 2026) give
+       0.97, which would put the row at -17%. The source's Table 5 implies 1.287 (155.83 kg
+       CO2-eq for the 121.11 kg of S1.A1); that is a check only, since taking it as an input
+       would put part of the target on both sides of the comparison. Until 1.6.0 the builder
+       used the library's order-of-magnitude 0.87. Natural soda from trona is lower, about
+       0.35 cradle to gate (Eti Soda EPD S-P-01129, 2017). The 1.14 that McKuin et al. (2022)
+       list for sodium bicarbonate is soda ash used as a proxy (their Table S36, footnote l),
+       so it is not a second source for this factor."
   todos:
     - "Author overlap with AlgaMetrix is not recorded: the citation gives only
        the first author, and nobody has checked the full list against it. The
        field stays unknown rather than being written as no."
+    - "Nitrogen: the builder's 9.6 kg CO2-eq per kg N is about half of the 18.1 the source's
+       potassium nitrate implies (52.34 kg CO2-eq for 20.91 kg KNO3 in Table 5 and the
+       inventory, 2.50 per kg), and the engine's stoichiometric N (0.123 kg per kg) is 23%
+       above the nitrate's nitrogen (0.101). Together -4.5 points of the -8.1%."
+    - "Inputs the builder leaves out, all in Table 5 and the inventory: tap water (5.46 kg
+       CO2-eq per FU1), chelated iron (1.56), potassium sulfate (1.39), packaging (1.08),
+       wastewater (0.65), plastic waste (0.42), magnesium sulfate (0.21), and the phosphate
+       beyond the stoichiometric P. Together -2.8 points."
 
 - study_id: mckuin_schizo
   short_citation: "McKuin et al., 2022"

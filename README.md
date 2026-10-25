@@ -388,7 +388,7 @@ comparisons are therefore classified by **what each one depends on**, and never 
 | Class | n | Agreement |
 |---|---:|---|
 | retrospective untuned — production cost | 4 scenarios, 2 publications | −14% to +1.5% |
-| retrospective untuned — cradle-to-gate GWP | 3 scenarios, 3 publications | −11% to +4% |
+| retrospective untuned — cradle-to-gate GWP | 3 scenarios, 3 publications | −8% to −1.1% |
 | component-informed — production cost | 1 | −4%, with 48.28 % of the compared numerator built from the source's own published OPEX |
 | calibrated benchmarks | 4 | −5% to +6% |
 

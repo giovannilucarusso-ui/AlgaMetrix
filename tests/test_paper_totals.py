@@ -202,10 +202,55 @@ def test_tredici_is_compared_against_the_harmonized_endpoint(rows):
     assert row.verdict == "+1.5%"
 
 
-def test_untuned_gwp_is_three_scenarios_from_minus_11_to_plus_4(rows):
+def test_untuned_gwp_is_three_scenarios_from_minus_8_to_minus_1(rows):
+    # -11% to +4% before 1.6.0, when the two Spirulina builders charged their
+    # electricity twice for harvest losses and McKuin was compared with the U.S. case.
     c = reproduction.cohort(rows, "retrospective_untuned", "gwp")
     assert c.n == 3
-    assert c.range_label == "-11% to +4%"
+    assert c.range_label == "-8% to -1.1%"
+
+
+def test_the_spirulina_gwp_builders_carry_the_source_electricity_per_kg_of_product(lib):
+    """Both sources give electricity per kg of product.
+
+    The engine charges cultivation electricity per kg grown and divides it by the
+    harvest recovery, so a figure entered as it stands is charged twice for the
+    losses: 155.2 and 18.0 kWh/kg until 1.6.0.
+    """
+    from algametrix.inventory import build_inventory
+    from algametrix.paper import reconstructions
+
+    iceland = build_inventory(reconstructions.build("iceland_spirulina", lib))
+    spiralg = build_inventory(reconstructions.build("spiralg2019", lib))
+    assert iceland.elec_kwh_per_kg == pytest.approx(139.7)
+    # S1.A1-A5 of the Zenodo sheet, operation (S1.A0) left out as in the 14.1
+    assert spiralg.elec_kwh_per_kg == pytest.approx(428.2201 / 28.78)
+
+
+def test_iceland_is_compared_on_the_gross_with_the_corrected_electricity(rows):
+    row = next(r for r in rows
+               if r.study_id == "gwp_iceland_spirulina" and r.metric == "gwp")
+    assert row.reference == pytest.approx(1.2615)
+    assert row.model == pytest.approx(1.1800, abs=5e-5)
+    assert row.verdict == "-6%"
+
+
+def test_spiralg_uses_the_source_boundary_and_an_independent_bicarbonate_factor(lib, rows):
+    """14.1 is S1 in 2019 without infrastructure, operation and transport.
+
+    The bicarbonate factor is AGRIBALYSE 3.2's 1.27, not the 1.287 implied by the
+    source's Table 5: that one is part of the published result, and taking an
+    input from it would make the row component-informed. Nitrogen and the inputs
+    the builder leaves out account for most of the rest.
+    """
+    from algametrix.paper import reconstructions
+
+    assert reconstructions.build("spiralg2019", lib).lcia.bicarbonate_gwp == pytest.approx(1.27)
+    row = next(r for r in rows if r.study_id == "spiralg2019" and r.metric == "gwp")
+    assert row.evidence_class == "retrospective_untuned"
+    assert row.reference == pytest.approx(14.10)
+    assert row.model == pytest.approx(12.954, abs=5e-4)
+    assert row.verdict == "-8%"
 
 
 def test_mckuin_is_the_brazil_case_rebuilt_from_its_own_inventory(rows):

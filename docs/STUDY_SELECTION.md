@@ -166,19 +166,31 @@ The module that held the study dataset and the scenario reconstructions
 on `main`**. It lives on the feature branch `m2-harmonization` (PR #1), which was
 never merged, while its *outputs* were copied onto `main` as files.
 
-Reconstructions therefore reach `main` by four routes, all recorded in
+Reconstructions therefore reach `main` by five routes, all recorded in
 `paper/reconstructions.py:BUILDER_PROVENANCE`:
 
 | route | studies |
 |---|---|
 | recovered from shipped templates and example scripts on `main` | `scp_protein`, `russo2022_aury`, `superpro_algaloil`, `superpro_omega3`, `phycocyanin`, `astaxanthin`, `frontiers2026_spirulina`, `padi2023_spirulina` |
-| ported verbatim from `m2-harmonization:reference_studies.py` | `tredici2016`, `vazquez2022`, `iceland_spirulina`, `spiralg2019` |
+| ported verbatim from `m2-harmonization:reference_studies.py` | `tredici2016`, `vazquez2022` |
+| ported from the same branch and corrected in 1.6.0 | `iceland_spirulina`, `spiralg2019` |
 | built from a source's own published data in this revision | `vazquez2022b_nas`, `vazquez2022b_tiso_pht`, `vazquez2022b_nas_10ha` |
 | rebuilt in 1.6.0 from the source's supplementary inventory | `mckuin_schizo` |
 
-Each ported builder reproduces its published legacy value exactly (12.29, 104.26,
-−0.56, 12.61 respectively). That equality is how the port is verified: no
-scenario was fitted to a known answer.
+Each ported builder reproduced its published legacy value exactly (12.29, 104.26,
+−0.56, 12.61 respectively). That equality is how the port was verified: no
+scenario was fitted to a known answer. `tredici2016` and `vazquez2022` still do.
+
+The two Spirulina GWP builders were corrected in 1.6.0. Both took an electricity
+figure the source gives per kg of product and let the engine divide it by the
+harvest recovery again. `spiralg2019` also counted the operation electricity
+that the source's 14.1 leaves out, and used the library's order-of-magnitude
+bicarbonate factor (0.87). It now takes the electricity of S1.A1–A5 from the
+Zenodo inventory the paper cites (10.5281/zenodo.14718129). The bicarbonate
+factor, which the paper does not print, comes from AGRIBALYSE 3.2
+(10.57745/XTENSJ): 1.27 kg CO₂-eq/kg. The 1.287 implied by the paper's Table 5
+is a check only; taking it as an input would make the row component-informed.
+They give 1.180 against 1.262 and 12.95 against 14.10.
 
 `mckuin_schizo` was ported the same way until 1.6.0 and reproduced its legacy 2.39.
 That builder described the Brazilian plant but was compared with the U.S. result, and
