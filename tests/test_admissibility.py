@@ -6,7 +6,8 @@ that comes out of the engine describes the numbers that went in.
 * **The substrate is declared, not assumed.** The carbon fraction of the organic
   feed is a scenario field. It was a module constant — glucose's — applied to
   glycerol, ethanol and food side-streams alike, and it drives the respired
-  carbon and the "biomass C <= substrate C" admissibility check.
+  carbon and the "biomass C <= substrate C" admissibility check. Since 1.6
+  ``run_scenario`` also refuses a scenario that fails that check.
 * **The balance refuses what it cannot compute.** Recovery, carbon utilization,
   nutrient uptake and substrate yield are all divided by, so all four are
   bounded before use. ``run_scenario`` now rejects a scenario that would need
@@ -94,6 +95,54 @@ def test_a_low_carbon_substrate_can_fail_the_check_glucose_would_pass(lib):
     glucose = build_template(HETEROTROPHIC, lib)
     carbon = [i for i in verify(glucose).admissibility if "substrate C" in i.name]
     assert carbon and carbon[0].passed
+
+
+def _carbon_ceiling(scenario) -> float:
+    """The highest yield the substrate's carbon allows, kg biomass per kg substrate."""
+    return scenario.system.substrate_carbon_fraction / scenario.organism.carbon
+
+
+def test_a_yield_the_substrate_carbon_cannot_support_is_refused(lib):
+    """Each input is inside its own range; together they would create carbon.
+
+    The yield check alone allows anything up to 1 kg/kg. Biomass richer in carbon
+    than its substrate, as Schizochytrium is next to glucose, has a lower ceiling,
+    and up to 1.5 a yield above it ran and reported a negative respired CO2.
+    """
+    scenario = build_template(HETEROTROPHIC, lib)
+    too_high = 1.05 * _carbon_ceiling(scenario)
+    assert too_high < 1.0
+    scenario.system = dataclasses.replace(scenario.system, substrate_yield=too_high)
+    issues = errors(scenario)
+    assert [i.field for i in issues] == ["system.substrate_yield"]
+    assert "carbon" in issues[0].message
+    with pytest.raises(InadmissibleScenarioError):
+        run_scenario(scenario)
+
+
+def test_inputcheck_and_verify_put_the_carbon_ceiling_in_the_same_place(lib):
+    """Just under the ceiling both accept the scenario, just over it both refuse it."""
+    for factor, admissible in ((0.999, True), (1.001, False)):
+        scenario = build_template(HETEROTROPHIC, lib)
+        scenario.system = dataclasses.replace(
+            scenario.system, substrate_yield=factor * _carbon_ceiling(scenario))
+        carbon = next(i for i in verify(scenario).admissibility if "substrate C" in i.name)
+        assert carbon.passed == admissible
+        assert (not errors(scenario)) == admissible
+
+
+def test_a_monte_carlo_draw_past_the_carbon_ceiling_is_skipped(lib):
+    from algametrix.sensitivity import PARAMETERS
+    from algametrix.uncertainty import run_montecarlo
+
+    scenario = build_template(HETEROTROPHIC, lib)
+    # A nominal yield just under the ceiling, so a ±20 % spread crosses it.
+    scenario.system = dataclasses.replace(
+        scenario.system, substrate_yield=0.95 * _carbon_ceiling(scenario))
+    yield_param = next(p for p in PARAMETERS if p.name == "Substrate yield")
+    result = run_montecarlo(scenario, [(yield_param, 0.2)], n=100, seed=1)
+    assert result.skipped > 0
+    assert result.n + result.skipped == 100
 
 
 def test_naming_a_substrate_without_its_carbon_is_flagged(lib):

@@ -80,7 +80,9 @@ Inequalities a scenario can genuinely violate:
 - **Heterotrophic carbon feasibility** — the carbon incorporated into biomass cannot exceed the
   carbon supplied by the substrate. This is the elemental constraint the identity above does
   *not* test, because that identity never mentions carbon. The remainder is respired and is
-  reported as `biogenic_co2_respired_per_kg`;
+  reported as `biogenic_co2_respired_per_kg`. Since 1.6 `algametrix.inputcheck` applies the
+  same condition before every run, so `run_scenario`, the Monte Carlo and the sensitivity
+  sweeps refuse a scenario or a draw that violates it; up to 1.5 it was only reported here;
 - **Product mass** — downstream products never sum to more than the biomass fed;
 - **Scale invariance** — per-kg intensities unchanged when the plant scale is doubled
   (continuous mode, where this is mathematically required).

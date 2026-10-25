@@ -329,9 +329,11 @@ carries its basis in the header, and the itemised cost table is allocated the
 same way the KPI is.
 
 **An impossible scenario is refused, not computed — in a script as well as in the
-app.** Zero productivity, zero substrate yield on a heterotroph, a recovery of
-1.4, a proximate composition summing to 400%: the engine would return `inf`, or a
-number computed from a value it had to bound rather than the one you set.
+app.** Zero productivity, zero substrate yield on a heterotroph, a substrate yield
+that would put more carbon into the biomass than the substrate carries, a recovery
+of 1.4, a proximate composition summing to 400%: the engine would return `inf`, a
+negative respired CO₂, or a number computed from a value it had to bound rather
+than the one you set.
 `algametrix.inputcheck` runs on the scenario before any inventory is built, and
 `run_scenario` runs it for you: the window shows what is wrong and withholds the
 result, the wizard will not finish, export and analysis are blocked — and an

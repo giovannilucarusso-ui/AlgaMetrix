@@ -87,7 +87,8 @@ beside it — and defaults to glucose stoichiometry (6 × 12.011 / 180.156 = 0.4
 It does not enter any cost or impact sum: the price and the production burden are
 per kilogram of substrate, whatever that substrate is. What it does set is the
 respired-carbon report above and the falsifiable *biomass C ≤ substrate C* check
-in [VERIFICATION.md](VERIFICATION.md), which is why it cannot stay a constant:
+in [VERIFICATION.md](VERIFICATION.md), which `algametrix.inputcheck` also applies
+before every run. That is why it cannot stay a constant:
 glycerol carries 0.391 kg C/kg, crude glycerol about 0.31, ethanol 0.521, acetate
 0.400, and a wet food side-stream taken as received far less. Naming a substrate
 without changing its carbon fraction is flagged as a warning by

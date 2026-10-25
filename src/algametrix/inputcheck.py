@@ -36,6 +36,9 @@ from .products import product_yield
 ERROR = "error"
 WARNING = "warning"
 
+# Same relative tolerance as the carbon check in verification.verify().
+_CARBON_TOL = 1e-9
+
 
 @dataclass(frozen=True)
 class InputIssue:
@@ -157,6 +160,22 @@ def _cultivation(scn: Scenario) -> list[InputIssue]:
                 f"Glycerol is 0.391, crude glycerol about 0.31, ethanol 0.521.",
                 WARNING,
             ))
+        # The limits above are one input at a time. This one joins the yield, the
+        # substrate and the organism: the biomass cannot hold more carbon than the
+        # substrate fed to grow it. verification.verify() reports the same
+        # condition; here it stops the run, and every Monte Carlo draw with it.
+        org_c = scn.organism.carbon
+        if sys.substrate_yield > 0 and 0 < sys.substrate_carbon_fraction <= 1 and org_c > 0:
+            supplied = sys.substrate_carbon_fraction / sys.substrate_yield
+            if org_c > supplied * (1.0 + _CARBON_TOL):
+                issues.append(InputIssue(
+                    "system.substrate_yield",
+                    f"a yield of {sys.substrate_yield:g} kg biomass per kg of "
+                    f"{sys.substrate_name} feeds {supplied:.3f} kg of carbon per kg of "
+                    f"biomass, but the biomass contains {org_c:.3f} kg. With this "
+                    f"substrate and organism the yield is at most "
+                    f"{sys.substrate_carbon_fraction / org_c:.3f} kg/kg.",
+                ))
     else:
         if sys.co2_utilization <= 0:
             issues.append(InputIssue(
