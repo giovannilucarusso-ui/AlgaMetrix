@@ -147,3 +147,31 @@ The effluent intensity is a useful check: 2.47 m³ per kg of dry biomass here, a
 2.86 m³/kg implied by the Intelligen wastewater biostimulant case
 ([10.13140/RG.2.2.11499.71202](https://doi.org/10.13140/RG.2.2.11499.71202)), which was modelled
 independently in SuperPro Designer.
+
+## 7. Nutrients the recipe carries
+
+The same rule covers a recipe material that brings N or P with it: yeast extract, urea, a
+phosphate salt. Such a material declares `nitrogen_fraction` and `phosphorus_fraction` (kg per kg
+of material) and `assimilable_fraction`, the share the culture can take up (default 1). It is
+counted after any waste feed:
+
+```
+usable(j)      = Σ amount × fraction(j) × assimilable
+from_recipe(j) = min(usable(j), demand(j) − from_waste(j))
+purchased(j)   = demand(j) − from_waste(j) − from_recipe(j)
+surplus(j)     = Σ amount × fraction(j) − from_recipe(j)
+```
+
+The material keeps its own price and factors; what goes is the fertiliser line it replaces.
+Whatever it carries and the culture does not use, the unassimilable share included, is discharged
+with the other surpluses and enters eutrophication. Both fractions default to zero, and a material
+that declares neither is a priced and characterised line item and nothing more.
+
+The shipped fermenter declares it for its yeast extract: 11 % N, 69 % of it usable, which is the
+share of the extract the SuperPro batch consumes. Its 0.61 kg/kg covers the whole nitrogen demand,
+so the case buys no nitrogen. Before 1.6.0 it bought the stoichiometric nitrogen on top of the
+extract, and the same nitrogen was paid for and characterised twice.
+
+`verification.py` adds the split of the demand and the recipe's own balance for each nutrient a
+material declares, the matrix implementation applies the rule on its own, and the printed equation
+`inv.recipe` restates it.

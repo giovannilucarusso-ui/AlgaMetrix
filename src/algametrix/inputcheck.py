@@ -343,11 +343,30 @@ def _waste(scn: Scenario) -> list[InputIssue]:
     return issues
 
 
+def _materials(scn: Scenario) -> list[InputIssue]:
+    issues: list[InputIssue] = []
+    for i, m in enumerate(scn.materials):
+        for name in ("nitrogen_fraction", "phosphorus_fraction", "assimilable_fraction"):
+            value = getattr(m, name)
+            if not 0 <= value <= 1:
+                issues.append(InputIssue(
+                    f"materials[{i}].{name}",
+                    f"{m.name}: {name.replace('_', ' ')} of {value:g} is not a fraction.",
+                ))
+        if (m.nitrogen_fraction or m.phosphorus_fraction) and m.amount_per_kg < 0:
+            issues.append(InputIssue(
+                f"materials[{i}].amount_per_kg",
+                f"{m.name}: a negative amount cannot bring nitrogen or phosphorus "
+                f"into the culture.",
+            ))
+    return issues
+
+
 def check_inputs(scenario: Scenario) -> list[InputIssue]:
     """Everything wrong with ``scenario``, errors first."""
     issues: list[InputIssue] = []
     for check in (_composition, _cultivation, _downstream, _batch,
-                  _products, _economics, _waste, _conventions):
+                  _products, _economics, _waste, _materials, _conventions):
         issues.extend(check(scenario))
     return sorted(issues, key=lambda i: 0 if i.is_error else 1)
 

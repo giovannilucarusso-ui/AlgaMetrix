@@ -94,6 +94,9 @@ def _material(d: dict) -> Material:
         price=float(d.get("price", 0.0)),
         gwp=float(d.get("gwp", 0.0)),
         ced=float(d.get("ced", 0.0)),
+        nitrogen_fraction=float(d.get("nitrogen_fraction", 0.0)),
+        phosphorus_fraction=float(d.get("phosphorus_fraction", 0.0)),
+        assimilable_fraction=float(d.get("assimilable_fraction", 1.0)),
         notes=d.get("notes", ""),
     )
 

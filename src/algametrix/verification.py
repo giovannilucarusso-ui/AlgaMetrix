@@ -149,36 +149,51 @@ def verify(scenario: Scenario) -> VerificationReport:
         "Identity: N supplied x uptake == biomass N",
         inv.nitrogen_per_kg * uptake, org.nitrogen * gpp))
     # Everything entering the culture leaves it assimilated or emitted. A waste
-    # stream dosed on another nutrient can carry N beyond the demand, so the
-    # left-hand side is the demand plus that surplus; with no waste feed the
-    # surplus is zero and this is the identity it has always been.
+    # stream dosed on another nutrient, or a recipe richer than the demand, can
+    # carry N beyond it, so the left-hand side is the demand plus those
+    # surpluses; with neither they are zero and this is the identity it has
+    # always been.
     balances.append(IdentityCheck(
         "Identity: N entering == assimilated + emitted",
-        inv.nitrogen_per_kg + inv.nitrogen_surplus_per_kg,
+        inv.nitrogen_per_kg + inv.nitrogen_surplus_per_kg
+        + inv.nitrogen_materials_surplus_per_kg,
         inv.nitrogen_per_kg * uptake + inv.nitrogen_emitted_per_kg))
     balances.append(IdentityCheck(
         "Identity: P supplied x uptake == biomass P",
         inv.phosphorus_per_kg * uptake, org.phosphorus * gpp))
     balances.append(IdentityCheck(
         "Identity: P entering == assimilated + emitted",
-        inv.phosphorus_per_kg + inv.phosphorus_surplus_per_kg,
+        inv.phosphorus_per_kg + inv.phosphorus_surplus_per_kg
+        + inv.phosphorus_materials_surplus_per_kg,
         inv.phosphorus_per_kg * uptake + inv.phosphorus_emitted_per_kg))
 
     # --- where the nutrients were bought ------------------------------------
-    # The split is an accounting of one quantity, so it must close exactly.
+    # The split is an accounting of one quantity, so it must close exactly. A
+    # recipe split is checked only for a nutrient some material declares; for
+    # the others there is nothing to split.
+    in_recipe = {"N": any(m.nitrogen_fraction for m in scenario.materials),
+                 "P": any(m.phosphorus_fraction for m in scenario.materials)}
+    for label, demand, purchased, from_waste, from_recipe in (
+        ("N", inv.nitrogen_per_kg, inv.nitrogen_purchased_per_kg,
+         inv.nitrogen_from_waste_per_kg, inv.nitrogen_from_materials_per_kg),
+        ("P", inv.phosphorus_per_kg, inv.phosphorus_purchased_per_kg,
+         inv.phosphorus_from_waste_per_kg, inv.phosphorus_from_materials_per_kg),
+    ):
+        if not (scenario.waste_feed.enabled or in_recipe[label]):
+            continue
+        sources = " + ".join(
+            ["purchased"]
+            + (["from waste"] if scenario.waste_feed.enabled else [])
+            + (["from recipe"] if in_recipe[label] else []))
+        balances.append(IdentityCheck(
+            f"Identity: {label} demand == {sources}",
+            demand, purchased + from_waste + from_recipe))
     if scenario.waste_feed.enabled:
         wf = scenario.waste_feed
-        for label, demand, purchased, from_waste, per_unit in (
-            ("N", inv.nitrogen_per_kg, inv.nitrogen_purchased_per_kg,
-             inv.nitrogen_from_waste_per_kg, wf.nitrogen_per_unit),
-            ("P", inv.phosphorus_per_kg, inv.phosphorus_purchased_per_kg,
-             inv.phosphorus_from_waste_per_kg, wf.phosphorus_per_unit),
-            ("substrate", inv.substrate_per_kg, inv.substrate_purchased_per_kg,
-             inv.substrate_from_waste_per_kg, wf.substrate_per_unit),
-        ):
-            balances.append(IdentityCheck(
-                f"Identity: {label} demand == purchased + from waste",
-                demand, purchased + from_waste))
+        balances.append(IdentityCheck(
+            "Identity: substrate demand == purchased + from waste",
+            inv.substrate_per_kg,
+            inv.substrate_purchased_per_kg + inv.substrate_from_waste_per_kg))
         # And the stream delivers exactly what its composition says it does:
         # what the culture uses plus what runs past it.
         for label, from_waste, surplus, per_unit in (
@@ -190,6 +205,20 @@ def verify(scenario: Scenario) -> VerificationReport:
             balances.append(IdentityCheck(
                 f"Identity: waste stream x {label} per unit == used + surplus",
                 inv.waste_feed_per_kg * max(per_unit, 0.0), from_waste + surplus))
+    # The same for the recipe: what its materials carry is used or discharged.
+    for label, attr, used, surplus in (
+        ("N", "nitrogen_fraction", inv.nitrogen_from_materials_per_kg,
+         inv.nitrogen_materials_surplus_per_kg),
+        ("P", "phosphorus_fraction", inv.phosphorus_from_materials_per_kg,
+         inv.phosphorus_materials_surplus_per_kg),
+    ):
+        if not in_recipe[label]:
+            continue
+        carried = sum(max(m.amount_per_kg, 0.0) * getattr(m, attr)
+                      for m in scenario.materials)
+        balances.append(IdentityCheck(
+            f"Identity: recipe {label} content == used + surplus",
+            carried, used + surplus))
 
     invariants: list[InvariantCheck] = []
 
@@ -244,6 +273,17 @@ def verify(scenario: Scenario) -> VerificationReport:
             invariants.append(InvariantCheck(
                 f"Admissible: avoided-treatment {label} entered positive",
                 value >= 0.0, f"{value:.6g} per {wf.unit}"))
+
+    # --- nutrients carried by the recipe ------------------------------------
+    # The recipe split caps what it covers at the demand, like the waste feed.
+    # With a waste feed as well, the checks above already cover the purchase.
+    if not scenario.waste_feed.enabled:
+        for label, purchased in (("N", inv.nitrogen_purchased_per_kg),
+                                 ("P", inv.phosphorus_purchased_per_kg)):
+            if in_recipe[label]:
+                invariants.append(InvariantCheck(
+                    f"Admissible: {label} purchased >= 0",
+                    purchased >= -TOL, f"{purchased:.6g} kg/kg"))
 
     # The elemental carbon constraint the old "Carbon:" identity did not test:
     # a heterotroph cannot incorporate more carbon than its substrate carried.

@@ -162,6 +162,34 @@ def test_save_load_roundtrip_preserves_all_advanced_state(omega3_window, tmp_pat
             == pytest.approx(run_scenario(saved).tea.production_cost_eur_per_kg))
 
 
+def test_the_materials_editor_keeps_the_nutrient_columns(window, monkeypatch):
+    """A custom urea line must reach the engine as nitrogen, and come back as such."""
+    import desktop.main_window as mw
+
+    seen = []
+
+    class FakeEditor:
+        def __init__(self, title, headers, rows, parent=None, hint=""):
+            seen.append(rows)
+
+        def exec(self):
+            return True
+
+        def result_rows(self):
+            return [["Urea", "0.01", "0.45", "1.2", "20", "0.466", "", "0.8"]]
+
+    monkeypatch.setattr(mw, "TableEditorDialog", FakeEditor)
+    window.edit_materials()
+    urea = window.custom_materials[0]
+    assert urea.nitrogen_fraction == pytest.approx(0.466)
+    assert urea.phosphorus_fraction == 0.0
+    assert urea.assimilable_fraction == pytest.approx(0.8)
+    assert window.build_scenario().materials[-1].nitrogen_fraction == pytest.approx(0.466)
+
+    window.edit_materials()                  # reopened, the columns are filled in
+    assert seen[-1] == [["Urea", 0.01, 0.45, 1.2, 20.0, 0.466, 0.0, 0.8]]
+
+
 # --------------------------------------------------------------------------- #
 # QA-008 — reset must reset
 # --------------------------------------------------------------------------- #

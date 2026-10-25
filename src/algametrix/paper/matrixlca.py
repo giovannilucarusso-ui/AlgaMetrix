@@ -243,9 +243,29 @@ def build_system(scenario: Scenario) -> MatrixSystem:
         demand_d, conc_d = dosed
         if conc_d > 0 and demand_d > 0:
             waste_qty = min(max(wf.coverage, 0.0), 1.0) * demand_d / conc_d
-    n_buy = n_demand - min(waste_qty * max(wf.nitrogen_per_unit, 0.0), n_demand)
-    p_buy = p_demand - min(waste_qty * max(wf.phosphorus_per_unit, 0.0), p_demand)
+    n_open = n_demand - min(waste_qty * max(wf.nitrogen_per_unit, 0.0), n_demand)
+    p_open = p_demand - min(waste_qty * max(wf.phosphorus_per_unit, 0.0), p_demand)
     s_buy = s_demand - min(waste_qty * max(wf.substrate_per_unit, 0.0), s_demand)
+
+    # N and P carried by recipe materials. The materials are declared per kg of
+    # product, so per kg of gross biomass they bring the recovery times as much.
+    # The assimilable part covers what the waste feed left open; everything else
+    # they carry is discharged with the emissions below.
+    def recipe(attr: str, assimilable_only: bool) -> float:
+        total = 0.0
+        for m in scenario.materials:
+            share = (min(max(m.assimilable_fraction, 0.0), 1.0)
+                     if assimilable_only else 1.0)
+            total += (max(m.amount_per_kg, 0.0)
+                      * min(max(getattr(m, attr), 0.0), 1.0) * share)
+        return total * recovery
+
+    n_recipe = min(recipe("nitrogen_fraction", True), n_open)
+    p_recipe = min(recipe("phosphorus_fraction", True), p_open)
+    n_recipe_surplus = recipe("nitrogen_fraction", False) - n_recipe
+    p_recipe_surplus = recipe("phosphorus_fraction", False) - p_recipe
+    n_buy = n_open - n_recipe
+    p_buy = p_open - p_recipe
 
     use("nitrogen (kg N)", i_cult, n_buy)
     use("phosphorus (kg P)", i_cult, p_buy)
@@ -343,14 +363,14 @@ def build_system(scenario: Scenario) -> MatrixSystem:
     emit(up_p, idx["electricity (kWh)"], f_.elec_eutroph_p)
 
     # un-assimilated nutrients leave the cultivation stage, and so does whatever
-    # the waste stream over-delivered: the culture cannot take it up, so it is
-    # discharged whichever bucket it arrived in
+    # the waste stream or the recipe over-delivered: the culture cannot take it
+    # up, so it is discharged whichever bucket it arrived in
     n_surplus = max(waste_qty * max(wf.nitrogen_per_unit, 0.0) - n_demand, 0.0)
     p_surplus = max(waste_qty * max(wf.phosphorus_per_unit, 0.0) - p_demand, 0.0)
     emit(ELEMENTARY_FLOWS[5], i_cult,
-         (n_demand * (1.0 - uptake) + n_surplus) * f_.n_to_water_frac)
+         (n_demand * (1.0 - uptake) + n_surplus + n_recipe_surplus) * f_.n_to_water_frac)
     emit(ELEMENTARY_FLOWS[6], i_cult,
-         (p_demand * (1.0 - uptake) + p_surplus) * f_.p_to_water_frac)
+         (p_demand * (1.0 - uptake) + p_surplus + p_recipe_surplus) * f_.p_to_water_frac)
 
     # the treatment this process displaces, where the scenario declares system
     # expansion: entered positive on its own flow and characterised negatively,

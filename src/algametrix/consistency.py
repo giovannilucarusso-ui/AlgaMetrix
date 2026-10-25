@@ -281,7 +281,8 @@ def check_scenario(scenario: Scenario, name: str = "scenario") -> ConsistencyRep
     #: Inventory field holding each flow, for the third (reference) reading.
     # Nitrogen, phosphorus and substrate reference the *purchased* quantity: it
     # is what the price and the fertiliser-production factor both multiply, and
-    # it equals the demand whenever no waste feed is enabled.
+    # it equals the demand whenever no waste feed is enabled and no recipe
+    # material declares N or P.
     inv_field = {
         "Electricity": "elec_kwh_per_kg",
         "Heat": "heat_mj_per_kg",

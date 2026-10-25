@@ -275,6 +275,13 @@ class Material:
 
     Complements the physics-derived flows (CO2, N, P, substrate): use it for the
     specific media components and process chemicals a real recipe needs.
+
+    A material that carries nitrogen or phosphorus (yeast extract, urea, a
+    phosphate salt) says so in ``nitrogen_fraction`` and ``phosphorus_fraction``.
+    The share the culture can take up then covers the demand before any
+    fertiliser is bought, and the rest is discharged. With both fractions at
+    zero, the default, the material is a priced and characterised line item and
+    nothing more.
     """
 
     name: str
@@ -291,6 +298,9 @@ class Material:
     acid: float | None = None        # kg SO2-eq / kg
     eutroph_n: float | None = None   # kg N-eq / kg
     eutroph_p: float | None = None   # kg P-eq / kg
+    nitrogen_fraction: float = 0.0     # kg N / kg material
+    phosphorus_fraction: float = 0.0   # kg P / kg material
+    assimilable_fraction: float = 1.0  # share of that N and P the culture can use
     notes: str = ""
 
 

@@ -149,8 +149,17 @@
   capex_per_unit: 800.0     # EUR/m3 working volume (sterile fermenter train)
   land_m2_per_unit: 0.5
   product_price: 20.0       # EUR/kg microalgae powder (seed value)
+  # The SuperPro medium is glucose, yeast extract and sea salts; it has no
+  # mineral nitrogen, so the yeast extract is the nitrogen source and declares
+  # it. Total N 0.11 kg/kg: 10.7-12.2 % in the AppliChem A1552 typical analysis,
+  # 10.8-11.2 % in Tao et al. 2023, J Microbiol Biotechnol 33:151, Table 1.
+  # Assimilable share 0.69: the SuperPro batch consumes 781.47 of the 1130 kg
+  # of yeast extract it loads (overall balance, Materials sheet), and the N is
+  # taken to go with the mass. No phosphorus content is declared, because no
+  # source gives one for the extract, so the stoichiometric P is still bought.
   materials:
-    - {name: Yeast extract, amount_per_kg: 0.61, price: 7.5, gwp: 1.5, ced: 20.0}
+    - {name: Yeast extract, amount_per_kg: 0.61, price: 7.5, gwp: 1.5, ced: 20.0,
+       nitrogen_fraction: 0.11, assimilable_fraction: 0.69}
     - {name: Sea salts (NaCl), amount_per_kg: 1.21, price: 0.24, gwp: 0.2, ced: 3.0}
   utilities:
     - {name: Sterilization steam, amount_per_kg: 6.27, unit: kg, price: 0.011, gwp: 0.20, ced: 3.2}

@@ -73,6 +73,14 @@ class Inventory:
     # eutrophication - never silently dropped to make the balance look tidy.
     nitrogen_surplus_per_kg: float = 0.0
     phosphorus_surplus_per_kg: float = 0.0
+    # --- nutrients carried by the recipe (Material.nitrogen_fraction etc.) ----
+    # The part of the demand left after any waste feed that the recipe's
+    # assimilable N and P cover, and everything else the recipe brings, which is
+    # discharged. All zero when no material declares a nutrient content.
+    nitrogen_from_materials_per_kg: float = 0.0
+    phosphorus_from_materials_per_kg: float = 0.0
+    nitrogen_materials_surplus_per_kg: float = 0.0
+    phosphorus_materials_surplus_per_kg: float = 0.0
     # --- carbon bookkeeping (biogenic-carbon accounting, see lca.CarbonAccounting) ---
     # Carbon that actually LEAVES THE GATE inside 1 kg of product, expressed as CO2.
     # Differs from ``co2_fixed_per_kg`` by the harvesting recovery: carbon fixed by
@@ -224,6 +232,50 @@ def _waste_split(scenario: Scenario, nitrogen: float, phosphorus: float,
     )
 
 
+@dataclass
+class _RecipeSplit:
+    """How much of the remaining demand the recipe's own N and P cover."""
+
+    nitrogen: float = 0.0              # kg N of the demand met by the recipe
+    phosphorus: float = 0.0
+    nitrogen_surplus: float = 0.0      # kg N carried and not used, assimilable or not
+    phosphorus_surplus: float = 0.0
+
+
+def _recipe_split(scenario: Scenario, nitrogen: float, phosphorus: float,
+                  clamp: "_Clamper | None" = None) -> _RecipeSplit:
+    """Count the N and P that explicit materials carry against what is still needed.
+
+    ``nitrogen`` and ``phosphorus`` are the demands left after any waste feed.
+    Only the assimilable share of what a material carries can meet them. The
+    unassimilable share, and whatever goes past the demand, ends up in the
+    effluent.
+    """
+    clamp = clamp or _Clamper()
+    carried = {"nitrogen": 0.0, "phosphorus": 0.0}
+    usable = {"nitrogen": 0.0, "phosphorus": 0.0}
+    for i, m in enumerate(scenario.materials):
+        if not (m.nitrogen_fraction or m.phosphorus_fraction):
+            continue
+        share = clamp(f"materials[{i}].assimilable_fraction", m.assimilable_fraction,
+                      0.0, 1.0, "a share of the nutrient the material carries")
+        for key, fraction in (("nitrogen", m.nitrogen_fraction),
+                              ("phosphorus", m.phosphorus_fraction)):
+            fraction = clamp(f"materials[{i}].{key}_fraction", fraction, 0.0, 1.0,
+                             "a mass fraction of the material")
+            amount = max(m.amount_per_kg, 0.0) * fraction
+            carried[key] += amount
+            usable[key] += amount * share
+    demand = {"nitrogen": max(nitrogen, 0.0), "phosphorus": max(phosphorus, 0.0)}
+    met = {k: min(usable[k], demand[k]) for k in demand}
+    return _RecipeSplit(
+        nitrogen=met["nitrogen"],
+        phosphorus=met["phosphorus"],
+        nitrogen_surplus=carried["nitrogen"] - met["nitrogen"],
+        phosphorus_surplus=carried["phosphorus"] - met["phosphorus"],
+    )
+
+
 def build_inventory(scenario: Scenario) -> Inventory:
     """Compute the process inventory for ``scenario``."""
     org = scenario.organism
@@ -297,6 +349,15 @@ def build_inventory(scenario: Scenario) -> Inventory:
     waste = _waste_split(scenario, nitrogen, phosphorus, substrate, clamp)
     nitrogen_emitted += waste.nitrogen_surplus
     phosphorus_emitted += waste.phosphorus_surplus
+
+    # --- nutrients the recipe carries ---------------------------------------
+    # Same rule as the waste feed: the demand stays where it is and only the
+    # purchase moves. What the recipe brings and the culture does not use is
+    # discharged.
+    recipe = _recipe_split(scenario, nitrogen - waste.nitrogen,
+                           phosphorus - waste.phosphorus, clamp)
+    nitrogen_emitted += recipe.nitrogen_surplus
+    phosphorus_emitted += recipe.phosphorus_surplus
 
     # --- water ------------------------------------------------------------
     water = sys.water_m3_per_kg * gross_per_product
@@ -380,11 +441,15 @@ def build_inventory(scenario: Scenario) -> Inventory:
         nitrogen_from_waste_per_kg=waste.nitrogen,
         phosphorus_from_waste_per_kg=waste.phosphorus,
         substrate_from_waste_per_kg=waste.substrate,
-        nitrogen_purchased_per_kg=nitrogen - waste.nitrogen,
-        phosphorus_purchased_per_kg=phosphorus - waste.phosphorus,
+        nitrogen_purchased_per_kg=nitrogen - waste.nitrogen - recipe.nitrogen,
+        phosphorus_purchased_per_kg=phosphorus - waste.phosphorus - recipe.phosphorus,
         substrate_purchased_per_kg=substrate - waste.substrate,
         nitrogen_surplus_per_kg=waste.nitrogen_surplus,
         phosphorus_surplus_per_kg=waste.phosphorus_surplus,
+        nitrogen_from_materials_per_kg=recipe.nitrogen,
+        phosphorus_from_materials_per_kg=recipe.phosphorus,
+        nitrogen_materials_surplus_per_kg=recipe.nitrogen_surplus,
+        phosphorus_materials_surplus_per_kg=recipe.phosphorus_surplus,
         biogenic_co2_in_product_per_kg=biogenic_co2_in_product,
         substrate_co2_supplied_per_kg=substrate_co2_supplied,
         inorganic_co2_supplied_per_kg=inorganic_co2_supplied,

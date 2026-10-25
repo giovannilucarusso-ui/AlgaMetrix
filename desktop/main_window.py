@@ -1410,9 +1410,16 @@ class MainWindow(QMainWindow):
         self.recompute()
 
     def edit_materials(self):
-        headers = ["Name", "kg per kg product", "€/kg", "GWP kgCO₂/kg", "CED MJ/kg"]
-        rows = [[m.name, m.amount_per_kg, m.price, m.gwp, m.ced] for m in self.custom_materials]
-        dlg = TableEditorDialog(tr("Media / materials editor"), headers, rows, self)
+        headers = ["Name", "kg per kg product", "€/kg", "GWP kgCO₂/kg", "CED MJ/kg",
+                   "N kg/kg", "P kg/kg", "Assimilable share"]
+        rows = [[m.name, m.amount_per_kg, m.price, m.gwp, m.ced,
+                 m.nitrogen_fraction, m.phosphorus_fraction, m.assimilable_fraction]
+                for m in self.custom_materials]
+        dlg = TableEditorDialog(tr("Media / materials editor"), headers, rows, self,
+                                hint="N and P: kg per kg of material, for a material that "
+                                     "carries them (yeast extract, urea, a phosphate). The "
+                                     "assimilable share of it replaces bought fertiliser; "
+                                     "the rest is discharged.")
         if dlg.exec():
             mats = []
             for row in dlg.result_rows():
@@ -1420,6 +1427,9 @@ class MainWindow(QMainWindow):
                     mats.append(Material(
                         name=row[0].strip(), amount_per_kg=float(row[1] or 0),
                         price=float(row[2] or 0), gwp=float(row[3] or 0), ced=float(row[4] or 0),
+                        nitrogen_fraction=float(row[5] or 0),
+                        phosphorus_fraction=float(row[6] or 0),
+                        assimilable_fraction=float(row[7] or 1),
                     ))
                 except (ValueError, IndexError):
                     continue

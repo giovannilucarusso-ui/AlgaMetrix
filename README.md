@@ -73,6 +73,9 @@ Raw materials and utilities are fully itemised: on top of the physics-derived fl
 water) you can add explicit media components and chemicals (yeast extract, nitrate, hexane, flocculant, …)
 and utilities (sterilization steam, cooling / chilled water), each with its own price and LCA factors —
 so a real fermentation recipe (where e.g. yeast extract dominates the material cost) is represented faithfully.
+A material that carries nitrogen or phosphorus (yeast extract, urea, a phosphate salt) can declare how
+much, and the share the culture can use then replaces bought fertiliser instead of adding to it; the rest
+is discharged ([docs/WASTE_FEEDS.md](docs/WASTE_FEEDS.md), section 7).
 
 **Fully configurable, no coding required.** In the desktop app you can define your own media recipes and
 products through built-in table editors, and switch between **continuous** production and **batch mode**

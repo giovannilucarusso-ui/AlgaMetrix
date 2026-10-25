@@ -50,13 +50,18 @@ def test_the_suite_is_27_scenarios_23_phototrophic_and_4_heterotrophic(lib, case
 
 
 # ----------------------------------------------------------------------
-# Internal verification: "163 construction identities, 147 admissibility"
+# Internal verification: "167 construction identities, 149 admissibility"
 # ----------------------------------------------------------------------
+#
+# 163 and 147 before 1.6.0. A recipe material that declares N or P gets two
+# identities per nutrient (the split of the demand and the recipe's own balance)
+# and one constraint (purchased >= 0). The fermenter's yeast extract declares N,
+# in rec_heterotrophic_powder and var_batch: +4 and +2.
 
-def test_verification_is_163_identities_and_147_admissibility_constraints(lib, cases):
+def test_verification_is_167_identities_and_149_admissibility_constraints(lib, cases):
     reports = [verify(c.scenario(lib)) for c in cases]
-    assert sum(len(r.balances) for r in reports) == 163
-    assert sum(len(r.invariants) for r in reports) == 147
+    assert sum(len(r.balances) for r in reports) == 167
+    assert sum(len(r.invariants) for r in reports) == 149
     assert all(r.all_pass for r in reports)
 
 
@@ -83,9 +88,10 @@ def test_verification_is_163_identities_and_147_admissibility_constraints(lib, c
 NOISE_FLOOR = 1e-12
 
 
-def test_shared_flow_recovery_is_167_comparisons(lib, cases):
+def test_shared_flow_recovery_is_165_comparisons(lib, cases):
+    # 167 before 1.6.0. The two yeast-extract cases no longer buy nitrogen (-2).
     reports = [consistency_mod.check_scenario(c.scenario(lib), c.label) for c in cases]
-    assert sum(len(r.active_flows) for r in reports) == 167
+    assert sum(len(r.active_flows) for r in reports) == 165
     assert all(r.all_pass for r in reports)
     worst = max(r.max_discrepancy for r in reports)
     assert worst <= NOISE_FLOOR, (

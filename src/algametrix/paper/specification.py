@@ -283,18 +283,31 @@ def _equations_inventory() -> list[Equation]:
             applies=lambda s, inv: s.waste_feed.enabled,
         ),
         Equation(
+            "inv.recipe",
+            r"u_j = \min\Big(\sum_m a_m\,x_{j,m}\,\alpha_m,\; r_j\Big),\qquad "
+            r"q_j^{\mathrm{rec}} = \sum_m a_m\,x_{j,m} - u_j",
+            "Nutrients carried by the recipe. A material $m$ (yeast extract, urea, a "
+            "phosphate salt) enters at $a_m$ kg per kg of product with a mass fraction "
+            "$x_{j,m}$ of nutrient $j$, of which the culture can take up the share "
+            "$\\alpha_m$. That assimilable part covers $r_j$, the demand still open "
+            "after any waste feed. The rest, $q_j^{\\mathrm{rec}}$, is discharged with "
+            "the emitted fraction. Zero unless a material declares a nutrient content.",
+            "inventory._recipe_split",
+            stated=lambda s, inv, tea, lca: _stated_recipe_nitrogen(s),
+            engine=lambda s, inv, tea, lca: inv.nitrogen_from_materials_per_kg,
+            applies=lambda s, inv: any(m.nitrogen_fraction for m in s.materials),
+        ),
+        Equation(
             "inv.nutrients.purchased",
-            r"q_\mathrm{N}^{\mathrm{buy}} = q_\mathrm{N} - \min(q_\mathrm{ws}\,c_\mathrm{N},"
-            r"\; q_\mathrm{N})",
-            "The nitrogen actually bought. Cost and the fertiliser-production burden are "
-            "computed from this and not from $q_\\mathrm{N}$, because nitrogen arriving "
-            "in an effluent had no fertiliser plant behind it. With no waste feed the "
+            r"q_\mathrm{N}^{\mathrm{buy}} = r_\mathrm{N} - u_\mathrm{N},\qquad "
+            r"r_\mathrm{N} = q_\mathrm{N} - \min(q_\mathrm{ws}\,c_\mathrm{N},\; q_\mathrm{N})",
+            "The nitrogen actually bought: the demand less what a waste feed and the "
+            "recipe cover. Cost and the fertiliser-production burden are computed from "
+            "this and not from $q_\\mathrm{N}$, because nitrogen arriving in an effluent "
+            "or in yeast extract had no fertiliser plant behind it. With neither, the "
             "two are the same number.",
             "inventory.build_inventory",
-            stated=lambda s, inv, tea, lca: max(
-                s.organism.nitrogen * _gpp(s) / _uptake(s)
-                - min(_stated_waste_quantity(s) * s.waste_feed.nitrogen_per_unit,
-                      s.organism.nitrogen * _gpp(s) / _uptake(s)), 0.0),
+            stated=lambda s, inv, tea, lca: _stated_nitrogen_purchased(s),
             engine=lambda s, inv, tea, lca: inv.nitrogen_purchased_per_kg,
         ),
         Equation(
@@ -686,6 +699,23 @@ def _stated_waste_quantity(s) -> float:
     if concentration <= 0.0 or demand <= 0.0:
         return 0.0
     return min(max(wf.coverage, 0.0), 1.0) * demand / concentration
+
+
+def _stated_nitrogen_open(s) -> float:
+    """Nitrogen demand left after any waste feed, restated from the scenario."""
+    demand = s.organism.nitrogen * _gpp(s) / _uptake(s)
+    return demand - min(_stated_waste_quantity(s) * s.waste_feed.nitrogen_per_unit, demand)
+
+
+def _stated_recipe_nitrogen(s) -> float:
+    """The part of that demand the recipe's assimilable nitrogen covers."""
+    usable = sum(m.amount_per_kg * m.nitrogen_fraction * m.assimilable_fraction
+                 for m in s.materials)
+    return min(usable, _stated_nitrogen_open(s))
+
+
+def _stated_nitrogen_purchased(s) -> float:
+    return max(_stated_nitrogen_open(s) - _stated_recipe_nitrogen(s), 0.0)
 
 
 def _stated_electricity(s) -> float:
