@@ -37,12 +37,12 @@ RESULT
   rec_algal_oil                              3.17e-16  GWP (kg CO₂-eq)
   rec_astaxanthin                            5.26e-16  GWP (kg CO₂-eq)
   rec_heterotrophic_powder                   1.71e-16  Water (m³)
-  rec_iceland_spirulina                      2.50e-16  Water (m³)
+  rec_iceland_spirulina                      1.34e-16  Water (m³)
   rec_mckuin_schizo                          3.36e-16  Land (m²·a)
   rec_omega3                                 2.42e-16  Marine eutrophication (kg N-eq)
   rec_phycocyanin                            2.27e-16  Land (m²·a)
   rec_scp_protein                            4.18e-16  Marine eutrophication (kg N-eq)
-  rec_spiralg2019                            4.22e-16  GWP (kg CO₂-eq)
+  rec_spiralg2019                            1.37e-16  GWP (kg CO₂-eq)
   rec_spirulina_padi                         1.72e-16  Acidification (kg SO₂-eq)
   rec_tredici2016                            5.84e-16  GWP (kg CO₂-eq)
   rec_vazquez2022                            1.96e-16  Marine eutrophication (kg N-eq)
@@ -105,13 +105,13 @@ rec_heterotrophic_powder  -  Reconstruction: heterotrophic_powder
 rec_iceland_spirulina  -  Reconstruction: iceland_spirulina
 ------------------------------------------------------------------------------
   category                                    matrixlca          bw2calc        rel
-  GWP (kg CO₂-eq)                          -0.562366908     -0.562366908    0.0e+00
-  Energy demand (MJ)                         1480.22515       1480.22515    1.5e-16
-  Water (m³)                                0.443777778      0.443777778    2.5e-16
+  GWP (kg CO₂-eq)                          -0.692753574     -0.692753574    0.0e+00
+  Energy demand (MJ)                         1332.76404       1332.76404    0.0e+00
+  Water (m³)                                0.412733333      0.412733333    1.3e-16
   Land (m²·a)                               0.112044818      0.112044818    0.0e+00
   Marine eutrophication (kg N-eq)         0.00315789474    0.00315789474    0.0e+00
-  Freshwater eutrophication (kg P-eq)     0.00853304094    0.00853304094    2.0e-16
-  Acidification (kg SO₂-eq)                 0.280419883      0.280419883    2.0e-16
+  Freshwater eutrophication (kg P-eq)     0.00775692982    0.00775692982    0.0e+00
+  Acidification (kg SO₂-eq)                 0.252479883      0.252479883    0.0e+00
 
 ------------------------------------------------------------------------------
 rec_mckuin_schizo  -  Reconstruction: mckuin_schizo
@@ -165,13 +165,13 @@ rec_scp_protein  -  Reconstruction: scp_protein
 rec_spiralg2019  -  Reconstruction: spiralg2019
 ------------------------------------------------------------------------------
   category                                    matrixlca          bw2calc        rel
-  GWP (kg CO₂-eq)                            12.6137268       12.6137268    4.2e-16
-  Energy demand (MJ)                         223.188031       223.188031    2.5e-16
-  Water (m³)                                 1.14711111       1.14711111    1.9e-16
-  Land (m²·a)                               0.587268029      0.587268029    3.8e-16
-  Marine eutrophication (kg N-eq)         0.00518518519    0.00518518519    3.3e-16
-  Freshwater eutrophication (kg P-eq)     0.00208518519    0.00208518519    2.1e-16
-  Acidification (kg SO₂-eq)                0.0334765432     0.0334765432    4.1e-16
+  GWP (kg CO₂-eq)                            12.9539922       12.9539922    1.4e-16
+  Energy demand (MJ)                          193.53935        193.53935    0.0e+00
+  Water (m³)                                 1.14086928       1.14086928    0.0e+00
+  Land (m²·a)                               0.587268029      0.587268029    0.0e+00
+  Marine eutrophication (kg N-eq)         0.00518518519    0.00518518519    0.0e+00
+  Freshwater eutrophication (kg P-eq)     0.00192913949    0.00192913949    0.0e+00
+  Acidification (kg SO₂-eq)                0.0278588983     0.0278588983    0.0e+00
 
 ------------------------------------------------------------------------------
 rec_spirulina_padi  -  Reconstruction: spirulina_padi
