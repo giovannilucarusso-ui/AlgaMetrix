@@ -926,7 +926,9 @@ studies:
   reconstruction_status: reproduced
   gwp_reconstruction_status: reproduced
   published_inventory_available: true
-  published_capex_available: true
+  # The cost-benefit analysis gives annual fixed and variable costs, with the
+  # fixed assets already depreciated straight-line; the investment is not published.
+  published_capex_available: false
   published_opex_available: true
   dependency_notes:
     - "CALIBRATED: the registered builder reconstructs the Padi et al. (2023) Scenario-I
@@ -1000,8 +1002,9 @@ studies:
   reconstruction_status: reproduced
   gwp_reconstruction_status: reproduced
   published_inventory_available: true
-  published_capex_available: true
-  published_opex_available: true
+  # An LCA: the paper gives no investment or operating cost.
+  published_capex_available: false
+  published_opex_available: false
   dependency_notes:
     - "The source side is DERIVED, not printed: the paper reports per kg wet biomass at 61%
        water and includes facility construction, and every figure compared here is obtained
@@ -1057,8 +1060,11 @@ studies:
   reconstruction_status: reproduced
   gwp_reconstruction_status: reproduced
   published_inventory_available: true
-  published_capex_available: true
-  published_opex_available: true
+  # An LCA. Product prices for the economic allocation come from Kingsley et al.
+  # (2023); the project's own economic data are confidential, and no investment
+  # or operating cost is published.
+  published_capex_available: false
+  published_opex_available: false
   biogenic_carbon_convention: no_biogenic_credit
   dependency_notes:
     - "BOUNDARY DIFFERENCE: the published total includes infrastructure and transport terms
@@ -1111,8 +1117,9 @@ studies:
   reconstruction_status: reproduced
   gwp_reconstruction_status: reproduced
   published_inventory_available: true
-  published_capex_available: true
-  published_opex_available: true
+  # An LCA: neither the paper nor its SI gives an investment or operating cost.
+  published_capex_available: false
+  published_opex_available: false
   dependency_notes:
     - "The source does not state a biogenic-carbon convention. The engine's own adjustment on
        this scenario is 0.000 on a gross of 1.830, so no convention could materially move the

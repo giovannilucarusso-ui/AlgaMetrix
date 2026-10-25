@@ -137,7 +137,11 @@ Implemented in `paper/schema.py:tier_rule`.
 **Tier B** requires *all three*:
 1. `published_inventory_available` — the source's foreground can be entered;
 2. `published_capex_available` **or** `published_opex_available` — the cost
-   structure can be rebuilt;
+   structure can be rebuilt. This is asked only of a record compared on an
+   economic value. A study compared on GWP alone is rebuilt from its inventory
+   and needs no cost data: McKuin et al. (2022), Tzachor et al. (2022) and Braud
+   et al. (2025) publish none, and Ahmed et al. (2026) publish operating costs
+   but not the investment;
 3. a scenario builder registered in `paper/reconstructions.py` — the repository
    can actually run it.
 

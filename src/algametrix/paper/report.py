@@ -79,10 +79,11 @@ def study_selection_audit(dataset, tier_disagreements) -> str:
         "",
         "3. TIER RULE AND DISAGREEMENTS",
         THIN,
-        "  Tier B requires ALL of: a published foreground inventory, published CAPEX or",
-        "  OPEX information, and a scenario builder registered in",
-        "  paper/reconstructions.py. Anything else is Tier A - a literature point that",
-        "  may enter descriptive statistics but not a mechanistic reconstruction.",
+        "  Tier B requires ALL of: a published foreground inventory, a scenario builder",
+        "  registered in paper/reconstructions.py and, for a record compared on an",
+        "  economic value, published CAPEX or OPEX information. A record compared on",
+        "  GWP alone needs no cost data. Anything else is Tier A - a literature point",
+        "  that may enter descriptive statistics but not a mechanistic reconstruction.",
         "",
     ]
     if tier_disagreements:

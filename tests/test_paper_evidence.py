@@ -61,12 +61,22 @@ def test_completeness_score_is_a_fraction(dataset):
 
 
 def test_tier_rule_requires_inventory_economics_and_a_builder():
-    base = dict(study_id="x", full_citation="y", published_inventory_available=True,
-                published_capex_available=True, reconstruction_builder="scp_protein")
+    base = dict(study_id="x", full_citation="y", reported_value=1.0,
+                published_inventory_available=True, published_capex_available=True,
+                reconstruction_builder="scp_protein")
     assert tier_rule(StudyRecord(**base)) == "B"
     assert tier_rule(StudyRecord(**{**base, "reconstruction_builder": None})) == "A"
     assert tier_rule(StudyRecord(**{**base, "published_inventory_available": None})) == "A"
     assert tier_rule(StudyRecord(**{**base, "published_capex_available": None})) == "A"
+
+
+def test_a_study_compared_on_gwp_alone_needs_no_cost_data_for_tier_b():
+    lca = dict(study_id="x", full_citation="y", published_inventory_available=True,
+               published_capex_available=False, published_opex_available=False,
+               reconstruction_builder="mckuin_schizo")
+    assert tier_rule(StudyRecord(**lca)) == "B"
+    # The same record with a cost to compare is back to needing the cost data.
+    assert tier_rule(StudyRecord(**{**lca, "reported_value": 1.0})) == "A"
 
 
 def test_declared_tier_disagreements_are_exactly_the_missing_scenarios(dataset):

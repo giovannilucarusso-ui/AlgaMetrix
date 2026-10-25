@@ -520,17 +520,21 @@ def tier_rule(record: StudyRecord) -> str:
     """Tier that the *declared evidence* supports, independent of any label.
 
     Tier B requires the study's foreground to be rebuildable: a published
-    inventory **and** enough economic documentation to reconstruct the cost
-    structure (CAPEX or OPEX), **and** a scenario builder present in this
-    repository. Everything else is Tier A - a literature point that can enter
-    descriptive range statistics but not a mechanistic reconstruction.
+    inventory **and** a scenario builder present in this repository, **and**,
+    when the record is compared on an economic value, enough economic
+    documentation to reconstruct the cost structure (CAPEX or OPEX). A study
+    compared on GWP alone is rebuilt from its inventory and needs no cost data.
+    Everything else is Tier A - a literature point that can enter descriptive
+    range statistics but not a mechanistic reconstruction.
 
     Returns ``"A"`` or ``"B"``. Compare against
     :attr:`StudyRecord.reconstructability_tier` to catch drift between the label
     and the evidence.
     """
     inventory = bool(record.published_inventory_available)
-    economics = bool(record.published_capex_available) or bool(record.published_opex_available)
+    economics = (not record.has_cost
+                 or bool(record.published_capex_available)
+                 or bool(record.published_opex_available))
     builder = bool(record.reconstruction_builder)
     return "B" if (inventory and economics and builder) else "A"
 
