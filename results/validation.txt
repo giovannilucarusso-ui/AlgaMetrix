@@ -27,11 +27,11 @@ HOW TO READ THIS
       note    : engine gross 14.236, biogenic adjustment +0.000, net 14.236 under source_specific_credit
       note    : source gross 15.050, source biogenic adjustment +0.000, source net 15.050. The comparison is made on the GROSS figure, which carries no biogenic-carbon convention and is therefore comparable whatever either side chose
       note    : source convention no_biogenic_credit; engine convention source_specific_credit - not matched, but immaterial here: the comparison above is made on the gross figures, which carry no convention
-  gwp_iceland_spirulina    gwp    retrospective_untuned  point            1.31      1.262 kg CO2-eq/kg   +4%
+  gwp_iceland_spirulina    gwp    retrospective_untuned  point            1.18      1.262 kg CO2-eq/kg   -6%
       endpoint: gwp_cradle_to_gate [gross (before any biogenic adjustment; convention-free)]
       group   : tzachor_marine_biotechnology_2022
       depends : The source side is DERIVED, not printed: the paper reports per kg wet biomass at 61% water and includes facility construction, and every figure compared here is obtained from its published components by one declared division onto the engine's per-kg-dry operational basis. This is the weakest of the retrospective untuned GWP points.
-      note    : engine gross 1.310, biogenic adjustment -1.873, net -0.562 under source_specific_credit
+      note    : engine gross 1.180, biogenic adjustment -1.873, net -0.693 under source_specific_credit
       note    : source gross 1.262, source biogenic adjustment -1.800, source net -0.538. The comparison is made on the GROSS figure, which carries no biogenic-carbon convention and is therefore comparable whatever either side chose
       note    : basis: The source reports per kg WET biomass at 61% water content and includes facility construction; the engine has no infrastructure term and works per kg DRY. Operational gross per kg wet = 0.693 - 0.201 (construction) = 0.492; divided by the 0.39 dry fraction gives 1.2615 per kg dry. The published biofixation credit -0.702 per kg wet gives -1.800 per kg dry. Net = 1.2615 - 1.800 = -0.5385. Every figure here is derived from the source's own published components by one declared division; NONE of them is a value the source prints, so this row is a comparison against a DERIVED quantity and is weaker than a comparison against a printed one.
       note    : source convention source_specific_credit; engine convention source_specific_credit - MATCHED
@@ -60,11 +60,11 @@ HOW TO READ THIS
       bracket : 17.26 - 17.42 USD 2022 over the two currency readings
       note    : like-for-like: the engine was run on a price set in USD 2022, the same basis the source reports in - no conversion applied
       note    : MIXED price set: 9 price(s) left at the shipped library default (electricity_price, heat_price, co2_price, nitrogen_price, phosphorus_price, water_price, land_price, harvest_capex_per_kgyr, drying_capex_per_kgyr). Re-running with those defaults expressed in USD 2022 (x1.0531) gives 17.42 instead of 17.26; the deviation is reported as the interval this spans
-  spiralg2019              gwp    retrospective_untuned  point           12.61       14.1 kg CO2-eq/kg   -11%
+  spiralg2019              gwp    retrospective_untuned  point           12.95       14.1 kg CO2-eq/kg   -8%
       endpoint: gwp_cradle_to_gate [net, engine convention no_biogenic_credit]
       group   : braud_btr_2025
-      depends : BOUNDARY DIFFERENCE: the published total includes infrastructure and transport terms (about 2 kg CO2-eq/kg) that the operational AlgaMetrix boundary does not represent, which accounts for most of the -11%. Informative, not strictly like-for-like.
-      note    : engine gross 12.614, biogenic adjustment +0.000, net 12.614 under no_biogenic_credit
+      depends : SAME BOUNDARY on both sides: the 14.1 leaves out infrastructure, operation and transport (section 3.1.2), and so does the engine. Until 2026-10-25 this note said the published value included infrastructure and transport; the paper says it does not.
+      note    : engine gross 12.954, biogenic adjustment +0.000, net 12.954 under no_biogenic_credit
       note    : source convention no_biogenic_credit; engine convention no_biogenic_credit - MATCHED
   superpro_algaloil        cost   calibrated             point           1.711        1.7 USD 2015       -2% to +1%
       endpoint: production_cost vs engine production cost
@@ -131,7 +131,7 @@ SUMMARY
     component_informed      : 1
     calibrated              : 4
     retrospective untuned, production cost: 4 scenarios from 2 publications, -14% to +1.5%
-    retrospective untuned, GWP            : 3 scenarios from 3 publications, -11% to +4%
+    retrospective untuned, GWP            : 3 scenarios from 3 publications, -8% to -1.1%
 
   range plausibility checks  : 1
   not comparable             : 0

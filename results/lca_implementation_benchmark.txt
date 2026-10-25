@@ -98,17 +98,17 @@ Independent matrix LCA - Reconstruction: heterotrophic_powder: PASS (max relativ
     [ok] GWP gross (kg CO2-eq)                 7.32697904       7.32697904    0.0e+00
     [ok] Biogenic adjustment (kg CO2-eq)                0               -0    0.0e+00
 
-Independent matrix LCA - Reconstruction: iceland_spirulina: PASS (max relative difference 3.9e-16; 11 processes, cond(A) = 3.51e+04)
+Independent matrix LCA - Reconstruction: iceland_spirulina: PASS (max relative difference 3.2e-16; 11 processes, cond(A) = 2.84e+04)
     indicator                                  sequential           matrix  rel. diff
-    [ok] GWP (kg CO₂-eq)                     -0.562366908     -0.562366908    3.9e-16
-    [ok] Energy demand (MJ)                    1480.22515       1480.22515    1.5e-16
-    [ok] Water (m³)                           0.443777778      0.443777778    2.5e-16
+    [ok] GWP (kg CO₂-eq)                     -0.692753574     -0.692753574    3.2e-16
+    [ok] Energy demand (MJ)                    1332.76404       1332.76404    0.0e+00
+    [ok] Water (m³)                           0.412733333      0.412733333    1.3e-16
     [ok] Land (m²·a)                          0.112044818      0.112044818    0.0e+00
     [ok] Marine eutrophication (kg N-eq)    0.00315789474    0.00315789474    0.0e+00
-    [ok] Freshwater eutrophication (kg P-eq)    0.00853304094    0.00853304094    2.0e-16
-    [ok] Acidification (kg SO₂-eq)            0.280419883      0.280419883    2.0e-16
-    [ok] GWP gross (kg CO2-eq)                 1.31041637       1.31041637    1.7e-16
-    [ok] Biogenic adjustment (kg CO2-eq)      -1.87278328      -1.87278328    2.4e-16
+    [ok] Freshwater eutrophication (kg P-eq)    0.00775692982    0.00775692982    0.0e+00
+    [ok] Acidification (kg SO₂-eq)            0.252479883      0.252479883    0.0e+00
+    [ok] GWP gross (kg CO2-eq)                 1.18002971       1.18002971    0.0e+00
+    [ok] Biogenic adjustment (kg CO2-eq)      -1.87278328      -1.87278328    1.2e-16
 
 Independent matrix LCA - Reconstruction: mckuin_schizo: PASS (max relative difference 6.3e-16; 23 processes, cond(A) = 218)
     indicator                                  sequential           matrix  rel. diff
@@ -158,16 +158,16 @@ Independent matrix LCA - Reconstruction: scp_protein: PASS (max relative differe
     [ok] GWP gross (kg CO2-eq)                 2.98715211       2.98715211    1.5e-16
     [ok] Biogenic adjustment (kg CO2-eq)        -2.035634        -2.035634    2.2e-16
 
-Independent matrix LCA - Reconstruction: spiralg2019: PASS (max relative difference 4.2e-16; 11 processes, cond(A) = 503)
+Independent matrix LCA - Reconstruction: spiralg2019: PASS (max relative difference 0.0e+00; 11 processes, cond(A) = 354)
     indicator                                  sequential           matrix  rel. diff
-    [ok] GWP (kg CO₂-eq)                       12.6137268       12.6137268    4.2e-16
-    [ok] Energy demand (MJ)                    223.188031       223.188031    2.5e-16
-    [ok] Water (m³)                            1.14711111       1.14711111    1.9e-16
-    [ok] Land (m²·a)                          0.587268029      0.587268029    3.8e-16
-    [ok] Marine eutrophication (kg N-eq)    0.00518518519    0.00518518519    3.3e-16
-    [ok] Freshwater eutrophication (kg P-eq)    0.00208518519    0.00208518519    2.1e-16
-    [ok] Acidification (kg SO₂-eq)           0.0334765432     0.0334765432    4.1e-16
-    [ok] GWP gross (kg CO2-eq)                 12.6137268       12.6137268    4.2e-16
+    [ok] GWP (kg CO₂-eq)                       12.9539922       12.9539922    0.0e+00
+    [ok] Energy demand (MJ)                     193.53935        193.53935    0.0e+00
+    [ok] Water (m³)                            1.14086928       1.14086928    0.0e+00
+    [ok] Land (m²·a)                          0.587268029      0.587268029    0.0e+00
+    [ok] Marine eutrophication (kg N-eq)    0.00518518519    0.00518518519    0.0e+00
+    [ok] Freshwater eutrophication (kg P-eq)    0.00192913949    0.00192913949    0.0e+00
+    [ok] Acidification (kg SO₂-eq)           0.0278588983     0.0278588983    0.0e+00
+    [ok] GWP gross (kg CO2-eq)                 12.9539922       12.9539922    0.0e+00
     [ok] Biogenic adjustment (kg CO2-eq)                0               -0    0.0e+00
 
 Independent matrix LCA - Reconstruction: spirulina_padi: PASS (max relative difference 1.7e-16; 11 processes, cond(A) = 763)

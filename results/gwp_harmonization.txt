@@ -55,36 +55,36 @@ GWP-REPRODUCED MATCHED SET
   study_id                 analysis class                            elec  nat.CF  com.CF   grossN     adjN     netN   grossC     netC   publ.
   ------------------------------------------------------------------------------
   frontiers2026_spirulina  published_gwp_calibrated_reconstruction   21.08   0.350   0.350   14.236    0.000   14.236   14.236   14.236   15.05
-  gwp_iceland_spirulina    published_gwp_untuned_reconstruction    155.22   0.008   0.350    1.310   -1.873   -0.562   54.334   52.462   -0.54
-  spiralg2019              published_gwp_untuned_reconstruction     18.00   0.430   0.350   12.614    0.000   12.614   11.174   11.174   14.10
+  gwp_iceland_spirulina    published_gwp_untuned_reconstruction    139.70   0.008   0.350    1.180   -1.873   -0.693   48.902   47.029   -0.54
+  spiralg2019              published_gwp_untuned_reconstruction     14.88   0.430   0.350   12.954    0.000   12.954   11.764   11.764   14.10
   mckuin_schizo            published_gwp_untuned_reconstruction      0.10   0.323   0.350    1.830    0.000    1.830    2.762    2.762    1.85
   (N = native background, C = common background; adj = biogenic-carbon adjustment)
     [frontiers2026_spirulina] native background == common background: this scenario carries no study-specific grid factor, so the native-to-common step is a no-op for it
 
   GWP-reproduced subset, native background, GROSS
     n                 : 4
-    min               : 1.31 kg CO2-eq/kg   [gwp_iceland_spirulina]
+    min               : 1.18 kg CO2-eq/kg   [gwp_iceland_spirulina]
     max               : 14.24 kg CO2-eq/kg   [frontiers2026_spirulina]
-    absolute range    : 12.93 kg CO2-eq/kg
-    median            : 7.222 kg CO2-eq/kg
-    IQR (Q1-Q3)       : 11.32 kg CO2-eq/kg   (1.7 - 13.02)
-    geometric mean    : 4.556 kg CO2-eq/kg
-    max/min ratio     : 10.86x
+    absolute range    : 13.06 kg CO2-eq/kg
+    median            : 7.392 kg CO2-eq/kg
+    IQR (Q1-Q3)       : 11.61 kg CO2-eq/kg   (1.668 - 13.27)
+    geometric mean    : 4.467 kg CO2-eq/kg
+    max/min ratio     : 12.06x
     P90/P10 ratio     : n/a
-    ratio convention  : max/min over strictly positive values: frontiers2026_spirulina (14.2358) / gwp_iceland_spirulina (1.31042)
+    ratio convention  : max/min over strictly positive values: frontiers2026_spirulina (14.2358) / gwp_iceland_spirulina (1.18003)
     note              : P90/P10 not reported: n=4 < 8, the percentiles would interpolate between the two extreme observations.
 
   GWP-reproduced subset, common background, GROSS
     n                 : 4
     min               : 2.762 kg CO2-eq/kg   [mckuin_schizo]
-    max               : 54.33 kg CO2-eq/kg   [gwp_iceland_spirulina]
-    absolute range    : 51.57 kg CO2-eq/kg
-    median            : 12.7 kg CO2-eq/kg
-    IQR (Q1-Q3)       : 15.19 kg CO2-eq/kg   (9.071 - 24.26)
-    geometric mean    : 12.43 kg CO2-eq/kg
-    max/min ratio     : 19.67x
+    max               : 48.9 kg CO2-eq/kg   [gwp_iceland_spirulina]
+    absolute range    : 46.14 kg CO2-eq/kg
+    median            : 13 kg CO2-eq/kg
+    IQR (Q1-Q3)       : 13.39 kg CO2-eq/kg   (9.513 - 22.9)
+    geometric mean    : 12.26 kg CO2-eq/kg
+    max/min ratio     : 17.71x
     P90/P10 ratio     : n/a
-    ratio convention  : max/min over strictly positive values: gwp_iceland_spirulina (54.3343) / mckuin_schizo (2.76197)
+    ratio convention  : max/min over strictly positive values: gwp_iceland_spirulina (48.9015) / mckuin_schizo (2.76197)
     note              : P90/P10 not reported: n=4 < 8, the percentiles would interpolate between the two extreme observations.
 
 ==============================================================================
@@ -105,8 +105,8 @@ FULL EXECUTABLE FOREGROUND SET
   superpro_algaloil        model_derived_gwp_from_tea_scenario       1.22   0.350   0.350    1.348   -2.049   -0.701    1.348   -0.701       -
   superpro_omega3          model_derived_gwp_from_tea_scenario       8.22   0.350   0.350    5.516    0.000    5.516    5.516    5.516       -
   frontiers2026_spirulina  published_gwp_calibrated_reconstruction   21.08   0.350   0.350   14.236    0.000   14.236   14.236   14.236   15.05
-  gwp_iceland_spirulina    published_gwp_untuned_reconstruction    155.22   0.008   0.350    1.310   -1.873   -0.562   54.334   52.462   -0.54
-  spiralg2019              published_gwp_untuned_reconstruction     18.00   0.430   0.350   12.614    0.000   12.614   11.174   11.174   14.10
+  gwp_iceland_spirulina    published_gwp_untuned_reconstruction    139.70   0.008   0.350    1.180   -1.873   -0.693   48.902   47.029   -0.54
+  spiralg2019              published_gwp_untuned_reconstruction     14.88   0.430   0.350   12.954    0.000   12.954   11.764   11.764   14.10
   mckuin_schizo            published_gwp_untuned_reconstruction      0.10   0.323   0.350    1.830    0.000    1.830    2.762    2.762    1.85
   padi2023_spirulina       model_derived_gwp_from_tea_scenario      21.08   0.350   0.350   14.236    0.000   14.236   14.236   14.236       -
   (N = native background, C = common background; adj = biogenic-carbon adjustment)
@@ -120,27 +120,27 @@ FULL EXECUTABLE FOREGROUND SET
 
   full executable foreground set, native background, GROSS
     n                 : 13
-    min               : 1.31 kg CO2-eq/kg   [gwp_iceland_spirulina]
+    min               : 1.18 kg CO2-eq/kg   [gwp_iceland_spirulina]
     max               : 40.06 kg CO2-eq/kg   [vazquez2022b_tiso_pht]
-    absolute range    : 38.75 kg CO2-eq/kg
+    absolute range    : 38.88 kg CO2-eq/kg
     median            : 7.327 kg CO2-eq/kg
     IQR (Q1-Q3)       : 11.64 kg CO2-eq/kg   (2.593 - 14.24)
-    geometric mean    : 6.442 kg CO2-eq/kg
-    max/min ratio     : 30.57x
+    geometric mean    : 6.403 kg CO2-eq/kg
+    max/min ratio     : 33.95x
     P90/P10 ratio     : 11.98x
-    ratio convention  : max/min over strictly positive values: vazquez2022b_tiso_pht (40.0593) / gwp_iceland_spirulina (1.31042)
+    ratio convention  : max/min over strictly positive values: vazquez2022b_tiso_pht (40.0593) / gwp_iceland_spirulina (1.18003)
 
   full executable foreground set, common background, GROSS
     n                 : 13
     min               : 1.348 kg CO2-eq/kg   [superpro_algaloil]
-    max               : 54.33 kg CO2-eq/kg   [gwp_iceland_spirulina]
-    absolute range    : 52.99 kg CO2-eq/kg
+    max               : 50.26 kg CO2-eq/kg   [vazquez2022]
+    absolute range    : 48.91 kg CO2-eq/kg
     median            : 14.24 kg CO2-eq/kg
     IQR (Q1-Q3)       : 12.93 kg CO2-eq/kg   (5.516 - 18.45)
-    geometric mean    : 11.1 kg CO2-eq/kg
-    max/min ratio     : 40.32x
-    P90/P10 ratio     : 18.52x
-    ratio convention  : max/min over strictly positive values: gwp_iceland_spirulina (54.3343) / superpro_algaloil (1.34757)
+    geometric mean    : 11.06 kg CO2-eq/kg
+    max/min ratio     : 37.29x
+    P90/P10 ratio     : 18.12x
+    ratio convention  : max/min over strictly positive values: vazquez2022 (50.2554) / superpro_algaloil (1.34757)
 
   full executable foreground set, native background, NET (declared convention)
     n                 : 13
@@ -149,7 +149,7 @@ FULL EXECUTABLE FOREGROUND SET
     absolute range    : 38.86 kg CO2-eq/kg
     median            : 7.327 kg CO2-eq/kg
     IQR (Q1-Q3)       : 12.77 kg CO2-eq/kg   (1.469 - 14.24)
-    geometric mean    : 6.93 kg CO2-eq/kg
+    geometric mean    : 6.947 kg CO2-eq/kg
     max/min ratio     : 50.16x
     P90/P10 ratio     : 10.72x
     ratio convention  : max/min over strictly positive values: vazquez2022b_tiso_pht (38.154) / tredici2016 (0.760703)
@@ -158,14 +158,14 @@ FULL EXECUTABLE FOREGROUND SET
   full executable foreground set, common background, NET (declared convention)
     n                 : 13
     min               : -0.7012 kg CO2-eq/kg   [superpro_algaloil]
-    max               : 52.46 kg CO2-eq/kg   [gwp_iceland_spirulina]
-    absolute range    : 53.16 kg CO2-eq/kg
+    max               : 48.34 kg CO2-eq/kg   [vazquez2022]
+    absolute range    : 49.04 kg CO2-eq/kg
     median            : 14.24 kg CO2-eq/kg
     IQR (Q1-Q3)       : 11.02 kg CO2-eq/kg   (5.516 - 16.54)
-    geometric mean    : 11.67 kg CO2-eq/kg
-    max/min ratio     : 63.96x
-    P90/P10 ratio     : 15.79x
-    ratio convention  : max/min over strictly positive values: gwp_iceland_spirulina (52.4615) / tredici2016 (0.820268)
+    geometric mean    : 11.62 kg CO2-eq/kg
+    max/min ratio     : 58.93x
+    P90/P10 ratio     : 15.41x
+    ratio convention  : max/min over strictly positive values: vazquez2022 (48.3354) / tredici2016 (0.820268)
     note              : 1 value(s) <= 0: ratios are computed over the 12 strictly positive value(s) only, and the absolute range is the primary summary.
 
 ==============================================================================

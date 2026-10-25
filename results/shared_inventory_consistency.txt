@@ -138,11 +138,11 @@ Shared-inventory consistency - Reconstruction: heterotrophic_powder: PASS (max r
     [ok] Land: area capitalised by TEA == area occupied in LCA
          75 vs 75 m2 (rel 0.0e+00)
 
-Shared-inventory consistency - Reconstruction: iceland_spirulina: PASS (max relative discrepancy 5.0e-14)
+Shared-inventory consistency - Reconstruction: iceland_spirulina: PASS (max relative discrepancy 2.3e-14)
     flow                   unit          TEA-implied    LCA-implied      inventory  rel. diff
-    [ok] Electricity       kWh             155.22222      155.22222      155.22222    0.0e+00
-    [ok] Nitrogen          kg N           0.11695906     0.11695906     0.11695906    1.9e-14
-    [ok] Phosphorus        kg P          0.014035088    0.014035088    0.014035088    5.0e-14
+    [ok] Electricity       kWh                 139.7          139.7          139.7    2.0e-16
+    [ok] Nitrogen          kg N           0.11695906     0.11695906     0.11695906    2.3e-14
+    [ok] Phosphorus        kg P          0.014035088    0.014035088    0.014035088    2.0e-14
     [ok] CO2 supply        kg CO2          2.0808703      2.0808703      2.0808703    6.4e-16
     [ok] Water             m3             0.13333333     0.13333333     0.13333333    1.0e-15  (direct)
     not present in this scenario: Heat, Bicarbonate, Substrate
@@ -222,16 +222,16 @@ Shared-inventory consistency - Reconstruction: scp_protein: PASS (max relative d
     [ok] Land: area capitalised by TEA == area occupied in LCA
          300,000 vs 300,000 m2 (rel 0.0e+00)
 
-Shared-inventory consistency - Reconstruction: spiralg2019: PASS (max relative discrepancy 6.6e-15)
+Shared-inventory consistency - Reconstruction: spiralg2019: PASS (max relative discrepancy 2.7e-14)
     flow                   unit          TEA-implied    LCA-implied      inventory  rel. diff
-    [ok] Electricity       kWh                    18             18             18    2.0e-16
-    [ok] Nitrogen          kg N           0.12345679     0.12345679     0.12345679    6.6e-15
-    [ok] Phosphorus        kg P          0.014814815    0.014814815    0.014814815    3.4e-15
-    [ok] Bicarbonate       kg NaHCO3       4.2056459      4.2056459      4.2056459    2.1e-16
-    [ok] Water             m3              1.1111111      1.1111111      1.1111111    4.0e-16  (direct)
+    [ok] Electricity       kWh             14.879086      14.879086      14.879086    1.2e-16
+    [ok] Nitrogen          kg N           0.12345679     0.12345679     0.12345679    3.4e-15
+    [ok] Phosphorus        kg P          0.014814815    0.014814815    0.014814815    2.7e-14
+    [ok] Bicarbonate       kg NaHCO3       4.2056459      4.2056459      4.2056459    0.0e+00
+    [ok] Water             m3              1.1111111      1.1111111      1.1111111    8.0e-16  (direct)
     not present in this scenario: Heat, CO2 supply, Substrate
     [ok] Functional unit: TEA cost denominator == LCA reference flow
-         255,420 vs 255,420 kg/yr (rel 1.1e-16)
+         255,420 vs 255,420 kg/yr (rel 0.0e+00)
     [ok] Land: area capitalised by TEA == area occupied in LCA
          150,000 vs 150,000 m2 (rel 0.0e+00)
 
