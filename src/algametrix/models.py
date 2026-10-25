@@ -170,6 +170,53 @@ class WasteFeed:
     notes: str = ""                      # provenance / citation for a preset
 
 
+@dataclass(frozen=True)
+class CostScaling:
+    """How an equipment cost coefficient changes with capacity.
+
+    A coefficient such as EUR per m2 of pond or EUR per (kg/yr) of dryer
+    capacity was obtained at some plant size, the reference capacity S_ref.
+    With ``exponent`` = 1, the default, cost is proportional to capacity and
+    the coefficient applies at any size: this is the model of every release up
+    to 1.5. Any other exponent n needs ``reference_capacity``, and the cost of
+    the group becomes
+
+        C = c * S_ref * (S / S_ref) ** n
+
+    ``max_capacity`` is the largest size one unit is built in. Above it the
+    capacity is split into N = ceil(S / max_capacity) identical units in
+    parallel, each costed with the same law, so beyond that size cost grows
+    with the number of units instead of following the curve. ``min_capacity``
+    is the smallest size the coefficient was derived for; below it the input
+    check warns that the cost is extrapolated.
+
+    Capacities are in the unit the coefficient is per: m2 or m3 of
+    cultivation for a cultivation system, kg/yr of dry biomass for
+    harvesting, drying and extraction. ``None`` means not declared.
+    """
+
+    exponent: float = 1.0
+    reference_capacity: float | None = None
+    min_capacity: float | None = None
+    max_capacity: float | None = None
+    source: str = ""   # where the coefficient and its reference capacity come from
+
+
+@dataclass(frozen=True)
+class LabourScaling(CostScaling):
+    """Annual labour cost against annual capacity (kg/yr of dry biomass).
+
+    ``L = L_ref * (S / S_ref) ** exponent``, with ``L_ref`` the
+    ``labor_cost_per_year`` of :class:`Economics`. The default exponent is 0:
+    labour is a fixed annual cost, as in every release up to 1.5. There are no
+    units to add for labour, so ``max_capacity`` is only the top of the range
+    the correlation was fitted on, and the input check warns above it as it
+    does below ``min_capacity``.
+    """
+
+    exponent: float = 0.0
+
+
 @dataclass
 class Organism:
     """A strain and its composition. Elemental fractions drive the nutrient balance."""
@@ -207,6 +254,9 @@ class CultivationSystem:
     substrate_yield: float     # kg biomass / kg substrate (heterotrophic)
     capex_per_unit: float      # EUR per m2 (area) or per m3 (volume)
     land_m2_per_unit: float    # m2 land per m2 pond or per m3 reactor
+    #: How ``capex_per_unit`` changes with the cultivation area or volume.
+    #: Proportional unless declared otherwise.
+    capex_scaling: CostScaling = field(default_factory=CostScaling)
     #: Fraction of the nominal reactor volume the culture occupies (headspace,
     #: foam and impeller clearance take the rest). Used by the batch sizing, which
     #: ties one batch to the reactor that holds it:
@@ -348,6 +398,7 @@ class Extraction:
     solvent_gwp: float = 0.0                 # kg CO2-eq / kg
     solvent_ced: float = 0.0                 # MJ / kg
     capex_per_kgyr: float = 0.0              # EUR per (kg biomass/yr)
+    capex_scaling: CostScaling = field(default_factory=CostScaling)
     allocation: str = "economic"             # economic | mass | none (all to main product)
     notes: str = ""                          # provenance / citation for a catalogued preset
 
@@ -392,6 +443,10 @@ class Economics:
     working_capital_frac: float = 0.05  # working capital as fraction of DFC
     startup_frac: float = 0.05          # start-up cost as fraction of DFC
     tax_rate: float = 0.30              # income tax rate
+    # --- capacity scaling (defaults reproduce the proportional model) ---
+    harvest_capex_scaling: CostScaling = field(default_factory=CostScaling)
+    drying_capex_scaling: CostScaling = field(default_factory=CostScaling)
+    labor_scaling: LabourScaling = field(default_factory=LabourScaling)
 
 
 @dataclass

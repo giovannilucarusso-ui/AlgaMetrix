@@ -28,10 +28,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .inventory import MIN_CARBON_UTILIZATION
+from .inventory import MIN_CARBON_UTILIZATION, gross_production
 from .inventory import SUBSTRATE_CARBON_FRACTION as GLUCOSE_CARBON_FRACTION
-from .models import Basis, CarbonAccounting, Scenario, TrophicMode
+from .models import Basis, CarbonAccounting, CostScaling, Scenario, TrophicMode
 from .products import product_yield
+from .scaling import KG_PER_YEAR, equipment_groups, parallel_units
 
 ERROR = "error"
 WARNING = "warning"
@@ -321,6 +322,102 @@ def _economics(scn: Scenario) -> list[InputIssue]:
     return issues
 
 
+def _qty(x: float) -> str:
+    return f"{x:,.0f}" if abs(x) >= 100 else f"{x:.3g}"
+
+
+def _scaling_issues(label: str, path: str, sc: CostScaling, capacity: float, unit: str,
+                    equipment: bool) -> list[InputIssue]:
+    """One cost group's declared scaling: complete, plausible, and used inside its range."""
+    issues: list[InputIssue] = []
+    n, ref = sc.exponent, sc.reference_capacity
+    default = 1.0 if equipment else 0.0
+    for name in ("reference_capacity", "min_capacity", "max_capacity"):
+        value = getattr(sc, name)
+        if value is not None and value <= 0:
+            issues.append(InputIssue(f"{path}.{name}",
+                                     f"{label}: {value:g} {unit} is not a capacity."))
+    if n != default and ref is None:
+        issues.append(InputIssue(
+            f"{path}.reference_capacity",
+            f"{label}: an exponent of {n:g} needs the capacity the cost was taken at "
+            f"(the reference capacity, in {unit}).",
+        ))
+    if equipment and n <= 0:
+        issues.append(InputIssue(
+            f"{path}.exponent",
+            f"{label}: with an exponent of {n:g} a larger unit costs no more than a "
+            f"smaller one. Equipment correlations lie between about 0.3 and 1.",
+        ))
+    elif not equipment and n < 0:
+        issues.append(InputIssue(
+            f"{path}.exponent",
+            f"{label}: an exponent of {n:g} has labour fall as the plant grows.",
+        ))
+    elif n > 1:
+        issues.append(InputIssue(
+            f"{path}.exponent",
+            f"{label}: an exponent of {n:g} makes each unit of capacity dearer as the "
+            f"plant grows; "
+            + ("equipment correlations usually lie between 0.3 and 1." if equipment
+               else "labour usually rises much less than capacity."),
+            WARNING,
+        ))
+    lo, hi = sc.min_capacity, sc.max_capacity
+    if lo is not None and hi is not None and 0 < hi < lo:
+        issues.append(InputIssue(
+            f"{path}.min_capacity",
+            f"{label}: the declared range {_qty(lo)}-{_qty(hi)} {unit} is empty.",
+        ))
+    if any(i.is_error for i in issues) or capacity <= 0:
+        return issues
+
+    # Above the largest unit the equipment is built as identical units in
+    # parallel, so the size the cost law sees is the size of one unit.
+    units = parallel_units(capacity, sc) if equipment else 1
+    size = capacity / units
+    per_unit = " per unit" if units > 1 else ""
+    if lo is not None and size < lo:
+        issues.append(InputIssue(
+            f"{path}.min_capacity",
+            f"{label}: {_qty(size)} {unit}{per_unit} is below the smallest size the cost "
+            f"was derived for ({_qty(lo)} {unit}), so the cost is extrapolated.",
+            WARNING,
+        ))
+    if not equipment and hi is not None and capacity > hi:
+        issues.append(InputIssue(
+            f"{path}.max_capacity",
+            f"{label}: {_qty(capacity)} {unit} is above the range the labour cost was "
+            f"fitted on (up to {_qty(hi)} {unit}), so it is extrapolated.",
+            WARNING,
+        ))
+    if n != default and lo is None and hi is None and not 0.1 <= size / ref <= 10:
+        issues.append(InputIssue(
+            f"{path}.reference_capacity",
+            f"{label}: {_qty(size)} {unit}{per_unit} is {size / ref:.2g} times the "
+            f"reference capacity and no range is declared. Power-law correlations are "
+            f"normally used within about a factor of ten of where they were fitted.",
+            WARNING,
+        ))
+    return issues
+
+
+def _capacity(scn: Scenario) -> list[InputIssue]:
+    """Declared cost scaling, and whether the plant lies inside its range."""
+    recovery = scn.harvesting.recovery
+    annual_kg = gross_production(scn)[0] * recovery if 0 < recovery <= 1 else 0.0
+    issues: list[InputIssue] = []
+    for group in equipment_groups(scn, annual_kg):
+        if group.coefficient:
+            issues += _scaling_issues(group.label, group.path, group.scaling,
+                                      group.capacity, group.capacity_unit, equipment=True)
+    eco = scn.economics
+    if eco.labor_cost_per_year:
+        issues += _scaling_issues("Labour", "economics.labor_scaling", eco.labor_scaling,
+                                  annual_kg, KG_PER_YEAR, equipment=False)
+    return issues
+
+
 def _waste(scn: Scenario) -> list[InputIssue]:
     wf = scn.waste_feed
     if not wf.enabled:
@@ -366,7 +463,7 @@ def check_inputs(scenario: Scenario) -> list[InputIssue]:
     """Everything wrong with ``scenario``, errors first."""
     issues: list[InputIssue] = []
     for check in (_composition, _cultivation, _downstream, _batch,
-                  _products, _economics, _waste, _materials, _conventions):
+                  _products, _economics, _capacity, _waste, _materials, _conventions):
         issues.extend(check(scenario))
     return sorted(issues, key=lambda i: 0 if i.is_error else 1)
 

@@ -276,6 +276,21 @@ def _recipe_split(scenario: Scenario, nitrogen: float, phosphorus: float,
     )
 
 
+def gross_production(scenario: Scenario) -> tuple[float, float]:
+    """Gross dry biomass cultivated per year, before harvesting losses, and the
+    number of batches per year (0 in continuous operation)."""
+    sys = scenario.system
+    if scenario.batch_mode and scenario.batch_cycle_time_h > 0:
+        # batches limited by cycle time over the annual operating window
+        batches_per_year = sys.operating_days * 24.0 / scenario.batch_cycle_time_h
+        return scenario.batch_size_kg * batches_per_year, batches_per_year
+    if sys.basis == Basis.AREA:
+        # g/m2/d * m2 * d/yr  ->  g/yr  ->  kg/yr
+        return sys.productivity * scenario.scale * sys.operating_days / 1000.0, 0.0
+    # VOLUME: g/L/d * (m3 * 1000 L/m3) * d/yr  ->  g/yr  ->  kg/yr
+    return sys.productivity * (scenario.scale * 1000.0) * sys.operating_days / 1000.0, 0.0
+
+
 def build_inventory(scenario: Scenario) -> Inventory:
     """Compute the process inventory for ``scenario``."""
     org = scenario.organism
@@ -284,18 +299,7 @@ def build_inventory(scenario: Scenario) -> Inventory:
     dry = scenario.drying
 
     # --- annual production ------------------------------------------------
-    # Gross biomass cultivated before harvesting losses.
-    batches_per_year = 0.0
-    if scenario.batch_mode and scenario.batch_cycle_time_h > 0:
-        # batches limited by cycle time over the annual operating window
-        batches_per_year = sys.operating_days * 24.0 / scenario.batch_cycle_time_h
-        gross_kg_yr = scenario.batch_size_kg * batches_per_year
-    elif sys.basis == Basis.AREA:
-        # g/m2/d * m2 * d/yr  ->  g/yr  ->  kg/yr
-        gross_kg_yr = sys.productivity * scenario.scale * sys.operating_days / 1000.0
-    else:  # VOLUME
-        # g/L/d * (m3 * 1000 L/m3) * d/yr  ->  g/yr  ->  kg/yr
-        gross_kg_yr = sys.productivity * (scenario.scale * 1000.0) * sys.operating_days / 1000.0
+    gross_kg_yr, batches_per_year = gross_production(scenario)
     total_land_m2 = scenario.scale * sys.land_m2_per_unit
 
     clamp = _Clamper()

@@ -115,6 +115,18 @@ def test_every_cross_reference_names_a_section_that_exists():
         assert where.strip() and what.strip()
 
 
+def test_a_comma_inside_a_subscript_does_not_split_a_symbol():
+    """The main text lists the symbols its equations use. A row such as
+    ``S_k, S_{ref,k}`` split at every comma left ``S_{ref`` behind, which matched
+    the labour term and listed the equipment capacities in a text without them."""
+    assert specification._symbol_parts(r"S_k, S_{\mathrm{ref},k}") == [
+        "S_k", r"S_{\mathrm{ref},k}"]
+    lib, cases = _cases()
+    block = "\n".join(specification.render_main_text_block(lib, cases[:1]))
+    assert r"S_{\mathrm{ref},L}" in block
+    assert r"S_{\mathrm{ref},k}" not in block
+
+
 def test_symbols_carry_a_unit_and_a_source():
     for sym in specification.SYMBOLS:
         assert sym.unit.strip(), sym.latex

@@ -65,6 +65,9 @@ harvesting:
 # The solvent make-up (net of recycle) carries the solvent's cradle-to-gate GWP
 # and CED into the LCA and its price into the TEA. For supercritical CO2 the
 # "solvent" is the CO2 itself (recycled >98%, so a small net make-up).
+# A preset may carry a `capex_scaling` block for capex_per_kgyr, with capacities
+# in kg/yr of dry biomass (keys as in data/systems.yaml). None does: the
+# coefficients are not tied to a plant size, so they stay proportional.
 downstream:
   - name: Hexane solvent extraction (lipids)
     disruption_elec_kwh_per_kg: 0.5   # bead mill / homogeniser pre-treatment
@@ -189,6 +192,13 @@ economics:
   overhead_frac: 0.20          # general overhead, as fraction of (variable + labour + maintenance)
   discount_rate: 0.08          # for the capital recovery factor
   plant_lifetime: 20.0         # yr
+  # Optional capacity scaling, with capacities in kg/yr of dry biomass and the
+  # keys of data/systems.yaml:
+  #   harvest_capex_scaling: {exponent: ..., reference_capacity: ..., max_capacity: ..., source: ...}
+  #   drying_capex_scaling:  {exponent: ..., reference_capacity: ..., max_capacity: ..., source: ...}
+  #   labor_scaling:         {exponent: ..., reference_capacity: ..., source: ...}
+  # Equipment defaults to an exponent of 1 (proportional) and labour to 0 (a fixed
+  # annual cost). Not declared here: the figures above are not tied to a plant size.
 
 # Cradle-to-gate life-cycle characterization factors: see data/lcia.yaml.
 #

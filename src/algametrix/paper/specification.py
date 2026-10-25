@@ -29,6 +29,7 @@ product, and every upstream flow is referred to it.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Callable
 
@@ -151,6 +152,21 @@ SYMBOLS: list[Symbol] = [
     # --- economics --------------------------------------------------------
     Symbol(r"c_k", "unit price of flow $k$", "EUR per unit of $k$", "Economics"),
     Symbol(r"C_\mathrm{eq}", "delivered equipment cost", "EUR", "derived"),
+    Symbol(r"c_\mathrm{cult}, c_\mathrm{harv}, c_\mathrm{dry}, c_\mathrm{ext}",
+           r"equipment cost per unit of capacity of each group $k$, at $S_{\mathrm{ref},k}$",
+           "EUR m$^{-2}$, EUR m$^{-3}$ or EUR (kg yr$^{-1}$)$^{-1}$",
+           "system.capex_per_unit, economics.harvest_capex_per_kgyr / "
+           ".drying_capex_per_kgyr, extraction.capex_per_kgyr"),
+    Symbol(r"S_k, S_{\mathrm{ref},k}",
+           "capacity of equipment group $k$, and the capacity its cost coefficient "
+           "was derived at", "m$^2$, m$^3$ or kg yr$^{-1}$",
+           "scenario.scale or $m_\\mathrm{prod}$; .capex_scaling.reference_capacity"),
+    Symbol(r"n_k", "cost exponent of equipment group $k$ (1, proportional, by default)",
+           "-", ".capex_scaling.exponent"),
+    Symbol(r"S_{\max,k}, N_k",
+           "largest unit size of group $k$, and the number of identical units it is "
+           "built as", "unit of $S_k$; -",
+           ".capex_scaling.max_capacity; derived"),
     Symbol(r"f_\mathrm{inst}", "installation factor", "-", "economics.installation_factor"),
     Symbol(r"f_\mathrm{ind}", "indirect (engineering + contingency) factor", "-",
            "economics.indirect_factor"),
@@ -167,7 +183,12 @@ SYMBOLS: list[Symbol] = [
     Symbol(r"n", "project evaluation horizon", "yr", "economics.plant_lifetime"),
     Symbol(r"i", "discount rate", "-", "economics.discount_rate"),
     Symbol(r"\tau", "income tax rate", "-", "economics.tax_rate"),
-    Symbol(r"L", "annual labour cost", "EUR yr$^{-1}$", "economics.labor_cost_per_year"),
+    Symbol(r"L", "annual labour cost", "EUR yr$^{-1}$",
+           r"derived; equal to $L_\mathrm{ref}$ when $n_L = 0$"),
+    Symbol(r"L_\mathrm{ref}, S_{\mathrm{ref},L}, n_L",
+           "labour cost at the reference capacity, that capacity, and the labour "
+           "exponent (0, a fixed cost, by default)", "EUR yr$^{-1}$; kg yr$^{-1}$; -",
+           "economics.labor_cost_per_year; economics.labor_scaling"),
     # --- LCIA -------------------------------------------------------------
     Symbol(r"\gamma_k", "characterization factor of flow $k$ for the impact category",
            "impact unit per unit of $k$", "LCIAFactors (data/lcia.yaml)"),
@@ -373,14 +394,24 @@ def _equations_capital() -> list[Equation]:
     return [
         Equation(
             "tea.equipment",
-            r"C_\mathrm{eq} = \underbrace{A\,c_\mathrm{cult}}_{\text{cultivation}}"
-            r" + \left(c_\mathrm{harv} + c_\mathrm{dry} + c_\mathrm{ext}\right) m_\mathrm{prod}",
-            "Delivered equipment cost. Cultivation equipment scales with the "
-            "cultivation area or volume; the downstream sections scale with annual "
-            "capacity. **The scaling is linear: there is no power-law exponent and no "
-            "reference capacity.** See the assumptions note below, because this is a "
-            "modelling choice with a validity range and not a neutral default.",
-            "tea.run_tea",
+            r"C_\mathrm{eq} = \sum_{k} N_k\,c_k\,S_{\mathrm{ref},k}"
+            r"\left(\frac{S_k}{N_k\,S_{\mathrm{ref},k}}\right)^{n_k},\qquad"
+            r" N_k = \max\left(1, \left\lceil S_k/S_{\max,k} \right\rceil\right),\qquad"
+            r" S_\mathrm{cult} = A,\ \ S_\mathrm{harv} = S_\mathrm{dry} = S_\mathrm{ext}"
+            r" = m_\mathrm{prod}",
+            "Delivered equipment cost, summed over the cultivation, harvesting, drying "
+            "and extraction groups in use. Each group is costed on its own capacity, "
+            "the cultivation area or volume or the annual production, and above its "
+            r"largest unit size $S_{\max,k}$ it is built as $N_k$ identical units in "
+            r"parallel. **With $n_k = 1$, the default for every group, the sum reduces "
+            r"to $A\,c_\mathrm{cult} + (c_\mathrm{harv} + c_\mathrm{dry} + "
+            r"c_\mathrm{ext})\,m_\mathrm{prod}$ whatever $S_{\mathrm{ref},k}$ and "
+            r"$N_k$ are.** That proportional model is the one in every release up to "
+            "1.5 and in every result reported here. Any other exponent needs the "
+            r"reference capacity $S_{\mathrm{ref},k}$ at which $c_k$ was derived. See the "
+            "assumptions note below, because the default is a modelling choice with a "
+            "validity range and not a neutral one.",
+            "tea.run_tea / scaling.equipment_cost",
             stated=lambda s, inv, tea, lca: _stated_equipment(s, inv),
             engine=lambda s, inv, tea, lca: tea.equipment_cost,
         ),
@@ -450,15 +481,19 @@ def _equations_operating() -> list[Equation]:
         Equation(
             "tea.aoc",
             r"\mathrm{AOC} = C_\mathrm{RM} + C_\mathrm{UT} + L + C_\mathrm{FD}"
-            r" + f_\mathrm{ov}\,(C_\mathrm{RM} + C_\mathrm{UT} + L) + C_\mathrm{other}",
-            "Annual operating cost. **Labour is a fixed annual figure independent of "
-            "plant capacity**, so the only economy of scale in the model reaches the "
-            "unit cost through this term; see the assumptions note.",
-            "tea.run_tea",
+            r" + f_\mathrm{ov}\,(C_\mathrm{RM} + C_\mathrm{UT} + L) + C_\mathrm{other},"
+            r"\qquad L = L_\mathrm{ref}\left(\frac{m_\mathrm{prod}}{S_{\mathrm{ref},L}}"
+            r"\right)^{n_L}",
+            "Annual operating cost. Labour is the labour cost at a reference capacity, "
+            r"taken to the annual production with the exponent $n_L$. **With the default "
+            r"$n_L = 0$ labour is a fixed annual figure independent of plant capacity**, "
+            "as in every result reported here, so the only economy of scale in those "
+            "results reaches the unit cost through this term; see the assumptions note.",
+            "tea.run_tea / scaling.labour_cost",
             stated=lambda s, inv, tea, lca: _stated_aoc(s, inv, tea),
             engine=lambda s, inv, tea, lca: tea.annual_opex,
             core=True,
-            core_gloss="Annual operating cost. Labour is a fixed annual figure, independent of capacity.",
+            core_gloss=r"Annual operating cost. Labour is a fixed annual figure by default ($n_L = 0$), independent of capacity.",
         ),
         Equation(
             "tea.cost",
@@ -752,13 +787,34 @@ def _stated_heat(s) -> float:
     return heat
 
 
+def _stated_group(c, capacity, scaling) -> float:
+    # The printed term rearranged: N c S_ref (S / (N S_ref))^n = c S (S / (N S_ref))^(n-1).
+    if scaling.exponent == 1.0 or c == 0.0:
+        return c * capacity
+    top = scaling.max_capacity
+    units = 1 if not top or capacity <= top else math.ceil(capacity / top - 1e-9)
+    return (c * capacity
+            * (capacity / (units * scaling.reference_capacity)) ** (scaling.exponent - 1.0))
+
+
 def _stated_equipment(s, inv) -> float:
     eco = s.economics
     m = inv.annual_biomass_kg
-    return (s.scale * s.system.capex_per_unit
-            + eco.harvest_capex_per_kgyr * m
-            + (eco.drying_capex_per_kgyr * m if s.drying.enabled else 0.0)
-            + (s.extraction.capex_per_kgyr * m if s.extraction.enabled else 0.0))
+    return (_stated_group(s.system.capex_per_unit, s.scale, s.system.capex_scaling)
+            + _stated_group(eco.harvest_capex_per_kgyr, m, eco.harvest_capex_scaling)
+            + (_stated_group(eco.drying_capex_per_kgyr, m, eco.drying_capex_scaling)
+               if s.drying.enabled else 0.0)
+            + (_stated_group(s.extraction.capex_per_kgyr, m, s.extraction.capex_scaling)
+               if s.extraction.enabled else 0.0))
+
+
+def _stated_labour(s, inv) -> float:
+    eco = s.economics
+    n_l = eco.labor_scaling.exponent
+    if n_l == 0.0 or eco.labor_cost_per_year == 0.0:
+        return eco.labor_cost_per_year
+    return (eco.labor_cost_per_year
+            * (inv.annual_biomass_kg / eco.labor_scaling.reference_capacity) ** n_l)
 
 
 def _stated_dfc(s, inv) -> float:
@@ -795,8 +851,9 @@ def _stated_utilities(s, inv) -> float:
 def _stated_aoc(s, inv, tea) -> float:
     eco = s.economics
     variable = _stated_materials(s, inv) + _stated_utilities(s, inv)
-    return (variable + eco.labor_cost_per_year + tea.facility_dependent
-            + (variable + eco.labor_cost_per_year) * eco.overhead_frac
+    labour = _stated_labour(s, inv)
+    return (variable + labour + tea.facility_dependent
+            + (variable + labour) * eco.overhead_frac
             + s.other_opex_per_year)
 
 
@@ -1057,16 +1114,20 @@ CROSS_REFERENCES: list[tuple[str, str, str]] = [
      "downstream yields and allocation. This is the section the review found "
      "descriptive, so the equations must appear here rather than only being "
      "pointed at."),
-    ("§2.2 immediately after the production-cost equation", "S1",
+    ("§2.3 immediately after the production-cost equation", "S1",
      "State the endpoint definition where the cost is first defined: the "
      "facility-dependent term is straight-line depreciation, so the reported "
      "cost carries no required return on capital and is not a minimum selling "
      "price. Return on capital is evaluated through NPV, IRR and ROI."),
-    ("§2.2 capital paragraph", "S1",
-     "State the validity range of the capital model: equipment cost is linear "
-     "in capacity, with no scaling exponent and no reference capacity, so the "
-     "unit costs hold near the capacities of the sources they were taken from "
-     "and the model does not predict economies of scale away from them."),
+    ("§2.3 capital paragraph", "S1",
+     "State the capital model and its validity range. By default equipment cost "
+     "is proportional to capacity and labour is fixed, so the unit costs hold "
+     "near the capacities of the sources they were taken from and the defaults "
+     "do not predict economies of scale away from them. Then give the optional "
+     "power law: the reference capacity of each coefficient, the declared size "
+     "range the software warns outside, identical units in parallel above the "
+     "largest unit, and the labour exponent, with the defaults that reproduce the "
+     "submitted results."),
     ("§2.5 Perturbation / consistency", "S2, S3",
      "The flow-by-flow recovery is S2; the controlled duplicated-inventory "
      "counter-example, on both archetypes, is S3."),
@@ -1101,6 +1162,22 @@ CROSS_REFERENCES: list[tuple[str, str, str]] = [
 ]
 
 
+def _symbol_parts(latex: str) -> list[str]:
+    """The symbols of one table row, split on commas outside braces only, so that
+    ``S_{\\mathrm{ref},k}`` stays one symbol."""
+    parts, depth, start = [], 0, 0
+    for i, ch in enumerate(latex):
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+        elif ch == "," and depth == 0:
+            parts.append(latex[start:i])
+            start = i + 1
+    parts.append(latex[start:])
+    return [p.strip() for p in parts if p.strip()]
+
+
 def render_main_text_block(lib, cases) -> list[str]:
     """The reduced equation set for the manuscript, plus where to cite the rest.
 
@@ -1116,8 +1193,8 @@ def render_main_text_block(lib, cases) -> list[str]:
     worst = max((c.residual for c in core_checks), default=0.0)
 
     used = [s for s in SYMBOLS
-            if any(part.strip() in eq.latex
-                   for eq in core for part in s.latex.split(","))]
+            if any(part in eq.latex
+                   for eq in core for part in _symbol_parts(s.latex))]
 
     L: list[str] = [
         "# Reduced equation set for the main text",
@@ -1167,20 +1244,29 @@ def render_main_text_block(lib, cases) -> list[str]:
 #: without deriving them. Each is stated with the range over which it is
 #: defensible, because none of them is neutral.
 ASSUMPTIONS: list[tuple[str, str]] = [
-    ("Equipment cost is linear in capacity",
-     "There is no power-law exponent and no reference capacity anywhere in the "
-     "capital model: the cultivation section scales with area or volume and the "
-     "downstream sections with annual capacity, both strictly proportionally. The "
-     "unit costs are therefore only defensible near the capacities of the sources "
-     "they were taken from, and the model must not be read as predicting the "
-     "economies of scale of a plant an order of magnitude away from them. The "
-     "consequence is visible in the sensitivity results: plant scale carries a "
-     "small total-order index on production cost, and it does so only through the "
-     "fixed labour term below."),
-    ("Labour is a fixed annual cost",
-     "Labour does not scale with capacity, so it is the only term through which "
-     "plant scale reaches the unit production cost at all. On a plant much larger "
-     "or smaller than the reference this is the assumption that will fail first."),
+    ("Equipment cost is linear in capacity by default",
+     "Every result reported here uses an exponent of 1 for every equipment group: "
+     "the cultivation section scales with area or volume and the downstream "
+     "sections with annual capacity, both strictly proportionally. That is close "
+     "to right for ponds and photobioreactors, which are enlarged by adding "
+     "modules of a fixed size, and an approximation for fermenters and downstream "
+     "equipment, whose cost per unit of capacity falls as the unit gets bigger. "
+     "The unit costs are therefore only defensible near the capacities of the "
+     "sources they were taken from, and the default must not be read as predicting "
+     "the economies of scale of a plant an order of magnitude away from them. "
+     "Since 1.6 a group can follow a power law instead, from the reference capacity "
+     "its coefficient was derived at, with a declared size range that the input "
+     "check warns outside and identical units in parallel above the largest unit "
+     "size; with an exponent of 1 it returns the proportional cost exactly. The "
+     "consequence of the default is visible in the sensitivity results: plant scale "
+     "carries a small total-order index on production cost, and it does so only "
+     "through the fixed labour term below."),
+    ("Labour is a fixed annual cost by default",
+     "With the default exponent of 0 labour does not scale with capacity, so in the "
+     "results reported here it is the only term through which plant scale reaches "
+     "the unit production cost at all. On a plant much larger or smaller than the "
+     "reference this is the assumption that will fail first. Since 1.6 labour can "
+     "follow the same power law as equipment, from a declared reference capacity."),
     ("The production cost carries no return on capital",
      "Facility-dependent cost uses straight-line depreciation. A capital recovery "
      "factor is implemented but is not applied to the production cost, so the "

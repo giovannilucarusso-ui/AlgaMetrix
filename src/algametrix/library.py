@@ -19,11 +19,13 @@ from .models import (
     Basis,
     CarbonAccounting,
     CarbonSource,
+    CostScaling,
     CultivationSystem,
     Drying,
     Economics,
     Extraction,
     Harvesting,
+    LabourScaling,
     LCIAFactors,
     Material,
     Organism,
@@ -87,6 +89,29 @@ def _organism(d: dict) -> Organism:
     )
 
 
+_SCALING_KEYS = {"exponent", "reference_capacity", "min_capacity", "max_capacity", "source"}
+
+
+def _scaling(d: dict | None, cls: type[CostScaling] = CostScaling) -> CostScaling:
+    """A ``capex_scaling`` or ``labor_scaling`` block; absent means the class default."""
+    if not d:
+        return cls()
+    unknown = set(d) - _SCALING_KEYS
+    if unknown:
+        raise ValueError(f"unknown key(s) in a cost-scaling block: {', '.join(sorted(unknown))}")
+
+    def opt(key: str) -> float | None:
+        return None if d.get(key) is None else float(d[key])
+
+    kwargs = {"reference_capacity": opt("reference_capacity"),
+              "min_capacity": opt("min_capacity"),
+              "max_capacity": opt("max_capacity"),
+              "source": str(d.get("source", ""))}
+    if d.get("exponent") is not None:
+        kwargs["exponent"] = float(d["exponent"])
+    return cls(**kwargs)
+
+
 def _material(d: dict) -> Material:
     return Material(
         name=d["name"],
@@ -130,6 +155,7 @@ def _system(d: dict) -> CultivationSystem:
         substrate_carbon_fraction=float(
             d.get("substrate_carbon_fraction", SUBSTRATE_CARBON_FRACTION)),
         capex_per_unit=float(d["capex_per_unit"]),
+        capex_scaling=_scaling(d.get("capex_scaling")),
         land_m2_per_unit=float(d.get("land_m2_per_unit", 0.0)),
         working_volume=float(d.get("working_volume", 0.8)),
         carbon_source=CarbonSource(d.get("carbon_source", "co2")),
@@ -179,6 +205,7 @@ def _extraction(d: dict) -> Extraction:
         solvent_gwp=float(d.get("solvent_gwp", 0.0)),
         solvent_ced=float(d.get("solvent_ced", 0.0)),
         capex_per_kgyr=float(d.get("capex_per_kgyr", 0.0)),
+        capex_scaling=_scaling(d.get("capex_scaling")),
         allocation=d.get("allocation", "economic"),
         notes=d.get("notes", ""),
     )
@@ -212,8 +239,16 @@ def _waste_feed(d: dict) -> WasteFeed:
     )
 
 
+_ECONOMICS_SCALING = {"harvest_capex_scaling": CostScaling,
+                      "drying_capex_scaling": CostScaling,
+                      "labor_scaling": LabourScaling}
+
+
 def _economics(d: dict) -> Economics:
-    return Economics(**{k: float(v) for k, v in d.items()})
+    d = dict(d)
+    scaling = {key: _scaling(d.pop(key), cls)
+               for key, cls in _ECONOMICS_SCALING.items() if key in d}
+    return Economics(**{k: float(v) for k, v in d.items()}, **scaling)
 
 
 def _lcia(d: dict) -> LCIAFactors:

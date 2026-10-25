@@ -5,7 +5,8 @@ Combines an :class:`~algametrix.inventory.Inventory` with the
 :class:`~algametrix.models.Material` / :class:`Utility` line items to produce:
 
 * a capital structure  — equipment -> installed -> DFC -> total investment
-  (direct fixed capital + working capital + start-up), and
+  (direct fixed capital + working capital + start-up), with each equipment
+  group costed on its own capacity (see :mod:`algametrix.scaling`), and
 * an annual operating cost (AOC) split into raw materials, utilities, labour and
   facility-dependent cost (straight-line depreciation + maintenance + insurance), and
 * the minimum biomass production cost (EUR/kg), and
@@ -23,6 +24,7 @@ from dataclasses import dataclass, field
 
 from .inventory import Inventory
 from .models import Scenario, WasteBurdenConvention
+from .scaling import KG_PER_YEAR, ScaledCost, equipment_cost, equipment_groups, labour_cost
 
 
 def capital_recovery_factor(rate: float, lifetime: float) -> float:
@@ -109,6 +111,9 @@ class TEAResult:
     capex_breakdown: dict = field(default_factory=dict)
     opex_breakdown: dict = field(default_factory=dict)
     opex_categories: dict = field(default_factory=dict)
+    # Capacity, units in parallel, exponent and cost of each equipment group and
+    # of labour, keyed like the CAPEX breakdown (algametrix.scaling.ScaledCost).
+    cost_scaling: dict = field(default_factory=dict)
     # The series NPV and IRR are computed on: the investment at t = 0, then one
     # after-tax cash flow per operating year.
     cash_flows: list = field(default_factory=list)
@@ -125,11 +130,20 @@ def run_tea(scenario: Scenario, inv: Inventory) -> TEAResult:
     annual_kg = inv.annual_biomass_kg
 
     # ---- CAPITAL --------------------------------------------------------
-    cultivation_equip = scenario.scale * sys.capex_per_unit
-    harvest_equip = eco.harvest_capex_per_kgyr * annual_kg
-    drying_equip = eco.drying_capex_per_kgyr * annual_kg if scenario.drying.enabled else 0.0
+    # Each group is costed on its own capacity: area or volume for cultivation,
+    # annual dry biomass for the rest. Proportional unless a power law is
+    # declared for it (see algametrix.scaling).
+    cost_scaling: dict[str, ScaledCost] = {}
+    for group in equipment_groups(scenario, annual_kg):
+        cost, units = equipment_cost(group.coefficient, group.capacity, group.scaling)
+        cost_scaling[group.label] = ScaledCost(
+            group.capacity, group.capacity_unit, units, group.scaling.exponent,
+            group.scaling.reference_capacity, cost)
+    cultivation_equip = cost_scaling["Cultivation equipment"].cost
+    harvest_equip = cost_scaling["Harvesting equipment"].cost
+    drying_equip = cost_scaling["Drying equipment"].cost if scenario.drying.enabled else 0.0
     extraction_equip = (
-        scenario.extraction.capex_per_kgyr * annual_kg if scenario.extraction.enabled else 0.0
+        cost_scaling["Extraction equipment"].cost if scenario.extraction.enabled else 0.0
     )
     equipment = cultivation_equip + harvest_equip + drying_equip + extraction_equip
 
@@ -189,7 +203,9 @@ def run_tea(scenario: Scenario, inv: Inventory) -> TEAResult:
     utility_unit_costs = {**derived_utilities, **extra_utilities}
     utilities_cost = sum(utility_unit_costs.values()) * annual_kg
 
-    labour = eco.labor_cost_per_year
+    labour = labour_cost(eco.labor_cost_per_year, annual_kg, eco.labor_scaling)
+    cost_scaling["Labour"] = ScaledCost(annual_kg, KG_PER_YEAR, 1, eco.labor_scaling.exponent,
+                                        eco.labor_scaling.reference_capacity, labour)
     depreciation = dfc / eco.depreciation_years if eco.depreciation_years > 0 else 0.0
     facility_dependent = depreciation + dfc * (eco.maintenance_frac + eco.insurance_frac)
     overhead = (raw_materials_cost + utilities_cost + labour) * eco.overhead_frac
@@ -306,5 +322,6 @@ def run_tea(scenario: Scenario, inv: Inventory) -> TEAResult:
         capex_breakdown={k: v for k, v in capex_breakdown.items() if v},
         opex_breakdown={k: v for k, v in opex_breakdown.items() if v},
         opex_categories={k: v for k, v in opex_categories.items() if v},
+        cost_scaling=cost_scaling,
         cash_flows=cash_flows,
     )

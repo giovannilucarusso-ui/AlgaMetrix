@@ -31,7 +31,11 @@ For a user-defined production scenario it computes, from a single mass/energy ba
 - **Techno-economic analysis** — a SuperPro-style capital structure (equipment → installed → direct
   fixed capital → total investment incl. working capital & start-up), an annual operating cost split into
   raw materials, utilities, labour and facility-dependent cost (depreciation + maintenance + insurance),
-  and the **minimum biomass production cost (€/kg)** with a full cost breakdown.
+  and the **minimum biomass production cost (€/kg)** with a full cost breakdown. Equipment cost is
+  proportional to capacity and labour is fixed by default; each equipment group and labour can instead
+  follow a **power law from a declared reference capacity**, with a size range the input check warns
+  outside and identical units in parallel above the largest unit
+  ([docs/COST_SCALING.md](docs/COST_SCALING.md)).
 - **Profitability** — revenues, gross/net profit, ROI, payback, **NPV**, **IRR** and the
   **minimum expected product price (MEPP / break-even selling price)** from a discounted cash-flow model.
 - **Downstream extraction & co-products** — optional cell disruption + solvent extraction splitting the
@@ -412,9 +416,10 @@ tables and the evidence classes, [docs/STUDY_SELECTION.md](docs/STUDY_SELECTION.
 why this is not a systematic review), [docs/PRICE_BASIS.md](docs/PRICE_BASIS.md) for currency and
 price-year handling, [docs/LCA_METHOD.md](docs/LCA_METHOD.md) for the life-cycle scope, boundary,
 cut-off, allocation and background declaration (and what the LCA leaves out), [docs/CARBON_ACCOUNTING.md](docs/CARBON_ACCOUNTING.md) for the
-biogenic-carbon conventions, and [docs/WASTE_FEEDS.md](docs/WASTE_FEEDS.md) for growing on
+biogenic-carbon conventions, [docs/WASTE_FEEDS.md](docs/WASTE_FEEDS.md) for growing on
 effluents and food-industry side-streams (the dosing rule, gate fees, and the cut-off vs
-avoided-treatment choice).
+avoided-treatment choice), and [docs/COST_SCALING.md](docs/COST_SCALING.md) for equipment and
+labour cost against plant size.
 
 ## Validating against SuperPro Designer
 
@@ -552,6 +557,7 @@ src/algametrix/   the engine
   library.py              loads the YAML data into objects
   inventory.py            mass & energy balance  ->  Inventory
   tea.py                  Inventory + prices     ->  economic results
+  scaling.py              equipment and labour cost against plant capacity
   lca.py                  Inventory + factors    ->  environmental results
   scenario.py             orchestrates the above
   verification.py         mass-balance closure and model invariants
@@ -594,6 +600,8 @@ AlgaMetrix.spec           the PyInstaller build, Windows and macOS from one file
       (`scripts/brightway_crosscheck.py`)
 - [x] Waste-derived nutrients and carbon (effluents, digestate, food-industry side-streams),
       with gate fees and a declared cut-off / avoided-treatment convention
+- [x] Optional power-law scaling of equipment and labour cost, with reference capacities,
+      declared size ranges and units in parallel (engine and saved scenarios; not yet in the UI)
 - [ ] Finer product fractionation (individual pigments/PUFA) and quality-based pricing
 - [ ] ecoinvent background integration (needs a licence; the shipped factors are
       representative editable defaults, not a certified LCA database)

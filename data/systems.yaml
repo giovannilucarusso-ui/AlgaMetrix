@@ -10,7 +10,19 @@
 # `nutrient_uptake`   fraction of supplied N and P that is actually assimilated
 # `water_m3_per_kg`   net water consumption (evaporation + blowdown - recycle) per kg dry biomass
 # `substrate_yield`   kg dry biomass per kg organic substrate (heterotrophic only)
-# `capex_per_unit`    installed-equipment CAPEX in EUR per m2 (area) or per m3 (volume)
+# `capex_per_unit`    equipment cost in EUR per m2 (area) or per m3 (volume), before the
+#                     installation factor in parameters.yaml is applied
+# `capex_scaling`     optional; how capex_per_unit changes with the area or volume:
+#                       exponent            1 = proportional, the default. Any other value
+#                                           needs the reference capacity.
+#                       reference_capacity  the area or volume the cost was derived at
+#                       min_capacity        smallest unit the cost covers; the input check
+#                                           warns below it
+#                       max_capacity        largest single unit; above it the plant is built
+#                                           as identical units in parallel
+#                       source              where the cost and these capacities come from
+#                     No entry below declares one. Their costs are illustrative and were not
+#                     taken from a costed plant of known size, so they stay proportional.
 # `land_m2_per_unit`  land footprint in m2 per m2 of pond (>=1) or per m3 of reactor
 #
 # Values are literature-typical placeholders. EDIT and cite your sources.
