@@ -17,11 +17,11 @@ DECLARED CONVERGENCE CRITERIA
 Open raceway pond (Chlorella) - Mode A - Production cost (EUR/kg)
 ------------------------------------------------------------------------------
        N    evals  runtime   maxCIw  maxShift  rank==max violations
-     512     4608     1.20   0.1578    0.0092       True          0
-    1024     9216     2.43   0.1186    0.0002       True          0
-    2048    18432     4.87   0.0901    0.0009       True          0
-    4096    36864     9.73   0.0618    0.0000       True          0
-    8192    73728    20.66   0.0378    0.0000       True          0
+     512     4608     1.74   0.1578    0.0092       True          0
+    1024     9216     3.58   0.1186    0.0002       True          0
+    2048    18432     4.80   0.0901    0.0009       True          0
+    4096    36864     9.28   0.0618    0.0000       True          0
+    8192    73728    28.50   0.0378    0.0000       True          0
   chosen: N=2048
   N=1024 not used: at that size the sensitivity runs missed
     NPV (EUR), B_full_decision: ST interval of a top-2 driver wider than 0.15
@@ -38,11 +38,11 @@ Open raceway pond (Chlorella) - Mode A - Production cost (EUR/kg)
 Heterotrophic fermenter (Schizochytrium) - Mode A - Production cost (EUR/kg)
 ------------------------------------------------------------------------------
        N    evals  runtime   maxCIw  maxShift  rank==max violations
-     512     4608     1.48   0.1586    0.0092       True          0
-    1024     9216     3.14   0.1176    0.0004       True          0
-    2048    18432     6.27   0.0876    0.0012       True          0
-    4096    36864    12.29   0.0588    0.0000       True          0
-    8192    73728    25.72   0.0402    0.0000       True          0
+     512     4608     1.86   0.1586    0.0092       True          0
+    1024     9216     4.38   0.1176    0.0004       True          0
+    2048    18432     8.46   0.0876    0.0012       True          0
+    4096    36864    16.07   0.0588    0.0000       True          0
+    8192    73728    31.11   0.0402    0.0000       True          0
   chosen: N=4096
   N=1024 not used: at that size the sensitivity runs missed
     NPV (EUR), B_full_decision: ST interval of a top-2 driver wider than 0.15
@@ -61,11 +61,11 @@ Heterotrophic fermenter (Schizochytrium) - Mode A - Production cost (EUR/kg)
 LED-assisted tubular PBR (P. tricornutum) - Mode A - Production cost (EUR/kg)
 ------------------------------------------------------------------------------
        N    evals  runtime   maxCIw  maxShift  rank==max violations
-     512     4608     1.28   0.1406    0.0023       True          0
-    1024     9216     2.55   0.1090    0.0026       True          0
-    2048    18432     5.29   0.0683    0.0002       True          0
-    4096    36864    10.32   0.0543    0.0000       True          0
-    8192    73728    20.97   0.0377    0.0000       True          0
+     512     4608     2.03   0.1406    0.0023       True          0
+    1024     9216     3.12   0.1090    0.0026       True          0
+    2048    18432     6.44   0.0683    0.0002       True          0
+    4096    36864    15.77   0.0543    0.0000       True          0
+    8192    73728    29.17   0.0377    0.0000       True          0
   chosen: N=1024
   N=512 not used: at that size the sensitivity runs missed
     NPV (EUR), A_shared_foreground: ST interval of a top-2 driver wider than 0.15

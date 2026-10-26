@@ -13,9 +13,11 @@
     "harmonization",
     "gwp",
     "carbon",
+    "input_origin",
     "sobol",
     "uncertainty",
     "plant_size",
+    "cost_indicators",
     "figures",
     "figures_jie",
     "supplementary"
@@ -31,7 +33,7 @@
   "task_6_uncertainty_decomposition": "pass",
   "task_7_study_audit": "pass",
   "task_8_biogenic_carbon": "pass",
-  "tests_passed": 651,
+  "tests_passed": 690,
   "tests_failed": 0,
   "notes": [
     "0 declared Tier-B studies have no scenario builder in the repository.",
@@ -46,9 +48,11 @@
     "Task 3 partial: index(es) without provider provenance: CEPCI.",
     "18 published GWP points; 4 engine reproductions of a published endpoint; 0 blocked.",
     "Net-negative GWP under the declared convention for: gwp_iceland_spirulina, superpro_algaloil - always reported with its gross value.",
+    "Inputs of the 13 compared results, by origin: source 154, library 110, fitted 65, assumed 22.",
     "Mode-A dominant driver by output and archetype: Open raceway pond (Chlorella): Production cost (EUR/kg) -> Productivity, NPV (EUR) -> Productivity, GWP net (kg CO2-eq/kg) -> Drying heat demand (driver differs by output); Heterotrophic fermenter (Schizochytrium): Production cost (EUR/kg) -> Productivity, NPV (EUR) -> Productivity, GWP net (kg CO2-eq/kg) -> Substrate yield (driver differs by output); LED-assisted tubular PBR (P. tricornutum): Production cost (EUR/kg) -> Cultivation electricity, NPV (EUR) -> Productivity, GWP net (kg CO2-eq/kg) -> Cultivation electricity (driver differs by output)",
     "Monte-Carlo sample size chosen by convergence: n=1000.",
-    "Group Sobol' decomposition (n_base=4096) over 3 parameter groups: Open raceway pond (Chlorella) / Production cost (EUR/kg): foreground S=0.89, economic S=0.11, lcia_background S=0.00, between-group interactions 0.005 [-0.039, 0.044]; Open raceway pond (Chlorella) / GWP net (kg CO2-eq/kg): foreground S=0.15, economic S=0.00, lcia_background S=0.83, between-group interactions 0.020 [-0.013, 0.058]; Heterotrophic fermenter (Schizochytrium) / Production cost (EUR/kg): foreground S=0.48, economic S=0.48, lcia_background S=0.00, between-group interactions 0.047 [-0.002, 0.092]; Heterotrophic fermenter (Schizochytrium) / GWP net (kg CO2-eq/kg): foreground S=0.27, economic S=0.00, lcia_background S=0.71, between-group interactions 0.019 [-0.024, 0.056]; LED-assisted tubular PBR (P. tricornutum) / Production cost (EUR/kg): foreground S=0.27, economic S=0.69, lcia_background S=0.00, between-group interactions 0.041 [0.002, 0.080]; LED-assisted tubular PBR (P. tricornutum) / GWP net (kg CO2-eq/kg): foreground S=0.38, economic S=0.00, lcia_background S=0.59, between-group interactions 0.032 [-0.006, 0.066]"
+    "Group Sobol' decomposition (n_base=4096) over 3 parameter groups: Open raceway pond (Chlorella) / Production cost (EUR/kg): foreground S=0.89, economic S=0.11, lcia_background S=0.00, between-group interactions 0.005 [-0.039, 0.044]; Open raceway pond (Chlorella) / GWP net (kg CO2-eq/kg): foreground S=0.15, economic S=0.00, lcia_background S=0.83, between-group interactions 0.020 [-0.013, 0.058]; Heterotrophic fermenter (Schizochytrium) / Production cost (EUR/kg): foreground S=0.48, economic S=0.48, lcia_background S=0.00, between-group interactions 0.047 [-0.002, 0.092]; Heterotrophic fermenter (Schizochytrium) / GWP net (kg CO2-eq/kg): foreground S=0.27, economic S=0.00, lcia_background S=0.71, between-group interactions 0.019 [-0.024, 0.056]; LED-assisted tubular PBR (P. tricornutum) / Production cost (EUR/kg): foreground S=0.27, economic S=0.69, lcia_background S=0.00, between-group interactions 0.041 [0.002, 0.080]; LED-assisted tubular PBR (P. tricornutum) / GWP net (kg CO2-eq/kg): foreground S=0.38, economic S=0.00, lcia_background S=0.59, between-group interactions 0.032 [-0.006, 0.066]",
+    "Break-even price over production cost, archetypes: +13.0%, +4.8%, +3.9%. Gross GWP per kg main product, economic over mass allocation: rec_algal_oil 2.83, rec_astaxanthin 38.56, rec_omega3 2.59, rec_phycocyanin 15.09, tpl_Biodiesel (Nannochloropsis) 2.67."
   ],
   "remaining_todos": [
     "[astaxanthin] PROVENANCE MISMATCH found 2026-08-02: the cited source (Panis & Carreon 2016, Algal Research 18:175-190) reports EUR 1536/kg (Livadeia) and EUR 6403/kg (Amsterdam) for its best case. Neither the 718 USD/kg point nor the 500-1500 USD/kg envelope appears to come from it. Re-extract from the source or re-attribute the numbers before this record is cited.",
@@ -87,8 +91,11 @@
     "[tredici2016] Extract the paper's cost breakdown (CAPEX/labour/energy/nutrients) to enable component-wise price-year normalization.",
     "[tredici2016] Record economic endpoint definition and system boundary from the source.",
     "[vazquez2022] Extract cost breakdown for component-wise normalization.",
+    "[vazquez2022] The composition check added in 1.6 flags the declared carbon, 0.524 kg/kg, as 18% above the 0.446 kg/kg the declared protein, lipid and carbohydrate imply. Confirm where the 0.524 comes from. At 0.446 the production cost does not move and gross GWP falls by 0.9%.",
     "[vazquez2022b_nas] Split the published MEC across cultivation, harvesting and drying so the capital is not carried entirely on the cultivation line.",
+    "[vazquez2022b_nas] The composition check added in 1.6 flags the carbon content: 0.52 kg/kg is the library value for Nannochloropsis sp., kept when the composition was replaced by the source's, which implies 0.435 kg/kg. Take the carbon from the source if it reports one. At 0.435 the production cost falls by 1.4% (1 ha) and 1.9% (10 ha); gross GWP by 0.2%.",
     "[vazquez2022b_nas_10ha] Split the published MEC across cultivation, harvesting and drying.",
+    "[vazquez2022b_nas_10ha] The composition check added in 1.6 flags the carbon content, as for vazquez2022b_nas: 0.52 kg/kg is the library value, the source composition implies 0.435 kg/kg.",
     "[vazquez2022b_tiso_pht] Split the published MEC across cultivation, harvesting and drying."
   ]
 }
