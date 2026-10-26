@@ -672,7 +672,7 @@ def build(run, outdir: Path, results_dir: Path, root: Path,
         "compared with that of Ahmed et al. (2026), and its inputs are classed against "
         "Padi et al. in both rows. The locations given for Tredici et al. (2016) and "
         "the two Vázquez-Romero et al. (2022) studies were checked against the source "
-        "texts for this revision.",
+        "texts for version 1.6.0.",
         "",
     ]
     L += _embed("S4.6 Where the inputs of each reconstruction come from",
