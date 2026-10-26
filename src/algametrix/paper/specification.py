@@ -1145,8 +1145,10 @@ CROSS_REFERENCES: list[tuple[str, str, str]] = [
      "are S5; the sampled input distributions with their evidence quality, and "
      "the complete quantile outputs, are S6."),
     ("Figure 2 caption", "S2, S3",
-     "Cite S2 for the per-scenario identities and admissibility constraints, "
-     "and S3 for the counter-example the top series shows."),
+     "State how many flow comparisons the panel holds and cite S2 for the "
+     "flow-by-flow recovery behind them. The identities, the admissibility "
+     "constraints and the duplicated-inventory counter-example are no longer "
+     "drawn: cite S2 and S3 for them, and Table 2 for the summary."),
     ("Figure 3 caption", "S4",
      "Cite S4 for the per-row basis notes, the exclusions and the range check."),
     ("Figure 4 caption", "S5, S6",

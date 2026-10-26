@@ -793,9 +793,7 @@ def stage_figures_jie(run: Run) -> None:
     from algametrix.paper import figures_jie
 
     prereq = {
-        "verification_reports": ("verification", stage_verification),
         "consistency": ("consistency", stage_consistency),
-        "benchmark": ("benchmark", stage_benchmark),
         "reproduction_rows": ("reproductions", stage_reproductions),
         "sobol_blocks": ("sobol", stage_sobol),
         "mc_blocks": ("uncertainty", stage_uncertainty),
@@ -807,7 +805,7 @@ def stage_figures_jie(run: Run) -> None:
             if stage_name not in run.stages_run:
                 run.stages_run.append(stage_name)
 
-    made = figures_jie.build_all(run, FIGURES / "jie", RESULTS)
+    made = figures_jie.build_all(run, FIGURES / "jie")
     for p in made:
         print(f"  wrote {p.relative_to(ROOT)}")
 

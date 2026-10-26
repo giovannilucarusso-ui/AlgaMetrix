@@ -6,8 +6,8 @@ and should not share a numbering scheme.
 
 Figure 1  architecture: scenario -> shared inventory -> TEA + LCA -> sensitivity
           and uncertainty
-Figure 2  shared-inventory consistency and internal verification, with the
-          controlled duplicated-inventory counter-example on the same residual axis
+Figure 2  shared-inventory consistency: every shared flow recovered from the
+          TEA and from the LCA, on the 1:1 line
 Figure 3  retrospective literature reconstruction and external benchmarking:
           deviations from point references, by evidence class
 Figure 4  model evaluation: the same physical parameter set driving an economic
@@ -25,8 +25,6 @@ process. Nothing is transcribed.
 
 from __future__ import annotations
 
-import json
-import math
 from pathlib import Path
 
 import numpy as np
@@ -39,18 +37,12 @@ from .figures import (
     C_LCA,
     C_NEUTRAL,
     C_TEA,
-    C_WARN,
     _save,
     _sublabels,
     plt,
 )
 from matplotlib.lines import Line2D                              # noqa: E402
 from matplotlib.patches import FancyArrowPatch, FancyBboxPatch   # noqa: E402
-
-#: Floating-point resolution, drawn on every precision axis so the reader can
-#: see that the residuals sit on it rather than merely near zero.
-EPS = np.finfo(float).eps
-
 
 def _panel_label(ax, letter: str, pad: float = 6.0) -> None:
     """A bare bold panel letter. The panel is described in the caption, so the
@@ -160,40 +152,19 @@ def figure1_architecture(outdir: Path) -> list[Path]:
 
 
 # ======================================================================
-# Figure 2 - consistency and internal verification
+# Figure 2 - shared-inventory consistency
 # ======================================================================
 
-def _safe_log10(values, floor: float) -> np.ndarray:
-    v = np.asarray([max(float(x), floor) for x in values], dtype=float)
-    return np.log10(v)
+def figure2_consistency(consistency_reports, outdir: Path) -> list[Path]:
+    """Every shared flow, recovered from the TEA and from the LCA, on the 1:1 line.
 
-
-def figure2_consistency(consistency_reports, verification_reports,
-                        benchmark_reports, demos, outdir: Path,
-                        brightway_json: Path | None = None) -> list[Path]:
-    """(a) recovered quantities on the 1:1 line, (b) every residual on one axis.
-
-    The duplicated-inventory counter-example used to have a panel of its own. It
-    did not earn one: every flow diverged by the same 15 %, so the panel carried
-    two numbers rather than a distribution, and the numbers are in the table
-    anyway. It is now a fifth series in panel (b), which is where it belongs -
-    the whole point of the counter-example is *how far it sits* from the
-    verification residuals, and panel (b) is already the axis that measures that.
-
-    The panels carry no prose: what each one is, how many comparisons it holds,
-    what the counter-example changed and which bw2calc build it was checked
-    against are stated in the caption. Only the two reference lines and the
-    tinted band beyond the acceptance criterion are annotated on the axes, since
-    they cannot be read off the data.
+    Until 1.6 the figure had a second panel with every verification residual and
+    the duplicated-inventory counter-example on one axis. Those numbers are in
+    Table 2 and SI S2-S3, so the figure keeps only what a table cannot show at a
+    glance: the recovered quantities themselves. How many comparisons it holds
+    is stated in the caption.
     """
-    # Equal cells and a square box on both panels: the two data areas are then
-    # the same size and share a baseline, so the panel letters line up. The
-    # surplus vertical space is cropped by the tight bounding box on save.
-    fig, axes = plt.subplots(1, 2, figsize=(7.2, 3.6),
-                             gridspec_kw={"wspace": 0.42, "width_ratios": [1.0, 1.0]})
-
-    # ---------------------------------------------------------------- (a)
-    ax = axes[0]
+    fig, ax = plt.subplots(figsize=(3.5, 3.5))
     tea, lca, kinds = [], [], []
     for rep in consistency_reports:
         for f in rep.active_flows:
@@ -223,67 +194,8 @@ def figure2_consistency(consistency_reports, verification_reports,
     ax.set_axisbelow(True)
     ax.set_xlabel("quantity implied by the TEA\n(per kg dry biomass)")
     ax.set_ylabel("quantity implied by the LCA\n(per kg dry biomass)")
-    _panel_label(ax, "a", pad=14)
     ax.legend(loc="upper left", frameon=False, fontsize=6.6, handletextpad=0.4,
               borderpad=0.2)
-
-    # ---------------------------------------------------------------- (b)
-    ax = axes[1]
-    floor = EPS / 4
-    series = [
-        # Not "mass balances": these residuals come from construction identities
-        # that hold by construction. The physical admissibility constraints, which
-        # can fail, are booleans and have no residual to plot - they are reported
-        # in the text and in results/verification.txt.
-        ("inventory\nidentities",
-         [c.residual for rep in verification_reports for c in rep.identities], C_FOREGROUND),
-        ("TEA vs LCA\nshared flows",
-         [f.discrepancy for rep in consistency_reports for f in rep.active_flows], C_JOINT),
-        ("sequential vs\nmatrix LCA",
-         [r.rel_diff for rep in benchmark_reports for r in rep.rows], C_LCA),
-    ]
-    if brightway_json and brightway_json.exists():
-        payload = json.loads(brightway_json.read_text(encoding="utf-8"))
-        series.append(("matrix vs\nbw2calc",
-                       payload["all_relative_differences"], C_TEA))
-    # The counter-example, on the same axis: this is the contrast the paper rests on.
-    demo_vals = [d.discrepancy for demo in demos for d in demo.duplicated
-                 if d.discrepancy > 0]
-    if demo_vals:
-        series.append(("duplicated\ninventories", demo_vals, C_WARN))
-
-    right = 0.6
-    ax.set_xlim(math.log10(floor) - 0.7, right)
-    ax.set_ylim(-0.62, len(series) - 0.38)
-    ax.set_box_aspect(1)
-    # Everything to the right of the acceptance criterion is a failure. Tinting
-    # that half of the axis says so without a sentence on the plot.
-    ax.axvspan(-9, right, color=C_WARN, alpha=0.06, lw=0, zorder=0)
-
-    rng = np.random.default_rng(0)      # jitter only; no result depends on it
-    for i, (_label, values, color) in enumerate(series):
-        x = _safe_log10(values, floor)
-        y = i + (rng.random(len(x)) - 0.5) * 0.30
-        ax.scatter(x, y, s=9, color=color, alpha=0.6, edgecolor="none", zorder=3)
-        ax.plot([x.max()], [i], "|", color=color, markersize=14, markeredgewidth=1.8,
-                zorder=4)
-    # The two reference lines are labelled horizontally above the axis rather
-    # than rotated inside it: inside, either label would have to run through the
-    # data it is there to put in context.
-    for xline, style, text in ((math.log10(EPS), ":", "double precision"),
-                               (-9, "--", "acceptance criterion")):
-        ax.axvline(xline, color="#555555", lw=0.8, ls=style, zorder=2)
-        ax.text(xline + 0.2, 1.012, text, transform=ax.get_xaxis_transform(),
-                fontsize=6.0, color="#555555", va="bottom", ha="left")
-    ax.set_yticks(range(len(series)))
-    ax.set_yticklabels([s[0] for s in series], fontsize=6.4)
-    # Each row label carries its series colour, which is what ties the counter-
-    # example to the tinted band without a legend or a note.
-    for tick, (_label, _values, color) in zip(ax.get_yticklabels(), series):
-        tick.set_color(color)
-    ax.tick_params(axis="y", length=0)
-    ax.set_xlabel("relative residual  (log$_{10}$)")
-    _panel_label(ax, "b", pad=14)
     return _save(fig, outdir, "jie_fig2_consistency", tight_bbox=True)
 
 
@@ -629,18 +541,14 @@ def figure_si_plant_size(ref, curves, outdir: Path) -> list[Path]:
 
 # ======================================================================
 
-def build_all(run, outdir: Path, results_dir: Path) -> list[Path]:
+def build_all(run, outdir: Path) -> list[Path]:
     """Draw the four JIE figures and the SI plant-size figure from the artifacts a
     ``reproduce.py`` run holds."""
     from .parameters import MODE_A_SHARED_FOREGROUND
 
     made: list[Path] = []
     made += figure1_architecture(outdir)
-    made += figure2_consistency(
-        run.artifacts["consistency"], run.artifacts["verification_reports"],
-        run.artifacts["benchmark"], run.artifacts["consistency_demos"], outdir,
-        brightway_json=results_dir / "brightway_crosscheck.json",
-    )
+    made += figure2_consistency(run.artifacts["consistency"], outdir)
     made += figure3_validation(run.artifacts["reproduction_rows"],
                                run.artifacts["reproduction_blocked"], outdir,
                                excluded=run.artifacts.get("reproduction_excluded"))

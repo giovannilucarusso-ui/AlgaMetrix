@@ -777,8 +777,7 @@ def build(run, outdir: Path, results_dir: Path, root: Path,
     L += _embed("S7.2 Matrix implementation against bw2calc",
                 results_dir / "brightway_crosscheck.txt", root, manifest,
                 note="*The machine-readable result, including every per-scenario "
-                     "relative difference plotted in Figure 2b, is "
-                     "`results/brightway_crosscheck.json`.*")
+                     "relative difference, is `results/brightway_crosscheck.json`.*")
 
     # ---- S8 ----------------------------------------------------------
     L += [
