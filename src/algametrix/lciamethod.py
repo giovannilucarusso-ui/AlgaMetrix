@@ -310,6 +310,9 @@ def method_statement(method: LCIAMethod, *, width: int = 88) -> str:
     if scope.get("conformance"):
         out.append("")
         out.append(_wrap(_text(scope["conformance"]), width))
+    if scope.get("intended_use"):
+        out.append("")
+        out.append(_labelled("Intended use", _text(scope["intended_use"]), width))
 
     out.append(_heading("2  System boundary", width))
     out.append("  Inside:")

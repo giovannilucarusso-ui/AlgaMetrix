@@ -106,6 +106,16 @@ def test_the_statement_renders_every_section(method):
     assert "\n" in text and " - " in text
 
 
+def test_the_statement_says_what_the_tool_is_not_for(method):
+    """The intended use is printed with the method, not only kept in the README."""
+    use = " ".join(str(method.scope.get("intended_use", "")).split())
+    assert "screening" in use
+    for claim in ("carbon-removal credits", "Environmental Product Declaration"):
+        assert claim in use, claim
+    text = " ".join(method_statement(method).split())
+    assert "Intended use" in text and "Environmental Product Declaration" in text
+
+
 def test_factor_rows_export_carries_the_source(method):
     rows = factor_rows(method)
     assert len(rows) == len(method.factors) + len(method.inventory_assumptions)

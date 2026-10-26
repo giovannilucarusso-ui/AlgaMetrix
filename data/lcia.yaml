@@ -37,6 +37,14 @@ method:
     data representative of the system studied, and - for comparative assertions
     disclosed to the public - obtains the critical review ISO 14044 clause 6
     requires. The defaults shipped here do not meet that condition on their own.
+  intended_use: >
+    As shipped, AlgaMetrix is a screening tool for early design: comparing
+    process configurations and finding which inputs need better data. Its
+    results are not suitable for substantiating carbon-removal credits or for an
+    Environmental Product Declaration. Most of the default factors below are
+    indicative, no product category rules or third-party verification are
+    applied, and the biogenic carbon credited at the gate says nothing about how
+    long that carbon stays out of the atmosphere.
   study_type: attributional
   modelling: linear, process-based, steady-state, average (not marginal)
   functional_unit: >

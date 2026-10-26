@@ -109,6 +109,22 @@ latter is how alkaliphilic *Arthrospira* (Spirulina) is actually grown at pH 9�
 > of the box. They are **not** validated for any specific plant. Replace them with your own data — and
 > validate against SuperPro — before drawing conclusions.
 
+## Intended use
+
+AlgaMetrix is a screening tool for early design: comparing process configurations, and finding which
+inputs most need better data before a detailed design. As shipped, its results are **not suitable for
+substantiating carbon-removal credits or for an Environmental Product Declaration**:
+
+- most default background factors are indicative, with no traceable dataset behind them
+  ([docs/LCA_METHOD.md](docs/LCA_METHOD.md), §4);
+- no product category rules or third-party verification are applied;
+- the biogenic carbon credited at the plant gate says nothing about how long that carbon stays out of
+  the atmosphere ([docs/CARBON_ACCOUNTING.md](docs/CARBON_ACCOUNTING.md)).
+
+A scenario file and the released software are enough to recompute any result, and the paper's evidence
+pipeline records a SHA-256 hash of every result file it embeds. That makes a calculation reproducible;
+it does not make the assumptions behind it appropriate for a given claim.
+
 ## Install
 
 Three different people arrive at this repository, and they do not need the same

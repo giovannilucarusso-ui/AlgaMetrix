@@ -38,6 +38,19 @@ representative of the system studied, and — for comparative assertions disclos
 to the public — obtains the critical review ISO 14044 clause 6 requires. The
 defaults do not meet that condition on their own.
 
+**Intended use.** As shipped, AlgaMetrix is a screening tool for early design:
+comparing process configurations and finding which inputs need better data. Its
+results are not suitable for substantiating carbon-removal credits or for an
+Environmental Product Declaration, for three reasons:
+
+- most default factors are indicative (§4);
+- no product category rules or third-party verification are applied;
+- the biogenic carbon credited at the gate says nothing about how long that
+  carbon stays out of the atmosphere ([CARBON_ACCOUNTING.md](CARBON_ACCOUNTING.md)).
+
+The same statement is declared in `data/lcia.yaml` (`method.intended_use`) and
+printed with the method statement.
+
 ## 2. Inside the boundary
 
 Cultivation (carbon supply as CO₂ or bicarbonate, nitrogen, phosphorus, process

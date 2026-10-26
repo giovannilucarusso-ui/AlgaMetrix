@@ -47,6 +47,15 @@ Standard     : ISO 14044:2006 Environmental management - Life cycle assessment -
   critical review ISO 14044 clause 6 requires. The defaults shipped here do not meet
   that condition on their own.
 
+  Intended use    : As shipped, AlgaMetrix is a screening tool for early design:
+                    comparing process configurations and finding which inputs need
+                    better data. Its results are not suitable for substantiating carbon-
+                    removal credits or for an Environmental Product Declaration. Most of
+                    the default factors below are indicative, no product category rules
+                    or third-party verification are applied, and the biogenic carbon
+                    credited at the gate says nothing about how long that carbon stays
+                    out of the atmosphere.
+
 2  System boundary
 ------------------
   Inside:
