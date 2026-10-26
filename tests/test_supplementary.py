@@ -27,7 +27,8 @@ RESULTS = ROOT / "results"
 #: checkout has them; a run that has not regenerated them still builds a valid
 #: bundle, it just describes the committed state.
 REQUIRED = [
-    "verification.txt", "shared_inventory_consistency.txt", "validation.txt",
+    "verification.txt", "shared_inventory_consistency.txt", "scenario_suite.txt",
+    "validation.txt",
     "carbon_accounting.txt", "sobol_validation.txt", "sobol_convergence.txt",
     "sensitivity.txt", "uncertainty.txt", "lca_implementation_benchmark.txt",
     "brightway_crosscheck.txt", "plant_size.txt",

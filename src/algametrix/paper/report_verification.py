@@ -7,7 +7,7 @@ and a reader should not have to disentangle them.
 
 from __future__ import annotations
 
-from .report import RULE, THIN, header
+from .report import RULE, THIN, _wrap, header
 
 
 # --------------------------------------------------------------------------
@@ -257,4 +257,64 @@ def lca_implementation_benchmark(reports, tol, brightway, bw_result) -> str:
     for rep in reports:
         lines.append(fmt_bench(rep, tol))
         lines.append("")
+    return "\n".join(lines)
+
+
+# --------------------------------------------------------------------------
+# The scenario suite (SI Table S-B)
+# --------------------------------------------------------------------------
+
+def scenario_suite(rows, coverage) -> str:
+    def table(columns, cells) -> list[str]:
+        widths = [max(len(head), *(len(c[i]) for c in cells))
+                  for i, head in enumerate(columns)]
+        out = ["  " + "  ".join(f"{h:<{w}}" for h, w in zip(columns, widths)).rstrip()]
+        for c in cells:
+            out.append("  " + "  ".join(f"{v:<{w}}" for v, w in zip(c, widths)).rstrip())
+        return out
+
+    lines = header(
+        "THE VERIFICATION SUITE (SI TABLE S-B)",
+        f"the {len(rows)} structurally distinct scenarios the verification and "
+        "consistency checks run over",
+    )
+    lines += ["  " + s for s in _wrap(
+        "Origin: a reconstruction is a published case rebuilt from its source, a "
+        "template a configuration shipped with the software, an archetype one of the "
+        "sensitivity and uncertainty archetypes, and a variant a shipped configuration "
+        "changed to reach a code path the others do not. The set was put together to "
+        "cover the configuration options of the model, not to sample the industry; the "
+        "counts at the end say how often each option is exercised. Members that build "
+        "an identical scenario by another route are listed under 'also built as' and "
+        "counted once.", 76)]
+
+    lines += ["", "S-B.1 ORIGIN", THIN]
+    cells = []
+    for r in rows:
+        cells.append([f"{r.number:>2}", r.key, r.kind, r.source])
+        if r.also:
+            cells.append(["", "", "", "also built as: " + ", ".join(r.also)])
+    lines += table(["#", "scenario", "origin", "source or purpose"], cells)
+
+    lines += ["", "S-B.2 CULTIVATION", THIN]
+    lines += table(
+        ["#", "organism", "cultivation system", "carbon", "basis", "operation"],
+        [[f"{r.number:>2}", r.organism, r.system, r.carbon, r.basis, r.operation]
+         for r in rows])
+
+    lines += ["", "S-B.3 PROCESSING AND OTHER OPTIONS EXERCISED", THIN]
+    lines += table(
+        ["#", "drying", "downstream", "products", "other options"],
+        [[f"{r.number:>2}", r.drying, r.downstream, str(r.products),
+          "; ".join(r.options) or "-"] for r in rows])
+    lines.append("")
+    lines += ["  " + s for s in _wrap(
+        "Other options: settings the columns above do not show. 'Source financial "
+        "assumptions' means a discount rate, plant life, depreciation period or tax "
+        "rate other than the library default.", 76)]
+
+    lines += ["", "S-B.4 HOW MANY SCENARIOS EXERCISE EACH OPTION", THIN]
+    for key, value in coverage.items():
+        lines.append(f"  {key:36s} {value}")
+    lines.append("")
     return "\n".join(lines)

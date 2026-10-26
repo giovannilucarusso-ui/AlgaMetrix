@@ -17,7 +17,7 @@ Stage outputs
 studies        results/study_selection_audit.txt
 endpoints      results/economic_endpoint_audit.txt
 verification   results/verification.txt
-consistency    results/shared_inventory_consistency.txt
+consistency    results/shared_inventory_consistency.txt, scenario_suite.txt
 method         results/lcia_method_statement.txt
 benchmark      results/lca_implementation_benchmark.txt
 reproductions  results/validation.txt
@@ -290,10 +290,12 @@ def stage_consistency(run: Run) -> None:
     demos = [consistency_mod.duplicated_inventory_drift(c.scenario(run.lib), c.label)
              for c in cases if c.key in demo_keys]
 
+    counts = suite.coverage(run.lib, cases)
     _write(RESULTS / "shared_inventory_consistency.txt",
            report_verification.shared_inventory_consistency(
-               reports, demos, suite.coverage(run.lib, cases), duplicates,
-               consistency_mod.CONSISTENCY_TOL))
+               reports, demos, counts, duplicates, consistency_mod.CONSISTENCY_TOL))
+    _write(RESULTS / "scenario_suite.txt",
+           report_verification.scenario_suite(suite.describe(run.lib, run.dataset), counts))
     run.artifacts["consistency"] = reports
     run.artifacts["consistency_demos"] = demos
     run.status["consistency"] = "pass" if ok else "fail"
@@ -831,6 +833,7 @@ def stage_supplementary(run: Run) -> None:
         "sensitivity.txt": "sobol",
         "uncertainty.txt": "uncertainty",
         "plant_size.txt": "plant_size",
+        "scenario_suite.txt": "consistency",
     }
     stale = sorted({stage for name, stage in required.items()
                     if stage not in run.stages_run and (RESULTS / name).exists()})

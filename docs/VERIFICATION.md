@@ -31,14 +31,20 @@ archetype and its template) and are counted once, so the evidence base is not in
 | area basis / volume basis | 23 / 4 |
 | continuous / batch | 25 / 2 |
 | with drying / without | 15 / 12 |
+| drying fuel: natural gas / electricity | 14 / 1 |
+| heated cultivation | 3 |
 | with downstream extraction | 5 |
 | with multi-product allocation | 5 |
 | with explicit media / utility line items | 5 |
+| waste-derived feed | 1 |
+| biogenic carbon: CO₂-fed credit / no credit / at-gate credit / declared fraction | 23 / 2 / 1 / 1 |
 
 The same table is printed, from the same function, at the head of
 [`results/shared_inventory_consistency.txt`](../results/shared_inventory_consistency.txt), and
 `tests/test_paper_totals.py` asserts the 27 / 23 / 4 split, so this page cannot drift away from
-the suite again.
+the suite again. [`results/scenario_suite.txt`](../results/scenario_suite.txt) (SI Table S-B)
+lists the 27 one by one: origin, organism, cultivation system, carbon source, basis, operation,
+drying, downstream processing and the other options each one exercises.
 
 Provenance: 15 study reconstructions, 9 shipped templates, 3 sensitivity archetypes and 8
 variants that exist to reach code paths the others do not (bicarbonate feed, batch scheduling,

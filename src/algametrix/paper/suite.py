@@ -94,7 +94,7 @@ def _no_drying(lib: Library) -> Scenario:
 
 
 def _heated_pond(lib: Library) -> Scenario:
-    """Seasonal cultivation heating — the only route into ``cultivation_heat_mj_per_kg``."""
+    """Seasonal pond heating from natural gas, on the shipped raceway."""
     scn = templates.build_template(_PHOTO_BASE, lib)
     scn.system = replace(scn.system, cultivation_heat_mj_per_kg=25.0,
                          cultivation_heat_fuel="natural_gas")
@@ -111,20 +111,24 @@ def _carbon_mode(mode: CarbonAccounting) -> Callable[[Library], Scenario]:
 
 VARIANTS: list[SuiteCase] = [
     SuiteCase("var_bicarbonate", "Variant: NaHCO3 carbon source", "variant", _bicarbonate,
-              "exercises the bicarbonate branch of the carbon balance"),
+              "the bicarbonate branch of the carbon balance"),
     SuiteCase("var_batch", "Variant: batch scheduling", "variant", _batch,
-              "annual output set by batches per year, not by area x productivity"),
+              "annual output set by batches per year, not by volume x productivity"),
     SuiteCase("var_electric_drying", "Variant: electrically dried", "variant", _electric_drying,
               "drying energy moved from the heat account to electricity"),
-    SuiteCase("var_no_drying", "Variant: wet paste (no drying)", "variant", _no_drying),
+    SuiteCase("var_no_drying", "Variant: wet paste (no drying)", "variant", _no_drying,
+              "no thermal drying step"),
     SuiteCase("var_heated_pond", "Variant: seasonally heated pond", "variant", _heated_pond,
-              "the only configuration with cultivation thermal conditioning"),
+              "cultivation heat from natural gas on an open pond"),
     SuiteCase("var_carbon_no_credit", "Variant: no biogenic credit", "variant",
-              _carbon_mode(CarbonAccounting.NO_BIOGENIC_CREDIT)),
+              _carbon_mode(CarbonAccounting.NO_BIOGENIC_CREDIT),
+              "biogenic carbon: no credit"),
     SuiteCase("var_carbon_at_gate", "Variant: at-gate storage credit", "variant",
-              _carbon_mode(CarbonAccounting.TEMPORARY_STORAGE_CREDIT_AT_GATE)),
+              _carbon_mode(CarbonAccounting.TEMPORARY_STORAGE_CREDIT_AT_GATE),
+              "biogenic carbon: credit for all carbon in the biomass at the gate"),
     SuiteCase("var_carbon_custom", "Variant: custom credit fraction", "variant",
-              _carbon_mode(CarbonAccounting.CUSTOM)),
+              _carbon_mode(CarbonAccounting.CUSTOM),
+              "biogenic carbon: credit for a declared fraction"),
 ]
 
 
@@ -189,6 +193,22 @@ def distinct_cases(lib: Library | None = None) -> tuple[list[SuiteCase], dict[st
     return kept, duplicates
 
 
+def carbon_convention(scn: Scenario) -> CarbonAccounting:
+    """The biogenic-carbon convention in force; the master switch off means no credit."""
+    if not scn.lcia.count_biogenic_uptake:
+        return CarbonAccounting.NO_BIOGENIC_CREDIT
+    return scn.lcia.carbon_accounting
+
+
+#: Short names of the biogenic-carbon conventions, as the coverage table prints them.
+CONVENTION_LABELS = {
+    CarbonAccounting.SOURCE_SPECIFIC_CREDIT: "CO2-fed credit",
+    CarbonAccounting.NO_BIOGENIC_CREDIT: "no credit",
+    CarbonAccounting.TEMPORARY_STORAGE_CREDIT_AT_GATE: "at-gate credit",
+    CarbonAccounting.CUSTOM: "declared fraction",
+}
+
+
 def coverage(lib: Library | None = None,
              cases: list[SuiteCase] | None = None) -> dict[str, int]:
     """How many suite members exercise each configuration axis.
@@ -206,8 +226,12 @@ def coverage(lib: Library | None = None,
         "area basis": 0, "volume basis": 0,
         "batch": 0, "continuous": 0,
         "with drying": 0, "without drying": 0,
+        "drying fuel: natural gas": 0, "drying fuel: electricity": 0,
+        "heated cultivation": 0,
         "with extraction": 0, "multi-product allocation": 0,
         "with explicit media/utilities": 0,
+        "waste-derived feed": 0,
+        **{f"biogenic carbon: {label}": 0 for label in CONVENTION_LABELS.values()},
     }
     for case in cases:
         scn = case.scenario(lib)
@@ -222,10 +246,136 @@ def coverage(lib: Library | None = None,
         counts["area basis" if scn.system.basis.value == "area" else "volume basis"] += 1
         counts["batch" if scn.batch_mode else "continuous"] += 1
         counts["with drying" if scn.drying.enabled else "without drying"] += 1
+        if scn.drying.enabled:
+            counts["drying fuel: electricity" if scn.drying.fuel == "electricity"
+                   else "drying fuel: natural gas"] += 1
+        if scn.system.cultivation_heat_mj_per_kg > 0:
+            counts["heated cultivation"] += 1
         if scn.extraction.enabled:
             counts["with extraction"] += 1
         if len(scn.products) > 1:
             counts["multi-product allocation"] += 1
         if scn.materials or scn.utilities:
             counts["with explicit media/utilities"] += 1
+        if scn.waste_feed.enabled:
+            counts["waste-derived feed"] += 1
+        counts[f"biogenic carbon: {CONVENTION_LABELS[carbon_convention(scn)]}"] += 1
     return counts
+
+
+# ---------------------------------------------------------------------
+# One row per scenario (SI Table S-B)
+# ---------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class SuiteRow:
+    """What one distinct scenario is and which model options it exercises."""
+
+    number: int
+    key: str
+    kind: str
+    source: str                   # the study, template, archetype or variant purpose
+    also: tuple[str, ...]         # other suite members that build the same scenario
+    organism: str
+    system: str
+    carbon: str                   # CO2 | NaHCO3 | the organic substrate
+    basis: str                    # area | volume
+    operation: str                # continuous | batch
+    drying: str
+    downstream: str
+    products: int                 # 1 for whole biomass
+    options: tuple[str, ...]
+
+
+def study_label(builder: str, dataset) -> str:
+    """Short citation and scenario label of the study a builder reconstructs.
+
+    Where two records share a builder, the one with an economic endpoint wins.
+    Empty when no record names the builder.
+    """
+    records = sorted((r for r in dataset if r.reconstruction_builder == builder),
+                     key=lambda r: (r.economic_endpoint_type is None, r.study_id))
+    if not records:
+        return ""
+    return f"{records[0].short_citation}, {records[0].scenario_label}"
+
+
+def options(scn: Scenario, lib: Library) -> tuple[str, ...]:
+    """The model options a scenario exercises that :class:`SuiteRow` has no column for."""
+    out = []
+    if scn.system.cultivation_heat_mj_per_kg > 0:
+        out.append("cultivation heat")
+    if len(scn.products) > 1:
+        out.append(f"{scn.extraction.allocation} allocation")
+    if scn.materials:
+        out.append("recipe materials")
+    if scn.utilities:
+        out.append("utility line items")
+    if scn.waste_feed.enabled:
+        out.append(f"waste-derived feed, {scn.waste_feed.convention.value.replace('_', '-')}")
+    if scn.credits_per_year or scn.coproduct_revenue_per_year:
+        out.append("revenue credits")
+    if scn.other_opex_per_year:
+        out.append("other operating cost")
+    convention = carbon_convention(scn)
+    if convention != CarbonAccounting.SOURCE_SPECIFIC_CREDIT:
+        out.append(f"biogenic carbon: {CONVENTION_LABELS[convention]}")
+    eco, ref = scn.economics, lib.economics
+    if ((eco.discount_rate, eco.plant_lifetime, eco.depreciation_years, eco.tax_rate)
+            != (ref.discount_rate, ref.plant_lifetime, ref.depreciation_years, ref.tax_rate)):
+        out.append("source financial assumptions")
+    return tuple(out)
+
+
+def _source(case: SuiteCase, dataset) -> str:
+    if case.kind == "reconstruction":
+        return study_label(case.key.removeprefix("rec_"), dataset) or "no study record"
+    if case.kind == "template":
+        return "shipped template"
+    if case.kind == "archetype":
+        arch = archetypes.get(case.key.removeprefix("arch_"))
+        return ("library-default archetype" if arch.kind == "library_default"
+                else "archetype")
+    return case.note
+
+
+def describe(lib: Library | None = None, dataset=None) -> list[SuiteRow]:
+    """The structurally distinct scenarios, numbered in suite order."""
+    from . import studies
+
+    lib = lib or load_library()
+    dataset = dataset if dataset is not None else studies.default_dataset()
+    cases, duplicates = distinct_cases(lib)
+    rows = []
+    for number, case in enumerate(cases, start=1):
+        scn = case.scenario(lib)
+        system = scn.system
+        if system.mode == TrophicMode.HETEROTROPHIC:
+            carbon = system.substrate_name
+        elif system.carbon_source == CarbonSource.BICARBONATE:
+            carbon = "NaHCO3"
+        else:
+            carbon = "CO2"
+        if not scn.drying.enabled:
+            drying = "none"
+        elif scn.drying.fuel == "electricity":
+            drying = f"{scn.drying.name}, electric"
+        else:
+            drying = scn.drying.name
+        rows.append(SuiteRow(
+            number=number,
+            key=case.key,
+            kind=case.kind,
+            source=_source(case, dataset),
+            also=tuple(duplicates.get(case.key, ())),
+            organism=scn.organism.name,
+            system=system.name,
+            carbon=carbon,
+            basis=system.basis.value,
+            operation="batch" if scn.batch_mode else "continuous",
+            drying=drying,
+            downstream=scn.extraction.name if scn.extraction.enabled else "none",
+            products=max(len(scn.products), 1),
+            options=options(scn, lib),
+        ))
+    return rows

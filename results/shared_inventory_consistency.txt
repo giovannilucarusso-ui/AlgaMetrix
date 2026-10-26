@@ -56,9 +56,17 @@ SCENARIO COVERAGE
   continuous                         25
   with drying                        15
   without drying                     12
+  drying fuel: natural gas           14
+  drying fuel: electricity           1
+  heated cultivation                 3
   with extraction                    5
   multi-product allocation           5
   with explicit media/utilities      5
+  waste-derived feed                 1
+  biogenic carbon: CO2-fed credit    23
+  biogenic carbon: no credit         2
+  biogenic carbon: at-gate credit    1
+  biogenic carbon: declared fraction 1
 
   The counts above are over the 27 STRUCTURALLY DISTINCT
   scenarios. Several suite members build an identical Scenario by a different

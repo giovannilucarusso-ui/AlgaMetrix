@@ -527,8 +527,16 @@ def build(run, outdir: Path, results_dir: Path, root: Path,
         "results describe the same population: 35 members, **27 structurally "
         "distinct**, because several members build an identical `Scenario` by "
         "different routes and are counted once rather than inflating the evidence "
-        "base. The coverage table at the head of S2.2 states what those 27 span.",
+        "base. The scenarios were chosen to cover the configuration options of the "
+        "model, not to sample the industry. Table S-B lists the 27 with their origin, "
+        "organism, cultivation system, carbon source, production basis, operating "
+        "mode, drying, downstream processing and the other options each one "
+        "exercises, and counts how many scenarios exercise each option.",
         "",
+    ]
+    L += _embed("Table S-B. The 27 scenarios of the verification suite",
+                results_dir / "scenario_suite.txt", root, manifest)
+    L += [
         "S2.1 reports two families of check that are not equally strong evidence. The "
         "**construction identities** restate each inventory field as a closed form of "
         "the scenario, written independently of `inventory.py`, and compare the two. "
