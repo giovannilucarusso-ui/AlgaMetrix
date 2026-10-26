@@ -189,7 +189,7 @@ economics:
   indirect_factor: 0.30        # engineering + contingency, as fraction of installed CAPEX
   labor_cost_per_year: 250000  # EUR/yr total labour
   maintenance_frac: 0.04       # per year, as fraction of total CAPEX
-  overhead_frac: 0.20          # general overhead, as fraction of (variable + labour + maintenance)
+  overhead_frac: 0.20          # general overhead, as fraction of (raw materials + utilities + labour)
   discount_rate: 0.08          # for the capital recovery factor
   plant_lifetime: 20.0         # yr
   # Optional capacity scaling, with capacities in kg/yr of dry biomass and the
