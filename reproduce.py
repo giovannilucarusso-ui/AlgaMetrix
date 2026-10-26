@@ -215,6 +215,26 @@ def stage_verification(run: Run) -> None:
     n_identities = sum(len(r.balances) for r in reports)
     n_admissible = sum(len(r.invariants) for r in reports)
 
+    # The checks run before every calculation, over the same scenarios. An error
+    # would stop the run; the warnings are listed so a reader sees what they flag.
+    import textwrap
+
+    from algametrix.inputcheck import check_inputs
+
+    flagged = [(case.key, issue) for case in cases
+               for issue in check_inputs(case.scenario(run.lib))]
+    n_errors = sum(1 for _, issue in flagged if issue.is_error)
+    warnings = [(key, issue) for key, issue in flagged if not issue.is_error]
+    warning_lines = []
+    if warnings:
+        warning_lines = ["Input-check warnings (the scenario still runs)", "-" * 46]
+        for key, issue in warnings:
+            warning_lines.append(f"  {key}  {issue.field}")
+            warning_lines.append(textwrap.fill(issue.message, width=96,
+                                               initial_indent="    ",
+                                               subsequent_indent="    "))
+        warning_lines += ["", ""]
+
     header = report.header(
         "INTERNAL VERIFICATION",
         "construction identities of the inventory, and the physical admissibility "
@@ -227,11 +247,14 @@ def stage_verification(run: Run) -> None:
         "measures round-off and code drift, not conservation)",
         f"admissibility constraints: {n_admissible}  (falsifiable: composition, fractions, "
         "heterotrophic carbon feasibility, product mass, scale invariance)",
+        f"input checks             : {n_errors} errors, {len(warnings)} warnings in "
+        f"{len({key for key, _ in warnings})} scenarios (algametrix.inputcheck, run before "
+        "every calculation)",
         f"overall                  : {'PASS' if ok else 'FAIL'}",
         "",
     ]
     _write(RESULTS / "verification.txt",
-           "\n".join(header) + "\n\n".join(blocks) + "\n")
+           "\n".join(header + warning_lines) + "\n\n".join(blocks) + "\n")
     run.artifacts["verification_reports"] = reports
     run.status["verification"] = "pass" if ok else "fail"
     run.notes.append(

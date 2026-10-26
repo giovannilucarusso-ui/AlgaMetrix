@@ -196,6 +196,10 @@ studies:
     - "Native electricity factor 0.019 kg CO2-eq/kWh (Norwegian hydro): the clean-grid case."
   todos:
     - "Extract cost breakdown for component-wise normalization."
+    - "The composition check added in 1.6 flags the declared carbon, 0.524 kg/kg,
+       as 18% above the 0.446 kg/kg the declared protein, lipid and carbohydrate
+       imply. Confirm where the 0.524 comes from. At 0.446 the production cost
+       does not move and gross GWP falls by 0.9%."
 
 # --- Vazquez-Romero et al. 2022 (Sci. Total Environ.) ------------------------
 # Added in the second revision to widen the matched reconstructable cohort,
@@ -290,6 +294,11 @@ studies:
   todos:
     - "Split the published MEC across cultivation, harvesting and drying so the
        capital is not carried entirely on the cultivation line."
+    - "The composition check added in 1.6 flags the carbon content: 0.52 kg/kg is
+       the library value for Nannochloropsis sp., kept when the composition was
+       replaced by the source's, which implies 0.435 kg/kg. Take the carbon from
+       the source if it reports one. At 0.435 the production cost falls by 1.4%
+       (1 ha) and 1.9% (10 ha); gross GWP by 0.2%."
 
 - study_id: vazquez2022b_tiso_pht
   short_citation: "Vázquez-Romero et al., 2022b"
@@ -423,6 +432,9 @@ studies:
        contingencies remain outside the reconstruction."
   todos:
     - "Split the published MEC across cultivation, harvesting and drying."
+    - "The composition check added in 1.6 flags the carbon content, as for
+       vazquez2022b_nas: 0.52 kg/kg is the library value, the source composition
+       implies 0.435 kg/kg."
 
 - study_id: russo2022_aury
   short_citation: "Russo et al., 2022"

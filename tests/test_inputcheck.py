@@ -95,6 +95,32 @@ def test_elemental_fractions_cannot_exceed_the_biomass(biomass):
     assert "organism.carbon" in fields(errors(biomass))
 
 
+def test_every_library_organism_passes_the_composition_plausibility_check(lib, biomass):
+    for name, org in lib.organisms.items():
+        biomass.organism = copy.deepcopy(org)
+        flagged = [i for i in check_inputs(biomass)
+                   if i.field in ("organism.carbon", "organism.nitrogen")]
+        assert not flagged, (name, format_issues(flagged))
+
+
+def test_carbon_the_composition_cannot_hold_is_a_warning(biomass):
+    org = biomass.organism
+    org.protein, org.lipid, org.carbohydrate, org.ash = 0.20, 0.55, 0.15, 0.10
+    org.carbon = 0.40          # an oil-rich strain declared with a lean strain's carbon
+    hit = [i for i in check_inputs(biomass) if i.field == "organism.carbon"]
+    assert is_admissible(biomass)
+    assert hit and hit[0].severity == WARNING
+    assert "imply" in hit[0].message
+
+
+def test_protein_and_nitrogen_that_disagree_are_a_warning(biomass):
+    biomass.organism.nitrogen = 0.04       # 0.50 protein over 0.04 N
+    issues = check_inputs(biomass)
+    assert is_admissible(biomass)
+    assert any(i.field == "organism.nitrogen" and i.severity == WARNING
+               and "12.5" in i.message for i in issues)
+
+
 def test_carbon_utilization_floor_is_reported_not_hidden(biomass):
     biomass.system.co2_utilization = 0.01
     issues = check_inputs(biomass)

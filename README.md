@@ -362,7 +362,11 @@ than the one you set.
 result, the wizard will not finish, export and analysis are blocked — and an
 import of the engine raises `InadmissibleScenarioError` naming the fields. Inputs
 that are merely unusual — a composition 4% off, a carbon utilisation below the
-balance's floor — are warnings and still run.
+balance's floor — are warnings and still run. So are two plausibility checks
+between the two ways a strain is described: the declared carbon content against
+the carbon its protein, lipid and carbohydrate fractions imply (flagged beyond
+±15%), and the protein-to-nitrogen ratio (flagged outside 3.5–6.5). Both rest on
+typical values, so they warn rather than refuse.
 
 ```python
 from algametrix.inputcheck import check_inputs, is_admissible, format_issues

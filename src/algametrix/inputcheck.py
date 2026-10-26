@@ -40,6 +40,25 @@ WARNING = "warning"
 # Same relative tolerance as the carbon check in verification.verify().
 _CARBON_TOL = 1e-9
 
+# Typical carbon mass fractions of the three macromolecule classes, for the
+# plausibility check between the declared composition and the declared carbon.
+# Carbohydrate is anhydroglucose (C6H10O5, 0.444); lipid is a triglyceride of
+# C16-C18 fatty acids (0.76-0.77; polar lipids are nearer 0.65); protein is the
+# textbook average of about 53% C with 16% N.
+PROTEIN_CARBON = 0.53
+LIPID_CARBON = 0.76
+CARBOHYDRATE_CARBON = 0.44
+# Declared carbon further than this from the implied value is flagged. The
+# spread of the three coefficients above and a 5% closure error on the
+# composition together reach about 15%.
+CARBON_PLAUSIBLE_DEVIATION = 0.15
+# Protein over total nitrogen. Protein over amino-acid nitrogen is about 6.2,
+# and non-protein nitrogen (a quarter of algal nitrogen on average, up to about
+# half) brings whole-biomass ratios down to about 4-5 (Templeton and Laurens
+# 2015, Algal Res. 11:359-367). Outside this band protein and nitrogen probably
+# do not describe the same biomass.
+PROTEIN_TO_NITROGEN = (3.5, 6.5)
+
 
 @dataclass(frozen=True)
 class InputIssue:
@@ -100,6 +119,37 @@ def _composition(scn: Scenario) -> list[InputIssue]:
             "nitrogen fraction is zero, so the culture is modelled as needing no "
             "nitrogen at all.", WARNING,
         ))
+
+    # The two descriptions of the biomass, by macromolecule and by element, are
+    # entered separately and nothing ties them together. These are plausibility
+    # checks, not balances: the coefficients are typical values, so a mismatch
+    # is a warning and the calculation uses the declared numbers.
+    implied = (PROTEIN_CARBON * org.protein + LIPID_CARBON * org.lipid
+               + CARBOHYDRATE_CARBON * org.carbohydrate)
+    if implied > 0 and org.carbon > 0:
+        deviation = org.carbon / implied - 1.0
+        if abs(deviation) > CARBON_PLAUSIBLE_DEVIATION:
+            issues.append(InputIssue(
+                "organism.carbon",
+                f"the declared carbon ({org.carbon:.3f} kg/kg) is {deviation:+.0%} "
+                f"from the {implied:.3f} kg/kg that the protein, lipid and "
+                f"carbohydrate fractions imply (at about {PROTEIN_CARBON}, "
+                f"{LIPID_CARBON} and {CARBOHYDRATE_CARBON} kg C/kg). Check the "
+                f"composition against the elemental analysis; the carbon balance "
+                f"uses the declared value.", WARNING,
+            ))
+    if org.nitrogen > 0 and org.protein > 0:
+        ratio = org.protein / org.nitrogen
+        low, high = PROTEIN_TO_NITROGEN
+        if not low <= ratio <= high:
+            issues.append(InputIssue(
+                "organism.nitrogen",
+                f"protein / nitrogen = {ratio:.1f}. Protein carries about 16% "
+                f"nitrogen, and non-protein nitrogen lowers the ratio for whole "
+                f"biomass to about 4-5; outside {low:g}-{high:g} the protein and "
+                f"nitrogen fractions probably do not describe the same biomass.",
+                WARNING,
+            ))
     return issues
 
 
