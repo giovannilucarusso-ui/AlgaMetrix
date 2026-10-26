@@ -26,6 +26,7 @@ gwp            results/gwp_harmonization.txt
 carbon         results/carbon_accounting.txt
 sobol          results/sobol_validation.txt, sobol_convergence.txt, sensitivity.txt
 uncertainty    results/uncertainty.txt
+plant_size     results/plant_size.txt
 figures        figures/*.pdf and figures/*.png
 figures_jie    figures/jie/*.pdf and figures/jie/*.png
 supplementary  supplementary/SI.md (+ .docx) and supplementary/data/*
@@ -55,6 +56,7 @@ from algametrix.paper import (                                   # noqa: E402
     indices,
     mcuncertainty,
     parameters,
+    plantsize,
     reconstructions,
     report,
     report_verification,
@@ -105,7 +107,7 @@ FIGURES = ROOT / "figures"
 
 STAGES = ("studies", "endpoints", "verification", "consistency", "method", "benchmark",
           "reproductions", "harmonization", "gwp", "carbon", "sobol", "uncertainty",
-          "figures", "figures_jie", "supplementary", "summary")
+          "plant_size", "figures", "figures_jie", "supplementary", "summary")
 
 
 def _write(path: Path, text: str) -> None:
@@ -710,6 +712,14 @@ def stage_uncertainty(run: Run) -> None:
             + "; ".join(f"{k}: {', '.join(v)}" for k, v in bad.items()))
 
 
+def stage_plant_size(run: Run) -> None:
+    """Production cost against plant size, default cost model and literature exponents."""
+    print("[plant_size] heterotrophic archetype from 0.1x to 10x its reference size")
+    ref = plantsize.reference(run.lib)
+    _write(RESULTS / "plant_size.txt", report.plant_size(ref, plantsize.sweep(ref)))
+    run.artifacts["plant_size"] = (ref, plantsize.sweep(ref, plantsize.FIGURE_MULTIPLES))
+
+
 def stage_figures(run: Run) -> None:
     print("[figures] regenerating")
     from algametrix.paper import figures as figmod
@@ -749,6 +759,7 @@ def stage_figures_jie(run: Run) -> None:
         "reproduction_rows": ("reproductions", stage_reproductions),
         "sobol_blocks": ("sobol", stage_sobol),
         "mc_blocks": ("uncertainty", stage_uncertainty),
+        "plant_size": ("plant_size", stage_plant_size),
     }
     for key, (stage_name, fn) in prereq.items():
         if key not in run.artifacts:
@@ -781,6 +792,7 @@ def stage_supplementary(run: Run) -> None:
         "sobol_validation.txt": "sobol",
         "sensitivity.txt": "sobol",
         "uncertainty.txt": "uncertainty",
+        "plant_size.txt": "plant_size",
     }
     stale = sorted({stage for name, stage in required.items()
                     if stage not in run.stages_run and (RESULTS / name).exists()})
@@ -807,7 +819,7 @@ def stage_summary(run: Run) -> None:
     task_stages = ("studies", "endpoints", "verification", "consistency", "method",
                    "benchmark",
                    "reproductions", "harmonization", "gwp", "carbon", "sobol",
-                   "uncertainty")
+                   "uncertainty", "plant_size")
     missing = [st for st in task_stages if st not in run.stages_run]
     if missing:
         print(f"  !! PARTIAL RUN: {', '.join(missing)} did not execute in this "
@@ -877,6 +889,7 @@ STAGE_FUNCS = {
     "carbon": stage_carbon,
     "sobol": stage_sobol,
     "uncertainty": stage_uncertainty,  # includes the group-wise Sobol' decomposition
+    "plant_size": stage_plant_size,
     "figures": stage_figures,
     "figures_jie": stage_figures_jie,
     "supplementary": stage_supplementary,

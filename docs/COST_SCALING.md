@@ -94,4 +94,15 @@ Nothing. The costs in `data/systems.yaml` and `data/parameters.yaml` are
 illustrative and were not taken from a costed plant of known size, so they have
 no reference capacity to declare and stay proportional. A study reconstruction
 or a template that takes its costs from a source at the source's capacity can
-declare that capacity. Every published result of the paper uses the defaults.
+declare that capacity. Every published result of the paper uses the defaults,
+except the plant-size sweep.
+
+## The plant-size sweep
+
+`algametrix.paper.plantsize` runs the heterotrophic archetype from a tenth to
+ten times its size with the defaults and with literature exponents (0.6-0.7 for
+every equipment group, 0.2-0.25 for labour). Its fermentation-section cost was
+calibrated against a SuperPro plant of 150 m³, so that plant is the reference
+for every exponent: cultivation at 150 m³, the other groups and labour at its
+annual output. `python reproduce.py --only plant_size` writes the table to
+`results/plant_size.txt`; the `figures_jie` stage draws it.

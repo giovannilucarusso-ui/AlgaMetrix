@@ -472,7 +472,7 @@ def build(run, outdir: Path, results_dir: Path, root: Path,
         "evidence classes, dependencies, price basis, carbon accounting, exclusions, "
         "failed range check |",
         "| S5 | Global sensitivity: estimator and group-estimator validation, "
-        "convergence, full Sobol' tables |",
+        "convergence, full Sobol' tables; production cost against plant size |",
         "| S6 | Monte-Carlo uncertainty: input distributions and full P10/P50/P90 |",
         "| S7 | LCA implementation cross-checks: sequential vs matrix vs Brightway |",
         "| S8 | Machine-readable dataset, parameter provenance, software map, manifest |",
@@ -691,6 +691,22 @@ def build(run, outdir: Path, results_dir: Path, root: Path,
                      "economic and LCIA parameters, and its rankings are conditional on "
                      "that assignment and are not evidence that one physical driver "
                      "matters more than another.*")
+    L += [
+        "S5.4 is a different kind of analysis: a one-way sweep of plant size for the "
+        "heterotrophic archetype, outside the Sobol' design "
+        "(`python reproduce.py --only plant_size`). It shows how much the capital-cost "
+        "model matters away from the size at which the costs were set. The default "
+        "model, with equipment cost proportional to capacity and labour a fixed annual "
+        "cost, is compared with power laws over the ranges usually quoted for enlarged "
+        "process equipment and for operating labour. Every case is anchored at the "
+        "plant whose capital cost was calibrated, 150 m³, so all of them agree there. "
+        "The SI figure on plant size (`figures/jie/jie_figS_plant_size.pdf`) draws the "
+        "same sweep at 81 sizes.",
+        "",
+    ]
+    L += _embed("S5.4 Production cost against plant size, default cost model and "
+                "literature exponents",
+                results_dir / "plant_size.txt", root, manifest)
 
     # ---- S6 ----------------------------------------------------------
     L += [

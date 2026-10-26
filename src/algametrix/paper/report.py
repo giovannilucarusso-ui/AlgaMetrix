@@ -1014,3 +1014,89 @@ def uncertainty(blocks, convergence_blocks, parameter_metadata, seed: int, n_cho
             lines.append(f"      note  : {md['notes']}")
     lines.append("")
     return "\n".join(lines)
+
+
+# --------------------------------------------------------------------------
+# Production cost against plant size (SI figure on capital-cost scaling)
+# --------------------------------------------------------------------------
+
+def plant_size(ref, curves) -> str:
+    from .plantsize import (CASES, EQUIPMENT_EXPONENTS, EQUIPMENT_SOURCE,
+                            LABOUR_EXPONENTS, LABOUR_SOURCE)
+
+    def band(pair, spec: str) -> str:
+        lo, hi = pair
+        return f"{lo:{spec}}" if lo == hi else f"{lo:{spec}}-{hi:{spec}}"
+
+    def change(pair, base: float) -> str:
+        lo, hi = (v / base - 1.0 for v in pair)
+        return f"{lo:+.1%}" if lo == hi else f"{lo:+.1%} to {hi:+.1%}"
+
+    def item(label: str, text: str) -> list[str]:
+        body = _wrap(text, 64)
+        return [f"  {label:<12}{body[0]}"] + [" " * 14 + s for s in body[1:]]
+
+    n_eq = band(EQUIPMENT_EXPONENTS, "g")
+    n_lab = band(LABOUR_EXPONENTS, "g")
+    lines = header(
+        "PRODUCTION COST AGAINST PLANT SIZE",
+        "heterotrophic archetype from a tenth to ten times its reference size, "
+        "default cost model and literature exponents",
+    )
+    lines += [
+        "REFERENCE PLANT",
+        THIN,
+        f"  archetype           : {ref.label}",
+        f"  provenance          : {ref.provenance}",
+        f"  fermentation volume : {ref.volume_m3:g} m3, fermentation section "
+        f"{ref.cultivation_cost_per_m3:,.0f} EUR/m3",
+        f"  dry biomass         : {ref.output_kg / 1000:.1f} t/yr",
+        f"  total investment    : {ref.investment / 1e6:.2f} M EUR",
+        f"  production cost     : {ref.cost:.2f} EUR/kg",
+    ]
+    lines += ["  " + s for s in _wrap(
+        "The fermentation-section cost was calibrated against the SuperPro case of "
+        "Russo et al. (2022) at this size. Every exponent is anchored here: "
+        "cultivation at the volume above, harvesting, drying and labour at the annual "
+        "output, so every case gives the reference result at the reference size. "
+        "Every other input is the archetype's own, and output is proportional to "
+        "volume.", 76)]
+    lines += ["", "EXPONENTS", THIN]
+    lines += item("default", "equipment 1 (cost proportional to capacity), labour 0 "
+                             "(a fixed annual cost)")
+    lines += item("equipment", f"{n_eq}, every group: {EQUIPMENT_SOURCE}")
+    lines += item("labour", f"{n_lab}: {LABOUR_SOURCE}")
+    lines += ["  " + s for s in _wrap(
+        "No largest unit size is declared, so each group is costed as one unit at "
+        "every size. A range below is the lowest and highest result over the ends of "
+        "the exponent ranges.", 76)]
+
+    default, equipment, both = (curves[c.key] for c in CASES)
+    lines += [
+        "",
+        "RESULTS",
+        THIN,
+        f"  {'volume':>7}  {'output':>7}   {'total investment, M EUR':<26} "
+        f"{'production cost, EUR/kg'}",
+        f"  {'m3':>7}  {'t/yr':>7}   {'default':>7}  {'n ' + n_eq:<16} "
+        f"{'default':>7}  {'n ' + n_eq:<13}  {'n ' + n_eq + ', n_L ' + n_lab}",
+    ]
+    for d, e, b in zip(default, equipment, both):
+        lines.append(
+            f"  {d.volume_m3:7.1f}  {d.output_kg / 1000:7.1f}   "
+            f"{d.investment[0] / 1e6:7.2f}  "
+            f"{band(tuple(v / 1e6 for v in e.investment), '.2f'):<16} "
+            f"{d.cost[0]:7.2f}  {band(e.cost, '.2f'):<13}  {band(b.cost, '.2f')}")
+    lines += [
+        "",
+        "CHANGE IN PRODUCTION COST AGAINST THE DEFAULT",
+        THIN,
+        f"  {'volume':>7}   {'n ' + n_eq + ', labour fixed':<26} "
+        f"{'n ' + n_eq + ', n_L ' + n_lab}",
+        f"  {'m3':>7}",
+    ]
+    for d, e, b in zip(default, equipment, both):
+        lines.append(f"  {d.volume_m3:7.1f}   {change(e.cost, d.cost[0]):<26} "
+                     f"{change(b.cost, d.cost[0])}")
+    lines.append("")
+    return "\n".join(lines)

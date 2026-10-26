@@ -14,6 +14,11 @@ Figure 4  model evaluation: the same physical parameter set driving an economic
           and an environmental output differently, the propagated uncertainty on
           both, and a group-wise Sobol' decomposition of that uncertainty
 
+and one figure for the Supplementary Information:
+
+Figure S  capital and production cost against plant size for the heterotrophic
+          archetype, with the default cost model and with literature exponents
+
 Every panel is drawn from objects produced by ``reproduce.py`` in the same
 process. Nothing is transcribed.
 """
@@ -534,9 +539,99 @@ def figure4_evaluation(sobol_blocks, mc_blocks, group_sobol, mode_key,
 
 
 # ======================================================================
+# SI figure - production cost against plant size
+# ======================================================================
+
+def figure_si_plant_size(ref, curves, outdir: Path) -> list[Path]:
+    """(a) total investment and (b) production cost against fermentation volume.
+
+    The default cost model is drawn as a line and the literature exponents as
+    bands over their ranges. Every curve passes through the reference plant,
+    where the costs were calibrated, so what the figure shows is what the cost
+    model does away from it. Labour does not enter the investment, so panel (a)
+    has one band.
+    """
+    from matplotlib.patches import Patch
+    from matplotlib.ticker import FixedLocator, NullFormatter, ScalarFormatter
+
+    from .plantsize import EQUIPMENT_EXPONENTS, LABOUR_EXPONENTS
+
+    n_eq = "{:g}–{:g}".format(*EQUIPMENT_EXPONENTS)
+    n_lab = "{:g}–{:g}".format(*LABOUR_EXPONENTS)
+    looks = {"default": ("#1a1a1a", None), "equipment": (C_TEA, 0.30),
+             "equipment_labour": (C_FOREGROUND, 0.28)}
+
+    def draw(ax, key, value, scale):
+        x = [p.volume_m3 for p in curves[key]]
+        lo = [getattr(p, value)[0] * scale for p in curves[key]]
+        hi = [getattr(p, value)[1] * scale for p in curves[key]]
+        color, alpha = looks[key]
+        if alpha is None:
+            ax.plot(x, lo, color=color, lw=1.3, zorder=4)
+            return
+        ax.fill_between(x, lo, hi, color=color, alpha=alpha, lw=0, zorder=2)
+        for edge in (lo, hi):
+            ax.plot(x, edge, color=color, lw=0.7, zorder=3)
+
+    def ticks(axis, values):
+        # Plain numbers at chosen positions: a default log axis over two decades
+        # labels in powers of ten and hides the reference size between them.
+        axis.set_major_locator(FixedLocator(values))
+        fmt = ScalarFormatter()
+        fmt.set_scientific(False)
+        axis.set_major_formatter(fmt)
+        axis.set_minor_formatter(NullFormatter())
+
+    t_per_m3 = ref.output_kg / 1000.0 / ref.volume_m3
+    fig, axes = plt.subplots(1, 2, figsize=(7.2, 3.2))
+    panels = (
+        (axes[0], "investment", 1e-6, ("default", "equipment"),
+         "total investment (M EUR)", ref.investment * 1e-6, [1, 2, 5, 10, 20, 50, 100]),
+        (axes[1], "cost", 1.0, ("equipment", "equipment_labour", "default"),
+         "production cost (EUR kg$^{-1}$)", ref.cost, [10, 15, 20, 30, 40, 50]),
+    )
+    for letter, (ax, value, scale, keys, ylabel, at_ref, yticks) in zip("ab", panels):
+        for key in keys:
+            draw(ax, key, value, scale)
+        ax.axvline(ref.volume_m3, color=C_NEUTRAL, ls=":", lw=0.8, zorder=1)
+        ax.plot(ref.volume_m3, at_ref, "o", color="#1a1a1a", ms=3.6, zorder=5)
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+        ticks(ax.xaxis, [v * ref.volume_m3 for v in (0.1, 0.2, 0.5, 1, 2, 5, 10)])
+        ticks(ax.yaxis, yticks)
+        ax.set_xlim(ref.volume_m3 / 10.8, ref.volume_m3 * 10.8)
+        ax.set_xlabel("fermentation volume (m$^3$)")
+        ax.set_ylabel(ylabel)
+        top = ax.secondary_xaxis("top", functions=(lambda v: v * t_per_m3,
+                                                   lambda t: t / t_per_m3))
+        ticks(top.xaxis, [50, 100, 200, 500, 1000, 2000])
+        top.set_xlabel("dry biomass (t yr$^{-1}$)")
+        _panel_label(ax, letter)
+    axes[1].set_ylim(10, 56)
+
+    fig.legend(
+        handles=[
+            Line2D([], [], color="#1a1a1a", lw=1.3,
+                   label="default: equipment $n$ = 1, labour fixed"),
+            Patch(facecolor=C_TEA, alpha=0.30, edgecolor=C_TEA,
+                  label=f"equipment $n$ = {n_eq}, labour fixed"),
+            Line2D([], [], color="#1a1a1a", marker="o", ms=3.6, ls=":", lw=0.8,
+                   label=f"reference plant, {ref.volume_m3:g} m$^3$"),
+            Patch(facecolor=C_FOREGROUND, alpha=0.28, edgecolor=C_FOREGROUND,
+                  label=f"equipment $n$ = {n_eq}, labour $n_L$ = {n_lab}"),
+        ],
+        loc="upper center", bbox_to_anchor=(0.5, 1.0), ncol=2, frameon=False,
+        fontsize=6.8, columnspacing=2.0, handlelength=1.8,
+    )
+    fig.tight_layout(rect=(0, 0, 1, 0.87), w_pad=2.0)
+    return _save(fig, outdir, "jie_figS_plant_size")
+
+
+# ======================================================================
 
 def build_all(run, outdir: Path, results_dir: Path) -> list[Path]:
-    """Draw the four JIE figures from the artifacts a ``reproduce.py`` run holds."""
+    """Draw the four JIE figures and the SI plant-size figure from the artifacts a
+    ``reproduce.py`` run holds."""
     from .parameters import MODE_A_SHARED_FOREGROUND
 
     made: list[Path] = []
@@ -553,4 +648,5 @@ def build_all(run, outdir: Path, results_dir: Path) -> list[Path]:
                                run.artifacts.get("group_sobol"),
                                MODE_A_SHARED_FOREGROUND, run.sobol_validation_passed,
                                outdir)
+    made += figure_si_plant_size(*run.artifacts["plant_size"], outdir)
     return made
