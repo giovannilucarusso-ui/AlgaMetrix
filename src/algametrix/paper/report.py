@@ -1100,3 +1100,136 @@ def plant_size(ref, curves) -> str:
                      f"{change(b.cost, d.cost[0])}")
     lines.append("")
     return "\n".join(lines)
+
+
+# --------------------------------------------------------------------------
+# Tables C and D - cost indicators and break-even price
+# --------------------------------------------------------------------------
+
+def cost_indicators(break_even, multi_product, left_out) -> str:
+    def pct(x: float) -> str:
+        return f"{x * 100:g}%"
+
+    def item(label: str, text: str) -> list[str]:
+        body = _wrap(text, 58)
+        return [f"  {label:<18}{body[0]}"] + [" " * 20 + s for s in body[1:]]
+
+    lines = header(
+        "COST INDICATORS AND BREAK-EVEN PRICE",
+        "production cost, net cost, allocated cost and break-even price "
+        "(Tables C and D of the manuscript)",
+    )
+    lines += ["DEFINITIONS", THIN]
+    lines += item("c_prod", "production cost: annual operating cost, including "
+                            "straight-line depreciation, over annual dry biomass. No "
+                            "revenue is subtracted and no return on capital is added.")
+    lines += item("c_net", "net production cost: operating cost minus co-product "
+                           "revenue and other credits, over annual dry biomass.")
+    lines += item("allocated cost", "operating cost times the product's allocation "
+                                    "share, over the product's annual mass. With "
+                                    "'none' the main product carries all of it and no "
+                                    "revenue is subtracted.")
+    lines += item("p*", "break-even price of the main product: NPV over the plant life "
+                        "is zero after tax, with working capital, start-up cost and "
+                        "year-by-year depreciation, and co-product prices held fixed.")
+    lines += item("simplified gap", "C_DFC [CRF(i, n) - 1/n_dep] / (m c_prod): the "
+                                    "gap p*/c_prod - 1 that remains when tax, working "
+                                    "capital and start-up cost are left out.")
+    lines += ["  " + s for s in _wrap(
+        "Every value is in the currency and price year of the price set its scenario "
+        "is run with (column 'basis'). Rows on different bases are not compared with "
+        "each other.", 76)]
+
+    # ---- Table D -------------------------------------------------------
+    marks = {}
+    for row in break_even:
+        if row.same_as:
+            marks[row.key] = f"({chr(ord('a') + len(marks))})"
+    w = max(len(r.label) + len(marks.get(r.key, "")) + 1 for r in break_even)
+    lines += [
+        "",
+        "TABLE D. PRODUCTION COST AND BREAK-EVEN PRICE, SINGLE-PRODUCT SCENARIOS",
+        THIN,
+        "  per kg dry biomass",
+        "",
+        f"    {'scenario':<{w}}  {'basis':<18} {'c_prod':>8} {'p*':>8} "
+        f"{'p*/c_prod-1':>11} {'simplified':>10} {'i':>6} {'n':>4} {'n_dep':>5} "
+        f"{'tax':>6} {'D/AOC':>6}",
+    ]
+    for group, title in (("archetype", "archetypes"),
+                         ("reconstruction", "study reconstructions")):
+        lines.append(f"  {title}")
+        for r in (r for r in break_even if r.group == group):
+            label = f"{r.label} {marks[r.key]}" if r.key in marks else r.label
+            lines.append(
+                f"    {label:<{w}}  {r.basis:<18} {r.production_cost:8.2f} "
+                f"{r.break_even:8.2f} {r.gap:+11.1%} {r.simplified_gap:+10.1%} "
+                f"{pct(r.discount_rate):>6} {r.lifetime:4g} {r.depreciation_years:5g} "
+                f"{pct(r.tax_rate):>6} {r.depreciation_share:6.2f}")
+    lines.append("")
+    for r in break_even:
+        if r.key in marks:
+            lines.append(f"  {marks[r.key]} Identical to the reconstruction '{r.same_as}'.")
+    lines += ["  " + s for s in _wrap(
+        "i discount rate, n plant life in years, n_dep depreciation period in years, "
+        "D/AOC depreciation as a share of the annual operating cost. Left out: "
+        f"{', '.join(left_out)}, built for a GWP comparison only; their prices are "
+        "library or template defaults and their cost describes no study. The "
+        "multi-product scenarios are in Table C.", 76)]
+
+    # ---- Table C -------------------------------------------------------
+    wk = max(len(r.key) for r in multi_product)
+    wp = max(len(r.main_product) for r in multi_product)
+    lines += [
+        "",
+        "TABLE C. COST INDICATORS AND ALLOCATED GWP, MULTI-PRODUCT SCENARIOS",
+        THIN,
+    ]
+    lines += _wrap("C.1 Cost indicators. c_prod and c_net per kg dry biomass; the "
+                   "allocated cost, p* and the price per kg main product.", 78)
+    lines += [
+        "",
+        f"  {'scenario':<{wk}}  {'basis':<18} {'main product':<{wp}} {'price':>8} "
+        f"{'yield':>6} {'c_prod':>7} {'c_net':>7}   "
+        f"{'allocated cost per kg main product':<34} {'p*':>9}",
+        f"  {'':<{wk}}  {'':<18} {'':<{wp}} {'':>8} {'kg/kg':>6} {'':>7} {'':>7}   "
+        f"{'economic':>10} {'mass':>10} {'none':>10}   {'':>9}",
+    ]
+    for r in multi_product:
+        a = r.allocated
+        lines.append(
+            f"  {r.key:<{wk}}  {r.basis:<18} {r.main_product:<{wp}} {r.main_price:8.2f} "
+            f"{r.main_yield:6.3f} {r.production_cost:7.3f} {r.net_production_cost:7.3f}   "
+            f"{a['economic'].cost:10.3f} {a['mass'].cost:10.3f} {a['none'].cost:10.3f}   "
+            f"{r.break_even:9.3f}")
+    lines += [
+        "",
+    ]
+    lines += _wrap("C.2 GWP, kg CO2-eq. Per kg dry biomass, then the gross value per kg "
+                   "main product under economic and mass allocation.", 78)
+    lines += [
+        "",
+        f"  {'scenario':<{wk}}  {'per kg biomass':>17}   {'share of the burden':>19}   "
+        f"{'gross, per kg main product':>32}",
+        f"  {'':<{wk}}  {'gross':>8} {'net':>8}   {'economic':>9} {'mass':>9}   "
+        f"{'economic':>10} {'mass':>10} {'ratio':>10}",
+    ]
+    for r in multi_product:
+        a = r.allocated
+        lines.append(
+            f"  {r.key:<{wk}}  {r.gwp_gross:8.3f} {r.gwp_net:8.3f}   "
+            f"{a['economic'].share:9.4f} {a['mass'].share:9.4f}   "
+            f"{a['economic'].gwp_gross:10.3f} {a['mass'].gwp_gross:10.3f} "
+            f"{r.gwp_ratio:10.2f}")
+    negative = [r.key for r in multi_product if r.gwp_net < 0]
+    lines.append("")
+    lines += ["  " + s for s in _wrap(
+        "The ratio is the economic share over the mass share, so it is the same for "
+        "the gross and the net value. The gross value is compared because the net "
+        f"value per kg biomass is negative in {len(negative)} of the "
+        f"{len(multi_product)} scenarios after the biogenic credit"
+        + (f" ({', '.join(negative)})" if negative else "")
+        + ". The economic share depends on the product prices, so under economic "
+        "allocation the GWP per kg of product moves with them.", 76)]
+    lines.append("")
+    return "\n".join(line.rstrip() for line in lines)

@@ -472,7 +472,8 @@ def build(run, outdir: Path, results_dir: Path, root: Path,
         "evidence classes, dependencies, price basis, carbon accounting, exclusions, "
         "failed range check |",
         "| S5 | Global sensitivity: estimator and group-estimator validation, "
-        "convergence, full Sobol' tables; production cost against plant size |",
+        "convergence, full Sobol' tables; production cost against plant size; cost "
+        "indicators and break-even price (Tables C and D) |",
         "| S6 | Monte-Carlo uncertainty: input distributions and full P10/P50/P90 |",
         "| S7 | LCA implementation cross-checks: sequential vs matrix vs Brightway |",
         "| S8 | Machine-readable dataset, parameter provenance, software map, manifest |",
@@ -717,6 +718,24 @@ def build(run, outdir: Path, results_dir: Path, root: Path,
     L += _embed("S5.4 Production cost against plant size, default cost model and "
                 "literature exponents",
                 results_dir / "plant_size.txt", root, manifest)
+    L += [
+        "S5.5 holds the values behind Tables C and D of the manuscript "
+        "(`python reproduce.py --only cost_indicators`), also outside the Sobol' "
+        "design. Table D sets the production cost of each archetype and of each "
+        "single-product reconstruction next to its break-even price, under the "
+        "financial assumptions the scenario carries. Its 'simplified' column is the "
+        "part of the gap that the capital recovery factor accounts for on its own, "
+        "before tax, working capital and start-up cost. Table C gives, for the "
+        "multi-product scenarios of the suite, the production cost and the net "
+        "production cost per kg of biomass, the allocated cost per kg of main product "
+        "under each allocation basis, the break-even price of the main product with "
+        "the co-product prices held fixed, and the gross GWP per kg of main product "
+        "under economic and under mass allocation.",
+        "",
+    ]
+    L += _embed("S5.5 Production cost, allocated cost and break-even price "
+                "(Tables C and D)",
+                results_dir / "cost_indicators.txt", root, manifest)
 
     # ---- S6 ----------------------------------------------------------
     L += [

@@ -14,23 +14,24 @@ are diagnostics and not results - the files are otherwise byte-identical.
 
 Stage outputs
 -------------
-studies        results/study_selection_audit.txt
-endpoints      results/economic_endpoint_audit.txt
-verification   results/verification.txt
-consistency    results/shared_inventory_consistency.txt, scenario_suite.txt
-method         results/lcia_method_statement.txt
-benchmark      results/lca_implementation_benchmark.txt
-reproductions  results/validation.txt
-harmonization  results/harmonization.txt
-gwp            results/gwp_harmonization.txt
-carbon         results/carbon_accounting.txt
-sobol          results/sobol_validation.txt, sobol_convergence.txt, sensitivity.txt
-uncertainty    results/uncertainty.txt
-plant_size     results/plant_size.txt
-figures        figures/*.pdf and figures/*.png
-figures_jie    figures/jie/*.pdf and figures/jie/*.png
-supplementary  supplementary/SI.md (+ .docx) and supplementary/data/*
-summary        results/revision_summary.json
+studies         results/study_selection_audit.txt
+endpoints       results/economic_endpoint_audit.txt
+verification    results/verification.txt
+consistency     results/shared_inventory_consistency.txt, scenario_suite.txt
+method          results/lcia_method_statement.txt
+benchmark       results/lca_implementation_benchmark.txt
+reproductions   results/validation.txt
+harmonization   results/harmonization.txt
+gwp             results/gwp_harmonization.txt
+carbon          results/carbon_accounting.txt
+sobol           results/sobol_validation.txt, sobol_convergence.txt, sensitivity.txt
+uncertainty     results/uncertainty.txt
+plant_size      results/plant_size.txt
+cost_indicators results/cost_indicators.txt
+figures         figures/*.pdf and figures/*.png
+figures_jie     figures/jie/*.pdf and figures/jie/*.png
+supplementary   supplementary/SI.md (+ .docx) and supplementary/data/*
+summary         results/revision_summary.json
 """
 
 from __future__ import annotations
@@ -50,6 +51,7 @@ from algametrix.verification import format_report, verify        # noqa: E402
 from algametrix.paper import (                                   # noqa: E402
     archetypes,
     carbon,
+    costindicators,
     endpoints,
     gwp,
     harmonization,
@@ -107,7 +109,8 @@ FIGURES = ROOT / "figures"
 
 STAGES = ("studies", "endpoints", "verification", "consistency", "method", "benchmark",
           "reproductions", "harmonization", "gwp", "carbon", "sobol", "uncertainty",
-          "plant_size", "figures", "figures_jie", "supplementary", "summary")
+          "plant_size", "cost_indicators", "figures", "figures_jie", "supplementary",
+          "summary")
 
 
 def _write(path: Path, text: str) -> None:
@@ -762,6 +765,20 @@ def stage_plant_size(run: Run) -> None:
     run.artifacts["plant_size"] = (ref, plantsize.sweep(ref, plantsize.FIGURE_MULTIPLES))
 
 
+def stage_cost_indicators(run: Run) -> None:
+    """Tables C and D: production, net and allocated cost against break-even price."""
+    print("[cost_indicators] production cost, allocated cost and break-even price")
+    break_even = costindicators.break_even_rows(run.lib, run.dataset)
+    multi = costindicators.multi_product_rows(run.lib)
+    _write(RESULTS / "cost_indicators.txt",
+           report.cost_indicators(break_even, multi, costindicators.left_out_of_break_even()))
+    archetype_gaps = ", ".join(f"{r.gap:+.1%}" for r in break_even if r.group == "archetype")
+    ratios = ", ".join(f"{r.key} {r.gwp_ratio:.2f}" for r in multi)
+    run.notes.append(
+        f"Break-even price over production cost, archetypes: {archetype_gaps}. Gross GWP "
+        f"per kg main product, economic over mass allocation: {ratios}.")
+
+
 def stage_figures(run: Run) -> None:
     print("[figures] regenerating")
     from algametrix.paper import figures as figmod
@@ -833,6 +850,7 @@ def stage_supplementary(run: Run) -> None:
         "sensitivity.txt": "sobol",
         "uncertainty.txt": "uncertainty",
         "plant_size.txt": "plant_size",
+        "cost_indicators.txt": "cost_indicators",
         "scenario_suite.txt": "consistency",
     }
     stale = sorted({stage for name, stage in required.items()
@@ -860,7 +878,7 @@ def stage_summary(run: Run) -> None:
     task_stages = ("studies", "endpoints", "verification", "consistency", "method",
                    "benchmark",
                    "reproductions", "harmonization", "gwp", "carbon", "sobol",
-                   "uncertainty", "plant_size")
+                   "uncertainty", "plant_size", "cost_indicators")
     missing = [st for st in task_stages if st not in run.stages_run]
     if missing:
         print(f"  !! PARTIAL RUN: {', '.join(missing)} did not execute in this "
@@ -931,6 +949,7 @@ STAGE_FUNCS = {
     "sobol": stage_sobol,
     "uncertainty": stage_uncertainty,  # includes the group-wise Sobol' decomposition
     "plant_size": stage_plant_size,
+    "cost_indicators": stage_cost_indicators,
     "figures": stage_figures,
     "figures_jie": stage_figures_jie,
     "supplementary": stage_supplementary,
