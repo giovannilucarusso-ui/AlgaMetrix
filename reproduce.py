@@ -24,6 +24,7 @@ reproductions   results/validation.txt
 harmonization   results/harmonization.txt
 gwp             results/gwp_harmonization.txt
 carbon          results/carbon_accounting.txt
+input_origin    results/input_origin.txt
 sobol           results/sobol_validation.txt, sobol_convergence.txt, sensitivity.txt
 uncertainty     results/uncertainty.txt
 plant_size      results/plant_size.txt
@@ -56,6 +57,7 @@ from algametrix.paper import (                                   # noqa: E402
     gwp,
     harmonization,
     indices,
+    inputorigin,
     mcuncertainty,
     parameters,
     plantsize,
@@ -108,9 +110,9 @@ RESULTS = ROOT / "results"
 FIGURES = ROOT / "figures"
 
 STAGES = ("studies", "endpoints", "verification", "consistency", "method", "benchmark",
-          "reproductions", "harmonization", "gwp", "carbon", "sobol", "uncertainty",
-          "plant_size", "cost_indicators", "figures", "figures_jie", "supplementary",
-          "summary")
+          "reproductions", "harmonization", "gwp", "carbon", "input_origin", "sobol",
+          "uncertainty", "plant_size", "cost_indicators", "figures", "figures_jie",
+          "supplementary", "summary")
 
 
 def _write(path: Path, text: str) -> None:
@@ -539,6 +541,20 @@ def stage_carbon(run: Run) -> None:
         )
 
 
+def stage_input_origin(run: Run) -> None:
+    """SI S4.6: where the inputs and cost coefficients of each reconstruction come from."""
+    print("[input_origin] origin of the inputs of every compared reconstruction")
+    compared = inputorigin.comparisons(run.lib, run.dataset)
+    _write(RESULTS / "input_origin.txt",
+           report.input_origin(inputorigin.cost_coefficients(run.lib, run.dataset),
+                               compared, inputorigin.gwp_only(run.dataset),
+                               inputorigin.CLASSES))
+    totals = {k: sum(c.count(k) for c in compared) for k in inputorigin.CLASSES}
+    run.notes.append(
+        f"Inputs of the {len(compared)} compared results, by origin: "
+        + ", ".join(f"{k} {v}" for k, v in totals.items()) + ".")
+
+
 def stage_sobol(run: Run) -> None:
     print("[sobol] implementation validation")
     n_bench = 1024 if run.quick else SOBOL_BENCHMARK_N
@@ -846,6 +862,7 @@ def stage_supplementary(run: Run) -> None:
         "lca_implementation_benchmark.txt": "benchmark",
         "validation.txt": "reproductions",
         "carbon_accounting.txt": "carbon",
+        "input_origin.txt": "input_origin",
         "sobol_validation.txt": "sobol",
         "sensitivity.txt": "sobol",
         "uncertainty.txt": "uncertainty",
@@ -877,8 +894,8 @@ def stage_summary(run: Run) -> None:
     tests_passed, tests_failed = _run_tests()
     task_stages = ("studies", "endpoints", "verification", "consistency", "method",
                    "benchmark",
-                   "reproductions", "harmonization", "gwp", "carbon", "sobol",
-                   "uncertainty", "plant_size", "cost_indicators")
+                   "reproductions", "harmonization", "gwp", "carbon", "input_origin",
+                   "sobol", "uncertainty", "plant_size", "cost_indicators")
     missing = [st for st in task_stages if st not in run.stages_run]
     if missing:
         print(f"  !! PARTIAL RUN: {', '.join(missing)} did not execute in this "
@@ -946,6 +963,7 @@ STAGE_FUNCS = {
     "harmonization": stage_harmonization,
     "gwp": stage_gwp,
     "carbon": stage_carbon,
+    "input_origin": stage_input_origin,
     "sobol": stage_sobol,
     "uncertainty": stage_uncertainty,  # includes the group-wise Sobol' decomposition
     "plant_size": stage_plant_size,

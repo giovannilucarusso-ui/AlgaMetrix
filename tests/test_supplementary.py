@@ -32,6 +32,7 @@ REQUIRED = [
     "carbon_accounting.txt", "sobol_validation.txt", "sobol_convergence.txt",
     "sensitivity.txt", "uncertainty.txt", "lca_implementation_benchmark.txt",
     "brightway_crosscheck.txt", "plant_size.txt", "cost_indicators.txt",
+    "input_origin.txt",
 ]
 
 

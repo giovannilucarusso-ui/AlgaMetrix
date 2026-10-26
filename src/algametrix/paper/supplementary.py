@@ -470,7 +470,7 @@ def build(run, outdir: Path, results_dir: Path, root: Path,
         "| S3 | Controlled duplicated-foreground counter-examples, both archetypes |",
         "| S4 | Retrospective literature reconstruction and external benchmarking: "
         "evidence classes, dependencies, price basis, carbon accounting, exclusions, "
-        "failed range check |",
+        "failed range check, origin of the inputs and cost coefficients |",
         "| S5 | Global sensitivity: estimator and group-estimator validation, "
         "convergence, full Sobol' tables; production cost against plant size; cost "
         "indicators and break-even price (Tables C and D) |",
@@ -613,7 +613,7 @@ def build(run, outdir: Path, results_dir: Path, root: Path,
         "## S4 Retrospective literature reconstruction and external benchmarking",
         "",
         "```bash",
-        "python reproduce.py --only reproductions --only carbon",
+        "python reproduce.py --only reproductions --only carbon --only input_origin",
         "```",
         "",
         "This is the only section of this document that compares AlgaMetrix against a "
@@ -661,6 +661,22 @@ def build(run, outdir: Path, results_dir: Path, root: Path,
                      "manuscript as a point prediction: it is a plausibility check, it "
                      "fell outside its published envelope, and it was retained rather "
                      "than removed.*")
+    L += [
+        "S4.6 says, for every reconstruction compared with a published value, where "
+        "its inputs come from (`python reproduce.py --only input_origin`). It lists the "
+        "cost coefficients of each reconstruction whose cost is compared and the plant "
+        "they refer to, counts the inputs each compared result depends on by origin "
+        "(from the source, library defaults, fitted to a published result, or assumed), "
+        "and names the five inputs each result is most sensitive to. The "
+        "`spirulina_padi` builder reconstructs Padi et al. (2023); its GWP is also "
+        "compared with that of Ahmed et al. (2026), and its inputs are classed against "
+        "Padi et al. in both rows. The locations given for Tredici et al. (2016) and "
+        "the two Vázquez-Romero et al. (2022) studies were checked against the source "
+        "texts for this revision.",
+        "",
+    ]
+    L += _embed("S4.6 Where the inputs of each reconstruction come from",
+                results_dir / "input_origin.txt", root, manifest)
 
     # ---- S5 ----------------------------------------------------------
     L += [

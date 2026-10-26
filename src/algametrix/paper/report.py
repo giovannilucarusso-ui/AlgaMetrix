@@ -1233,3 +1233,136 @@ def cost_indicators(break_even, multi_product, left_out) -> str:
         "allocation the GWP per kg of product moves with them.", 76)]
     lines.append("")
     return "\n".join(line.rstrip() for line in lines)
+
+
+# --------------------------------------------------------------------------
+# SI S4.6 - where the inputs of the reconstructions come from
+# --------------------------------------------------------------------------
+
+def _number(x: float) -> str:
+    if x == 0:
+        return "0"
+    if abs(x) >= 1e4:
+        return f"{x:,.0f}"
+    return f"{x:.4g}"
+
+
+def _with_note(left: str, note: str, width: int = 90) -> list[str]:
+    """``left`` followed by ``note``, the note wrapped under itself."""
+    body = _wrap(note, width)
+    return [left + body[0]] + [" " * len(left) + s for s in body[1:]]
+
+
+def input_origin(coefficients, comparisons, gwp_only, classes) -> str:
+    def item(label: str, text: str) -> list[str]:
+        body = _wrap(text, 64)
+        return [f"  {label:<12}{body[0]}"] + [" " * 14 + s for s in body[1:]]
+
+    lines = header(
+        "WHERE THE INPUTS OF THE STUDY RECONSTRUCTIONS COME FROM (SI S4.6)",
+        "cost coefficients, inputs by origin, and the inputs each compared result "
+        "depends on most",
+    )
+    lines += ["  " + s for s in _wrap(
+        "An input is a numeric field of a reconstruction's scenario. A compared result "
+        "depends on an input when a 1% change in the input moves the result. The "
+        "elasticity d ln(result) / d ln(input) is estimated from that change; the input "
+        "is raised, or lowered where a rise is not admissible, such as a recovery of 1. "
+        "Near a recovery of 1 the lowered value multiplies the loss several times over, "
+        "so a solvent recovery can carry a large elasticity where the solvent itself is "
+        "a small cost. "
+        "Inputs at zero have no elasticity and are not counted. Each input is put in one "
+        "of four classes, against the publication its builder reconstructs:", 76)]
+    lines.append("")
+    lines += item("source", "the source's own figure, or one that follows from its "
+                            "figures by a stated conversion.")
+    lines += item("library", "a default shipped with AlgaMetrix. A value from a library "
+                             "entry that was itself calibrated on the same source is "
+                             "counted as fitted.")
+    lines += item("fitted", "set so that the scenario reproduces a published result of "
+                            "the source, or taken from one, such as a published total "
+                            "operating cost. Part of the compared value is then on both "
+                            "sides of the comparison.")
+    lines += item("assumed", "set by the reconstruction with no location in the source "
+                             "recorded for it, including values taken from other "
+                             "publications or databases.")
+
+    # ---- S4.6.1 -----------------------------------------------------------
+    lines += ["", "S4.6.1 COST COEFFICIENTS AND THE PLANT THEY REFER TO", THIN]
+    lines += ["  " + s for s in _wrap(
+        "Each reconstruction is run at the capacity of the plant its source costs, "
+        "except the two SuperPro report cases: the algal-oil plant makes 3% more oil "
+        "than the report's and the omega-3 plant has 11% more fermenter volume. The "
+        "source and fitted cost coefficients are therefore used at, or close to, the "
+        "size they were derived for, where the proportional cost model and a power law "
+        "give about the same cost; 11% above the reference size, a six-tenths power law "
+        "gives 4% less capital. Library coefficients were not derived from a costed "
+        "plant of known size and have no reference capacity.", 76)]
+    for block in coefficients:
+        lines += ["", f"  {block.source} ({block.builder}), {block.basis}",
+                  f"    source plant   {block.plant}",
+                  f"    run at         {block.run_at}"]
+        for c in block.coefficients:
+            left = f"    {c.item:<22} {_number(c.value):>10} {c.unit:<10} {c.origin:<8} "
+            lines += _with_note(left, c.note)
+    lines += [""]
+    lines += ["  " + s for s in _wrap(
+        f"Compared on GWP only, so their cost coefficients enter no comparison: "
+        f"{', '.join(gwp_only)}.", 76)]
+
+    # ---- S4.6.2 -----------------------------------------------------------
+    lines += ["", "S4.6.2 INPUTS EACH COMPARED RESULT DEPENDS ON, BY ORIGIN", THIN]
+    ws = max(len(c.study) for c in comparisons)
+    wr = max(len(c.result) for c in comparisons)
+    wb = max(len(c.builder) for c in comparisons)
+    head = (f"  {'study':<{ws}}  {'result':<{wr}}  {'builder':<{wb}}  {'n':>3}  "
+            + "  ".join(f"{k:>7}" for k in classes))
+    lines += ["", head]
+    order = list(dict.fromkeys(c.evidence_class for c in comparisons))
+    for cls in order:
+        group = [c for c in comparisons if c.evidence_class == cls]
+        lines.append(f"  {cls.replace('_', ' ')}")
+        for c in group:
+            lines.append(
+                f"  {c.study:<{ws}}  {c.result:<{wr}}  {c.builder:<{wb}}  "
+                f"{len(c.inputs):>3}  " + "  ".join(f"{c.count(k):>7}" for k in classes))
+        total = sum(len(c.inputs) for c in group)
+        label = f"all {len(group)}" if len(group) > 1 else "total"
+        lines.append(
+            f"  {'':<{ws}}  {label:<{wr}}  {'':<{wb}}  {total:>3}  "
+            + "  ".join(f"{sum(c.count(k) for c in group):>7}" for k in classes))
+
+    # ---- S4.6.3 -----------------------------------------------------------
+    lines += ["", "S4.6.3 THE FIVE INPUTS EACH COMPARED RESULT IS MOST SENSITIVE TO", THIN]
+    wl = max(len(i.label) for c in comparisons for i in c.drivers())
+    for c in comparisons:
+        lines += ["", f"  {c.study}, {c.result} ({c.builder}, reconstructs {c.reconstructs})",
+                  f"    {'input':<{wl}}  {'value':>10}  {'elasticity':>10}  origin"]
+        for i in c.drivers():
+            lines.append(f"    {i.label:<{wl}}  {_number(i.value):>10}  "
+                         f"{i.elasticity:>+10.3f}  {i.origin}")
+
+    # ---- S4.6.4 -----------------------------------------------------------
+    lines += ["", "S4.6.4 FITTED AND ASSUMED INPUTS", THIN]
+    lines += ["  " + s for s in _wrap(
+        "Every fitted or assumed input that a compared result depends on, with where "
+        "its value comes from, once per builder.", 76)]
+    builders = list(dict.fromkeys(c.builder for c in comparisons))
+    for builder in builders:
+        seen: dict[str, object] = {}
+        for c in comparisons:
+            if c.builder != builder:
+                continue
+            for i in c.inputs:
+                if i.origin in ("fitted", "assumed") and i.path not in seen:
+                    seen[i.path] = i
+        if not seen:
+            continue
+        reconstructs = next(c.reconstructs for c in comparisons if c.builder == builder)
+        lines += ["", f"  {builder} ({reconstructs})"]
+        wi = max(len(i.label) for i in seen.values())
+        for i in sorted(seen.values(), key=lambda i: (i.origin, i.path)):
+            left = f"    {i.label:<{wi}}  {_number(i.value):>10}  {i.origin:<8} "
+            lines += _with_note(left, i.note)
+    lines.append("")
+    return "\n".join(line.rstrip() for line in lines)
