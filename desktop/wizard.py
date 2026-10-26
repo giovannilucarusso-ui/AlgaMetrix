@@ -26,6 +26,8 @@ from algametrix.inputcheck import check_inputs, format_issues
 from algametrix.library import Library
 from algametrix.models import Basis, Scenario
 from algametrix.products import main_product
+from algametrix.regions import describe as describe_region
+from algametrix.regions import load_regions
 from algametrix.templates import (
     TEMPLATES,
     apply_goal,
@@ -35,22 +37,6 @@ from algametrix.templates import (
 )
 
 from desktop.i18n import tr
-
-# region -> (electricity price EUR/kWh, grid GWP kg CO2-eq/kWh). Indicative values.
-REGION_ELEC = {
-    "Europe (EU average)": (0.15, 0.35),
-    "Italy": (0.18, 0.32),
-    "Spain": (0.14, 0.19),
-    "France": (0.13, 0.06),
-    "Germany": (0.20, 0.38),
-    "United Kingdom": (0.17, 0.21),
-    "United States": (0.10, 0.40),
-    "China": (0.09, 0.55),
-    "India": (0.10, 0.63),
-    "Low-carbon grid (Nordics)": (0.12, 0.03),
-    "Global average": (0.12, 0.45),
-    "Custom / keep current": (None, None),
-}
 
 
 def _default_scenario(lib: Library) -> Scenario:
@@ -454,8 +440,23 @@ class ContextPage(QWizardPage):
         self.setTitle(tr("Economic & environmental context"))
         self.setSubTitle(tr("Regional energy, finance and selling price. Defaults are fine to start."))
         f = QFormLayout(self)
-        self.cmb_region = QComboBox(); self.cmb_region.addItems(list(REGION_ELEC))
+        # A region fills the two electricity inputs from data/regions.yaml, where
+        # each value has a source. The first entry keeps the scenario's own
+        # values, so a template is not overwritten unless the user asks.
+        regional = load_regions()
+        self.regions = list(regional.regions) if regional else []
+        self.cmb_region = QComboBox()
+        self.cmb_region.addItem(tr("Keep the scenario's values"))
+        self.cmb_region.addItems([r.name for r in self.regions])
         f.addRow(tr("Region (electricity)"), self.cmb_region)
+        self.spn_elec_price = QDoubleSpinBox(); self.spn_elec_price.setRange(0, 5); self.spn_elec_price.setSingleStep(0.01); self.spn_elec_price.setDecimals(4)
+        self.spn_elec_gwp = QDoubleSpinBox(); self.spn_elec_gwp.setRange(0, 5); self.spn_elec_gwp.setSingleStep(0.01); self.spn_elec_gwp.setDecimals(4)
+        f.addRow(tr("Electricity price (€/kWh)"), self.spn_elec_price)
+        f.addRow(tr("Grid emission factor (kg CO₂-eq/kWh)"), self.spn_elec_gwp)
+        self.lbl_region = QLabel(); self.lbl_region.setWordWrap(True)
+        f.addRow("", self.lbl_region)
+        self._shown: tuple[float, float] = (0.0, 0.0)
+        self.cmb_region.currentIndexChanged.connect(self._region_changed)
         self.spn_disc = QDoubleSpinBox(); self.spn_disc.setRange(0, 0.25); self.spn_disc.setSingleStep(0.01); self.spn_disc.setDecimals(3)
         self.spn_life = QDoubleSpinBox(); self.spn_life.setRange(1, 40); self.spn_life.setDecimals(0)
         self.spn_price = QDoubleSpinBox(); self.spn_price.setRange(0, 100000); self.spn_price.setDecimals(2)
@@ -465,17 +466,40 @@ class ContextPage(QWizardPage):
 
     def initializePage(self):
         scn = self.wiz.scenario
+        self.cmb_region.blockSignals(True)
+        self.cmb_region.setCurrentIndex(0)
+        self.cmb_region.blockSignals(False)
+        self._region_changed(0)
         self.spn_disc.setValue(scn.economics.discount_rate)
         self.spn_life.setValue(scn.economics.plant_lifetime)
         mp = main_product(scn)
         self.spn_price.setValue(mp.price if mp else scn.product_price)
 
+    def _region_changed(self, index: int) -> None:
+        scn = self.wiz.scenario
+        price, gwp = scn.economics.electricity_price, scn.lcia.elec_gwp
+        if index <= 0:
+            text = tr("The scenario's own values. Edit them here or pick a region.")
+        else:
+            region = self.regions[index - 1]
+            gwp = region.grid.value
+            if region.price is not None:
+                price = region.price.value
+            text = describe_region(region)
+        self.spn_elec_price.setValue(price)
+        self.spn_elec_gwp.setValue(gwp)
+        self.lbl_region.setText(text)
+        self._shown = (self.spn_elec_price.value(), self.spn_elec_gwp.value())
+
     def validatePage(self):
         scn = self.wiz.scenario
-        price, gwp = REGION_ELEC[self.cmb_region.currentText()]
-        if price is not None:
-            scn.economics.electricity_price = price
-            scn.lcia.elec_gwp = gwp
+        shown = (self.spn_elec_price.value(), self.spn_elec_gwp.value())
+        # The spin boxes round to four decimals; write them back only when a
+        # region was picked or the user typed a value, so the scenario's own
+        # numbers pass through untouched otherwise.
+        if self.cmb_region.currentIndex() > 0 or shown != self._shown:
+            scn.economics.electricity_price = shown[0]
+            scn.lcia.elec_gwp = shown[1]
         scn.economics.discount_rate = self.spn_disc.value()
         scn.economics.plant_lifetime = self.spn_life.value()
         mp = main_product(scn)

@@ -194,6 +194,53 @@ def test_finish_is_allowed_for_an_admissible_case(wizard, lib):
     assert "Production cost" in review.lbl.text()
 
 
+def to_context(wiz, template):
+    """Start from a template and walk to the context page."""
+    start = page(wiz, START)
+    start.rb_example.setChecked(True)
+    start.cmb.setCurrentText(template)
+    assert start.validatePage()
+    for i in (GOAL, ORGANISM, CULTIVATION, DOWNSTREAM):
+        p = page(wiz, i)
+        p.initializePage()
+        assert p.validatePage()
+    ctx = page(wiz, CONTEXT)
+    ctx.initializePage()
+    return ctx
+
+
+def test_the_context_page_keeps_the_template_electricity(wizard):
+    """The region picker used to start on 'Europe' and overwrite every template."""
+    ctx = to_context(wizard, "Algal-oil biorefinery (phototrophic)")
+    assert ctx.validatePage()
+    assert wizard.scenario.economics.electricity_price == 0.10
+    assert wizard.scenario.lcia.elec_gwp == 0.35
+
+
+def test_picking_a_region_sets_both_values_and_shows_their_source(wizard):
+    from algametrix.regions import load_regions
+
+    ctx = to_context(wizard, "Algal-oil biorefinery (phototrophic)")
+    ctx.cmb_region.setCurrentText("Italy")
+    assert "Eurostat" in ctx.lbl_region.text() and "Ember" in ctx.lbl_region.text()
+    assert ctx.validatePage()
+    italy = load_regions().get("Italy")
+    assert wizard.scenario.economics.electricity_price == italy.price.value
+    assert wizard.scenario.lcia.elec_gwp == italy.grid.value
+
+
+def test_a_region_without_a_price_statistic_keeps_the_price(wizard):
+    from algametrix.regions import load_regions
+
+    ctx = to_context(wizard, "Algal-oil biorefinery (phototrophic)")
+    ctx.cmb_region.setCurrentText("Italy")
+    ctx.cmb_region.setCurrentText("China")     # must not keep Italy's price
+    assert "Price not set" in ctx.lbl_region.text()
+    assert ctx.validatePage()
+    assert wizard.scenario.economics.electricity_price == 0.10
+    assert wizard.scenario.lcia.elec_gwp == load_regions().get("China").grid.value
+
+
 def test_a_template_walks_through_unchanged(wizard, lib):
     """Every page pressed Next: the validated case must survive the trip."""
     start = page(wizard, START)

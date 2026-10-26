@@ -329,6 +329,23 @@ def stage_method(run: Run) -> None:
             "solvent outside\n  what the factor table characterizes. The structural "
             "exclusions of section 2 still\n  apply to all of them.")
 
+    # The values the desktop setup's region picker puts into a scenario. None of
+    # the paper's scenarios uses them, but they are defaults the software ships,
+    # so they are listed with their sources next to the other factors.
+    from algametrix.regions import load_regions, statement as regions_statement
+
+    regional = load_regions()
+    if regional is not None:
+        lines += ["", "", "9  Regional electricity values offered by the desktop setup",
+                  "-" * 58, ""]
+        lines.append(
+            f"  Declared in regions.yaml (accessed {regional.accessed}). Picking a "
+            "region sets the electricity price")
+        lines.append(
+            "  and the grid emission factor of the scenario; no scenario of this paper "
+            "uses them.")
+        lines += ["", regions_statement(regional)]
+
     indicative = method.indicative_factors()
     _write(RESULTS / "lcia_method_statement.txt", method_statement(method) + "\n".join(lines) + "\n")
     run.status["lcia_method_declared"] = "pass"

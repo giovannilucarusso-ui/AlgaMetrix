@@ -26,7 +26,9 @@ Standard     : ISO 14044:2006 Environmental management - Life cycle assessment -
                     electricity alone spans two orders of magnitude between national
                     grids, so a study outside Europe must replace at least the
                     electricity, heat and fertiliser factors before its results mean
-                    anything.
+                    anything. The desktop setup can set a national grid factor and
+                    electricity price from regions.yaml, each with its source; the other
+                    factors stay as declared here.
   Reference period: 2019-2022
                     The defaults describe a background of roughly 2019-2022. They carry
                     no trend and no scenario year: a prospective study of a 2035 plant
@@ -299,3 +301,68 @@ Standard     : ISO 14044:2006 Environmental management - Life cycle assessment -
   Urea                      material  1          ced, water, land, eutroph_n, eutroph_p, acid
   Wastewater treatment      utility   1          ced, water, land, eutroph_n, eutroph_p, acid
   Yeast extract             material  3          ced, water, land, eutroph_n, eutroph_p, acid
+
+
+9  Regional electricity values offered by the desktop setup
+----------------------------------------------------------
+
+  Declared in regions.yaml (accessed 2026-10-26). Picking a region sets the electricity price
+  and the grid emission factor of the scenario; no scenario of this paper uses them.
+
+  region                  price EUR/kWh  year  grid kg CO2-eq/kWh  year
+  ----------------------  -------------  ----  ------------------  ----
+  European Union (EU-27)  0.1618         2025  0.2099              2025
+  Italy                   0.1989         2025  0.2848              2025
+  Spain                   0.1221         2025  0.1536              2025
+  France                  0.1254         2025  0.0414              2025
+  Germany                 0.1927         2025  0.3297              2025
+  Norway                  0.0715         2025  0.0281              2025
+  United Kingdom          0.3024         2025  0.2174              2025
+  United States           0.0753         2025  0.3844              2025
+  China                   -                    0.5253              2025
+  India                   -                    0.6701              2025
+  World                   -                    0.4583              2025
+
+  Price: Non-household consumer price, excluding VAT and other recoverable taxes and
+  levies. Where the source reports consumption bands, the band is 2,000-19,999 MWh a
+  year (Eurostat band ID). Eurostat publishes half-year prices; the annual value is the
+  mean of the two halves of 2025. Prices outside the euro area are converted at the ECB
+  annual average reference rate for 2025: 1.12998 USD and 0.85679 GBP per EUR.
+
+  Grid factor: Life-cycle greenhouse-gas intensity of the electricity generated in the
+  region, all greenhouse gases, with upstream, supply-chain and manufacturing stages
+  included. It is generation-based, so imports, exports and grid losses are not counted,
+  and it is an annual average, not a marginal factor. The shipped default in lcia.yaml
+  (0.35, EU-27, 2019-2021) has a different vintage and is not one of these values.
+  Source: Ember (2026), Yearly Electricity Data and Yearly Electricity Data Europe,
+  life-cycle carbon intensity of electricity generation, 2025, as published by Our World
+  in Data (series co2_intensity__gco2_kwh, updated 2026-06-30); converted from g to kg
+  and rounded to 0.1 g.
+
+  Price sources:
+    - European Union (EU-27): Eurostat nrg_pc_205, band ID, excluding VAT and other
+      recoverable taxes and levies: mean of 2025-S1 (0.1640) and 2025-S2 (0.1596).
+    - Italy: Eurostat nrg_pc_205, band ID, excluding VAT and other recoverable taxes and
+      levies: mean of 2025-S1 (0.2030) and 2025-S2 (0.1948).
+    - Spain: Eurostat nrg_pc_205, band ID, excluding VAT and other recoverable taxes and
+      levies: mean of 2025-S1 (0.1250) and 2025-S2 (0.1191), rounded to 0.0001.
+    - France: Eurostat nrg_pc_205, band ID, excluding VAT and other recoverable taxes
+      and levies: mean of 2025-S1 (0.1296) and 2025-S2 (0.1212).
+    - Germany: Eurostat nrg_pc_205, band ID, excluding VAT and other recoverable taxes
+      and levies: mean of 2025-S1 (0.1932) and 2025-S2 (0.1922).
+    - Norway: Eurostat nrg_pc_205, band ID, excluding VAT and other recoverable taxes
+      and levies: mean of 2025-S1 (0.0709) and 2025-S2 (0.0720), rounded to 0.0001.
+    - United Kingdom: DESNZ Quarterly Energy Prices, Table 3.4.2 (annual, including the
+      Climate Change Levy, excluding VAT), medium consumers (2,000-19,999 MWh), 2025:
+      25.9052 p/kWh, divided by 0.85679 GBP/EUR. Table 3.4.2 rather than 3.4.1 because
+      the levy, like the taxes Eurostat keeps, cannot be recovered.
+    - United States: EIA Electric Power Monthly, Table 5.3, average price of electricity
+      to the industrial sector, 2025: 8.51 US cents/kWh, divided by 1.12998 USD/EUR. An
+      average over all industrial customers; the source has no consumption bands.
+    - China: not set. No public statistical office publishes a national average
+      industrial price; tariffs are set province by province. Enter the tariff of the
+      site.
+    - India: not set. Tariffs are set by each state's regulatory commission, and the
+      Central Electricity Authority reports them state by state, with no national
+      average. Enter the tariff of the site.
+    - World: not set. There is no world electricity price statistic.

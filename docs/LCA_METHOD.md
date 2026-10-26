@@ -100,7 +100,11 @@ Four consequences follow, and they are declared rather than implied:
    Brightway run over these factors therefore verifies the linear algebra and
    the foreground — not the characterization.
 3. **No regionalization and no database uncertainty.** The factors are point
-   values with no location dependence.
+   values with no location dependence. The one exception is offered by the
+   desktop setup: picking a region sets the grid emission factor (and, where a
+   national statistic exists, the electricity price) from
+   [`data/regions.yaml`](../data/regions.yaml), where each value carries its
+   source, reference year and geography. The other factors stay as declared.
 4. **Most defaults are indicative.** 22 of the 23 shipped factors are
    literature-typical order-of-magnitude values, chosen so the software runs out
    of the box. The acidification and eutrophication factors in particular carry

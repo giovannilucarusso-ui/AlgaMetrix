@@ -64,7 +64,9 @@ method:
       regionalized: no factor responds to where the plant is. Grid electricity
       alone spans two orders of magnitude between national grids, so a study
       outside Europe must replace at least the electricity, heat and fertiliser
-      factors before its results mean anything.
+      factors before its results mean anything. The desktop setup can set a
+      national grid factor and electricity price from regions.yaml, each with
+      its source; the other factors stay as declared here.
   reference_period:
     default: 2019-2022
     note: >

@@ -1,0 +1,214 @@
+# Regional electricity values offered by the desktop guided setup.
+#
+# Picking a region in the setup sets two scenario inputs:
+#   * economics.electricity_price - EUR per kWh, charged by the TEA;
+#   * lcia.elec_gwp               - kg CO2-eq per kWh, applied by the LCA.
+# Each value carries its source, reference year, geography and a quality flag,
+# with the same meaning as in lcia.yaml:
+#   sourced - the value the cited source reports (units converted, rounded)
+#   derived - computed from the cited source, with the arithmetic in `source`
+# A region with no national price statistic has `price: null` and a
+# `price_note`; the setup then sets the grid factor only and leaves the price
+# as it is.
+#
+# No result of the paper uses these values. They are here so that a user who
+# picks a country starts from a traceable number instead of a placeholder.
+# tests/test_regions.py refuses a value without a source.
+
+reference_year: 2025
+accessed: 2026-10-26
+
+price:
+  unit: EUR/kWh
+  scope: >
+    Non-household consumer price, excluding VAT and other recoverable taxes and
+    levies. Where the source reports consumption bands, the band is
+    2,000-19,999 MWh a year (Eurostat band ID). Eurostat publishes half-year
+    prices; the annual value is the mean of the two halves of 2025. Prices
+    outside the euro area are converted at the ECB annual average reference
+    rate for 2025: 1.12998 USD and 0.85679 GBP per EUR.
+
+grid:
+  unit: kg CO2-eq/kWh
+  scope: >
+    Life-cycle greenhouse-gas intensity of the electricity generated in the
+    region, all greenhouse gases, with upstream, supply-chain and manufacturing
+    stages included. It is generation-based, so imports, exports and grid losses
+    are not counted, and it is an annual average, not a marginal factor. The
+    shipped default in lcia.yaml (0.35, EU-27, 2019-2021) has a different
+    vintage and is not one of these values.
+  source: >
+    Ember (2026), Yearly Electricity Data and Yearly Electricity Data Europe,
+    life-cycle carbon intensity of electricity generation, 2025, as published by
+    Our World in Data (series co2_intensity__gco2_kwh, updated 2026-06-30);
+    converted from g to kg and rounded to 0.1 g.
+
+regions:
+  - name: European Union (EU-27)
+    price:
+      value: 0.1618
+      year: 2025
+      geography: EU-27
+      quality: derived
+      source: >
+        Eurostat nrg_pc_205, band ID, excluding VAT and other recoverable taxes
+        and levies: mean of 2025-S1 (0.1640) and 2025-S2 (0.1596).
+    grid:
+      value: 0.2099
+      year: 2025
+      geography: EU-27
+      quality: sourced
+      source: Ember (2026), 209.9 g CO2-eq/kWh.
+
+  - name: Italy
+    price:
+      value: 0.1989
+      year: 2025
+      geography: Italy
+      quality: derived
+      source: >
+        Eurostat nrg_pc_205, band ID, excluding VAT and other recoverable taxes
+        and levies: mean of 2025-S1 (0.2030) and 2025-S2 (0.1948).
+    grid:
+      value: 0.2848
+      year: 2025
+      geography: Italy
+      quality: sourced
+      source: Ember (2026), 284.8 g CO2-eq/kWh.
+
+  - name: Spain
+    price:
+      value: 0.1221
+      year: 2025
+      geography: Spain
+      quality: derived
+      source: >
+        Eurostat nrg_pc_205, band ID, excluding VAT and other recoverable taxes
+        and levies: mean of 2025-S1 (0.1250) and 2025-S2 (0.1191), rounded to
+        0.0001.
+    grid:
+      value: 0.1536
+      year: 2025
+      geography: Spain
+      quality: sourced
+      source: Ember (2026), 153.6 g CO2-eq/kWh.
+
+  - name: France
+    price:
+      value: 0.1254
+      year: 2025
+      geography: France
+      quality: derived
+      source: >
+        Eurostat nrg_pc_205, band ID, excluding VAT and other recoverable taxes
+        and levies: mean of 2025-S1 (0.1296) and 2025-S2 (0.1212).
+    grid:
+      value: 0.0414
+      year: 2025
+      geography: France
+      quality: sourced
+      source: Ember (2026), 41.4 g CO2-eq/kWh.
+
+  - name: Germany
+    price:
+      value: 0.1927
+      year: 2025
+      geography: Germany
+      quality: derived
+      source: >
+        Eurostat nrg_pc_205, band ID, excluding VAT and other recoverable taxes
+        and levies: mean of 2025-S1 (0.1932) and 2025-S2 (0.1922).
+    grid:
+      value: 0.3297
+      year: 2025
+      geography: Germany
+      quality: sourced
+      source: Ember (2026), 329.7 g CO2-eq/kWh.
+
+  - name: Norway
+    price:
+      value: 0.0715
+      year: 2025
+      geography: Norway
+      quality: derived
+      source: >
+        Eurostat nrg_pc_205, band ID, excluding VAT and other recoverable taxes
+        and levies: mean of 2025-S1 (0.0709) and 2025-S2 (0.0720), rounded to
+        0.0001.
+    grid:
+      value: 0.0281
+      year: 2025
+      geography: Norway
+      quality: sourced
+      source: Ember (2026), 28.1 g CO2-eq/kWh.
+
+  - name: United Kingdom
+    price:
+      value: 0.3024
+      year: 2025
+      geography: United Kingdom
+      quality: derived
+      source: >
+        DESNZ Quarterly Energy Prices, Table 3.4.2 (annual, including the Climate
+        Change Levy, excluding VAT), medium consumers (2,000-19,999 MWh), 2025:
+        25.9052 p/kWh, divided by 0.85679 GBP/EUR. Table 3.4.2 rather than 3.4.1
+        because the levy, like the taxes Eurostat keeps, cannot be recovered.
+    grid:
+      value: 0.2174
+      year: 2025
+      geography: United Kingdom
+      quality: sourced
+      source: Ember (2026), 217.4 g CO2-eq/kWh.
+
+  - name: United States
+    price:
+      value: 0.0753
+      year: 2025
+      geography: United States
+      quality: derived
+      source: >
+        EIA Electric Power Monthly, Table 5.3, average price of electricity to
+        the industrial sector, 2025: 8.51 US cents/kWh, divided by 1.12998
+        USD/EUR. An average over all industrial customers; the source has no
+        consumption bands.
+    grid:
+      value: 0.3844
+      year: 2025
+      geography: United States
+      quality: sourced
+      source: Ember (2026), 384.4 g CO2-eq/kWh.
+
+  - name: China
+    price: null
+    price_note: >
+      No public statistical office publishes a national average industrial
+      price; tariffs are set province by province. Enter the tariff of the site.
+    grid:
+      value: 0.5253
+      year: 2025
+      geography: China
+      quality: sourced
+      source: Ember (2026), 525.3 g CO2-eq/kWh.
+
+  - name: India
+    price: null
+    price_note: >
+      Tariffs are set by each state's regulatory commission, and the Central
+      Electricity Authority reports them state by state, with no national
+      average. Enter the tariff of the site.
+    grid:
+      value: 0.6701
+      year: 2025
+      geography: India
+      quality: sourced
+      source: Ember (2026), 670.1 g CO2-eq/kWh.
+
+  - name: World
+    price: null
+    price_note: There is no world electricity price statistic.
+    grid:
+      value: 0.4583
+      year: 2025
+      geography: World
+      quality: sourced
+      source: Ember (2026), 458.3 g CO2-eq/kWh.

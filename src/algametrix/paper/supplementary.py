@@ -506,7 +506,9 @@ def build(run, outdir: Path, results_dir: Path, root: Path,
         "narrower. **Section 7** records that 22 of the 23 shipped factors are "
         "order-of-magnitude values with no traceable dataset behind them, which is why "
         "the literature comparison in S4 covers GWP and production cost and nothing "
-        "else.",
+        "else. **Section 9** lists the regional electricity prices and grid emission "
+        "factors that the desktop setup offers, each with its source, reference year "
+        "and geographical scope; no scenario in this paper uses them.",
         "",
     ]
     L += _embed("Method statement: scope, coverage matrix and factor provenance",
