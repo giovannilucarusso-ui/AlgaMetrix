@@ -34,6 +34,10 @@ from PySide6.QtGui import (
 
 Drawer = Callable[[QPainter, QRectF, QColor], None]
 
+# Colour of the cut-outs inside a symbol (the raceway island, the drum over its
+# trough). It follows the sheet the symbol is drawn on; see ``paint_icon``.
+_PAPER = QColor("#ffffff")
+
 
 # --------------------------------------------------------------------------- #
 # helpers
@@ -173,7 +177,7 @@ def _draw_raceway(p, r, c):
     inner = _rect(r, 0.26, 0.45, 0.48, 0.18)
     path2 = QPainterPath()
     path2.addRoundedRect(inner, inner.height() / 2, inner.height() / 2)
-    p.setBrush(QBrush(QColor("#ffffff"))); p.drawPath(path2)   # island (carves channel)
+    p.setBrush(QBrush(_PAPER)); p.drawPath(path2)           # island (carves channel)
     _pen(p, c, r)
     p.drawPath(path2)
     cx, cy, rad = 0.30, 0.54, 0.055                        # paddlewheel
@@ -247,6 +251,30 @@ def _draw_stirred_tank(p, r, c):
     _line(p, r, 0.335, 0.36, 0.335, 0.66); _line(p, r, 0.665, 0.36, 0.665, 0.66)
     _pen(p, c, r, 0.02)
     _line(p, r, 0.26, 0.40, 0.20, 0.40); _line(p, r, 0.74, 0.66, 0.80, 0.66)
+
+
+def _draw_thin_layer(p, r, c):
+    """Thin-layer cascade: sloped lane on supports, retention tank, pumped return."""
+    lane = QPainterPath(_pt(r, 0.10, 0.30))
+    lane.lineTo(_pt(r, 0.66, 0.56)); lane.lineTo(_pt(r, 0.66, 0.61)); lane.lineTo(_pt(r, 0.10, 0.35))
+    lane.closeSubpath()
+    _fillpath(p, c, r, lane, 0.30, 0.61)
+    tank = QPainterPath(); tank.addRect(_rect(r, 0.62, 0.62, 0.22, 0.16))
+    _fillpath(p, c, r, tank, 0.62, 0.78)
+    _pen(p, c, r, 0.018)
+    _line(p, r, 0.64, 0.67, 0.82, 0.67)                    # tank level
+    _line(p, r, 0.22, 0.41, 0.22, 0.80); _line(p, r, 0.44, 0.51, 0.44, 0.80)   # supports
+    _line(p, r, 0.16, 0.80, 0.52, 0.80)
+    for x in (0.20, 0.40):                                 # film flowing down the lane
+        y = 0.30 + (x - 0.10) * 0.464 - 0.045
+        _line(p, r, x, y, x + 0.10, y + 0.046)
+        _poly(p, r, [(x + 0.065, y + 0.012), (x + 0.10, y + 0.046), (x + 0.055, y + 0.050)])
+    _pen(p, c, r)
+    _poly(p, r, [(0.84, 0.72), (0.91, 0.72), (0.91, 0.20), (0.10, 0.20), (0.10, 0.27)])
+    p.setBrush(QBrush(_PAPER))
+    p.drawEllipse(_pt(r, 0.91, 0.47), r.width() * 0.045, r.width() * 0.045)   # return pump
+    _pen(p, c, r, 0.018, fill=c)
+    _poly(p, r, [(0.895, 0.495), (0.925, 0.495), (0.91, 0.445)], close=True)
 
 
 # --------------------------------------------------------------------------- #
@@ -331,6 +359,59 @@ def _draw_settler(p, r, c):
     _pen(p, c, r)
     _line(p, r, 0.50, 0.80, 0.50, 0.88); _flange(p, r, 0.50, 0.84, True, 0.035)  # underflow
     _line(p, r, 0.78, 0.32, 0.86, 0.36)                    # overflow
+
+
+def _draw_drum_filter(p, r, c):
+    """Rotary vacuum drum filter: drum in a slurry trough, cake, scraper, vacuum line."""
+    trough = QPainterPath(_pt(r, 0.16, 0.50))
+    trough.lineTo(_pt(r, 0.16, 0.66)); trough.quadTo(_pt(r, 0.46, 0.94), _pt(r, 0.76, 0.66))
+    trough.lineTo(_pt(r, 0.76, 0.50))
+    _fillpath(p, c, r, trough, 0.50, 0.92)
+    rad = 0.23 * r.width()
+    centre = _pt(r, 0.46, 0.46)
+    p.setBrush(QBrush(_PAPER))
+    p.drawEllipse(centre, rad, rad)
+    _pen(p, c, r, 0.016)
+    for a in range(0, 360, 45):                            # internal compartments
+        dx = 0.20 * math.cos(math.radians(a)); dy = 0.20 * math.sin(math.radians(a))
+        _line(p, r, 0.46, 0.46, 0.46 + dx, 0.46 + dy)
+    _line(p, r, 0.17, 0.60, 0.25, 0.60); _line(p, r, 0.67, 0.60, 0.75, 0.60)   # slurry level
+    _pen(p, c, r, 0.05)
+    p.drawArc(QRectF(centre.x() - rad, centre.y() - rad, 2 * rad, 2 * rad), 10 * 16, 110 * 16)  # cake
+    _pen(p, c, r)
+    p.drawEllipse(centre, r.width() * 0.04, r.width() * 0.04)   # trunnion
+    _line(p, r, 0.67, 0.40, 0.84, 0.47)                    # scraper blade
+    _line(p, r, 0.82, 0.47, 0.88, 0.62)                    # cake chute
+    _line(p, r, 0.43, 0.43, 0.24, 0.24); _flange(p, r, 0.24, 0.24, False, 0.03)  # vacuum / filtrate
+
+
+def _draw_screen(p, r, c):
+    """Vibrating screen: inclined mesh deck, spring mounts, vibrator, undersize outlet."""
+    deck = QPainterPath(_pt(r, 0.12, 0.32))
+    deck.lineTo(_pt(r, 0.86, 0.50)); deck.lineTo(_pt(r, 0.86, 0.60)); deck.lineTo(_pt(r, 0.12, 0.42))
+    deck.closeSubpath()
+    _fillpath(p, c, r, deck, 0.32, 0.60)
+    _pen(p, c, r, 0.014)
+    for i in range(8):                                     # mesh
+        x = 0.17 + i * 0.085
+        y = 0.37 + (x - 0.12) * 0.243
+        _line(p, r, x, y - 0.035, x + 0.02, y + 0.035)
+    _pen(p, c, r, 0.018)
+    for x in (0.24, 0.74):                                 # spring mounts
+        y0 = 0.42 + (x - 0.12) * 0.243
+        pts, n = [], 6
+        for k in range(n + 1):
+            yy = y0 + (0.80 - y0) * k / n
+            pts.append((x + (0.025 if k % 2 else -0.025) if 0 < k < n else x, yy))
+        _poly(p, r, pts)
+    _pen(p, c, r)
+    _line(p, r, 0.16, 0.80, 0.82, 0.80)                    # base
+    p.drawRect(_rect(r, 0.42, 0.20, 0.14, 0.09))           # vibrator motor
+    p.drawEllipse(_pt(r, 0.49, 0.245), r.width() * 0.025, r.width() * 0.025)
+    _line(p, r, 0.49, 0.29, 0.49, 0.35)
+    _line(p, r, 0.06, 0.26, 0.14, 0.31)                    # feed chute
+    _line(p, r, 0.50, 0.55, 0.50, 0.70)                    # undersize (filtrate) out
+    _poly(p, r, [(0.47, 0.66), (0.50, 0.72), (0.53, 0.66)], close=True)
 
 
 # --------------------------------------------------------------------------- #
@@ -554,11 +635,14 @@ ICONS: dict[str, Drawer] = {
     "flat_panel": _draw_flat_panel,
     "bubble_column": _draw_bubble_column,
     "stirred_tank": _draw_stirred_tank,
+    "thin_layer": _draw_thin_layer,
     "centrifuge": _draw_centrifuge,
     "decanter": _draw_decanter,
     "membrane": _draw_membrane,
     "filter_press": _draw_filter_press,
     "settler": _draw_settler,
+    "drum_filter": _draw_drum_filter,
+    "screen": _draw_screen,
     "spray_dryer": _draw_spray_dryer,
     "drum_dryer": _draw_drum_dryer,
     "freeze_dryer": _draw_freeze_dryer,
@@ -573,14 +657,25 @@ ICONS: dict[str, Drawer] = {
 }
 
 
-def paint_icon(painter: QPainter, key: str, rect: QRectF, color: QColor) -> None:
-    """Draw the icon ``key`` inside ``rect`` (no-op if the key is unknown)."""
+def paint_icon(painter: QPainter, key: str, rect: QRectF, color: QColor,
+               paper: QColor | str | None = None) -> None:
+    """Draw the icon ``key`` inside ``rect`` (no-op if the key is unknown).
+
+    ``paper`` is the colour of the sheet underneath, used for the cut-outs.
+    """
+    global _PAPER
+    drawer = ICONS.get(key)
+    if drawer is None:
+        return
     painter.save()
     painter.setRenderHint(QPainter.Antialiasing, True)
-    drawer = ICONS.get(key)
-    if drawer is not None:
+    previous = _PAPER
+    _PAPER = QColor(paper) if paper is not None else QColor("#ffffff")
+    try:
         drawer(painter, rect, color)
-    painter.restore()
+    finally:
+        _PAPER = previous
+        painter.restore()
 
 
 def icon_pixmap(key: str, size: int, color: QColor) -> QPixmap:

@@ -139,7 +139,7 @@ jobs:
       - name: Run the desktop and wizard tests
         env:
           QT_QPA_PLATFORM: offscreen
-        run: python -m pytest tests/test_desktop_window.py tests/test_wizard.py -q
+        run: python -m pytest tests/test_desktop_window.py tests/test_wizard.py tests/test_flowsheet_designer.py -q
 
       - name: The application must start and compute its default case
         # The same self-test the Windows build runs on the packaged executable.
