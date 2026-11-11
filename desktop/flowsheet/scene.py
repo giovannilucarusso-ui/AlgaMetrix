@@ -43,6 +43,7 @@ from PySide6.QtWidgets import (
     QGraphicsPathItem,
     QGraphicsScene,
 )
+from shiboken6 import isValid
 
 from . import icons, model as M
 from .theme import LAYER_LABELS, PAPER, STREAM_LABELS, Theme, category_color
@@ -192,7 +193,7 @@ class NodeItem(QGraphicsObject):
         self.node = node
         self.sp = node.spec
         self.theme = theme
-        self.accent = category_color(self.sp.category, theme)
+        self.accent = category_color(self.sp.category)
         self._lines: list = []          # read-out plate: list of [(glyph, text)]
         self._status = "ok" if node.role else "idle"
         self._status_note = ""
@@ -236,13 +237,6 @@ class NodeItem(QGraphicsObject):
         return self.ports.get((is_input, name))
 
     # -- state pushed by the editor -------------------------------------- #
-    def set_theme(self, theme: Theme):
-        self.theme = theme
-        self.accent = category_color(self.sp.category, theme)
-        self.update()
-        for p in self.ports.values():
-            p.update()
-
     def set_readout(self, lines):
         """``lines``: list of lines, each a list of (glyph, text) segments, or a string."""
         if isinstance(lines, str):
@@ -372,9 +366,9 @@ class NodeItem(QGraphicsObject):
                 ghost = sym.translated(5.0 * k, -5.0 * k)
                 painter.save()
                 painter.setOpacity(0.22 if k == 2 else 0.38)
-                icons.paint_icon(painter, self.sp.icon, ghost, accent, self.theme.paper)
+                icons.paint_icon(painter, self.sp.icon, ghost, accent)
                 painter.restore()
-        icons.paint_icon(painter, self.sp.icon, sym, accent, self.theme.paper)
+        icons.paint_icon(painter, self.sp.icon, sym, accent)
         if self._parallel > 1:
             f = _font(7, QFont.Bold)
             text = f"×{self._parallel}"
@@ -685,7 +679,7 @@ class EdgeItem(QGraphicsPathItem):
         # moving dashes show the direction of flow
         if self._scene.animate and self.kind not in ("empty",) and w >= 1.4:
             dw = max(1.0, w * 0.42)
-            anim = QPen(_alpha(t.flow_tint, 150 if not t.dark else 110), dw, Qt.CustomDashLine,
+            anim = QPen(_alpha(t.flow_tint, 150), dw, Qt.CustomDashLine,
                         Qt.RoundCap, Qt.RoundJoin)
             dash, gap = 5.0, 15.0
             anim.setDashPattern([dash / dw, gap / dw])
@@ -772,7 +766,7 @@ class SectionItem(QGraphicsItem):
         if self._rect.isNull():
             return
         t = self._scene.theme
-        color = QColor(category_color_for_section(self.code, t, self.base_color))
+        color = QColor(self.base_color)
         painter.setRenderHint(painter.RenderHint.Antialiasing, True)
         fill = _alpha(color, 10 + int(26 * self._intensity))
         painter.setBrush(QBrush(fill))
@@ -804,16 +798,8 @@ class SectionItem(QGraphicsItem):
             painter.setPen(QPen(color, 1.0))
             painter.drawRoundedRect(mtab, 8, 8)
             painter.setFont(f2)
-            painter.setPen(QPen(color.darker(115) if not t.dark else color.lighter(120)))
+            painter.setPen(QPen(color.darker(115)))
             painter.drawText(mtab, Qt.AlignCenter, self._metric)
-
-
-_SECTION_DARK = {"100": "#8fb0cc", "200": "#4ade80", "300": "#60a5fa", "400": "#fb923c",
-                 "500": "#c084fc"}
-
-
-def category_color_for_section(code: str, theme: Theme, paper_color: str) -> str:
-    return _SECTION_DARK.get(code, paper_color) if theme.dark else paper_color
 
 
 class UtilityItem(QGraphicsItem):
@@ -930,7 +916,7 @@ class StreamCard(QGraphicsItem):
         painter.setRenderHint(painter.RenderHint.Antialiasing, True)
         rect = QRectF(0, 0, self.W, self._h)
         painter.setPen(Qt.NoPen)
-        painter.setBrush(QBrush(_alpha("#000000", 34 if not t.dark else 90)))
+        painter.setBrush(QBrush(_alpha("#000000", 34)))
         painter.drawRoundedRect(rect.translated(0, 3), 8, 8)
         painter.setBrush(QBrush(QColor(t.face_bg)))
         painter.setPen(QPen(QColor(t.face_border), 1.0))
@@ -1210,14 +1196,7 @@ class FlowsheetScene(QGraphicsScene):
         self.selectionChanged.connect(self._on_selection)
         self.rebuild()
 
-    # -- theme / modes --------------------------------------------------- #
-    def set_theme(self, theme: Theme):
-        self.theme = theme
-        self.setBackgroundBrush(QBrush(QColor(theme.canvas)))
-        for item in self.node_items.values():
-            item.set_theme(theme)
-        self.update()
-
+    # -- modes ----------------------------------------------------------- #
     def set_animation(self, on: bool):
         self.animate = on
         if on and self.edge_items:
@@ -1229,6 +1208,8 @@ class FlowsheetScene(QGraphicsScene):
 
     def pause_animation(self, paused: bool):
         """Stop the clock while the canvas is hidden; keep the setting."""
+        if not isValid(self._timer):      # the window is hidden while Qt shuts down
+            return
         if paused:
             self._timer.stop()
         elif self.animate and self.edge_items:

@@ -212,18 +212,19 @@ def test_the_designer_follows_a_case_changed_elsewhere(window):
     assert "changed" in ed.banner_text.text()
 
 
-def test_the_report_image_is_drawn_on_the_paper_sheet(window, tmp_path):
+def test_the_report_image_is_drawn_on_the_white_sheet(window, tmp_path):
     ed = _editor(window, POWDER)
-    ed.set_theme("Blueprint")
+    cult = _node(ed, B.CULTIVATION)
+    ed.scene.select_node(cult.id)
     out = tmp_path / "pfd.png"
     assert ed.render_diagram_png(str(out))
     assert out.stat().st_size > 10_000
     from PySide6.QtGui import QImage
 
-    img = QImage(str(out))
-    corner = img.pixelColor(4, 4)
-    assert corner.lightness() > 200          # paper, not the dark blueprint sheet
-    assert ed.scene.theme.name == "Blueprint"
+    corner = QImage(str(out)).pixelColor(4, 4)
+    assert corner.lightness() > 200
+    # the selection is only set aside for the picture
+    assert ed.scene.node_item(cult.id).isSelected()
 
 
 def test_every_layer_and_toggle_paints(window):
@@ -235,8 +236,6 @@ def test_every_layer_and_toggle_paints(window):
     for key in ("areas", "utilities", "labels", "flow", "sheet", "map"):
         ed.toggle_btns[key].toggle()
         ed.grab()
-    ed.set_theme("Blueprint")
-    ed.grab()
     for idx in range(ed.dock.count()):
         ed.dock.setCurrentIndex(idx)
         ed.grab()

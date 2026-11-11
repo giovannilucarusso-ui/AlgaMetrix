@@ -35,7 +35,7 @@ from PySide6.QtGui import (
 Drawer = Callable[[QPainter, QRectF, QColor], None]
 
 # Colour of the cut-outs inside a symbol (the raceway island, the drum over its
-# trough). It follows the sheet the symbol is drawn on; see ``paint_icon``.
+# trough): the white of the sheet.
 _PAPER = QColor("#ffffff")
 
 
@@ -657,25 +657,14 @@ ICONS: dict[str, Drawer] = {
 }
 
 
-def paint_icon(painter: QPainter, key: str, rect: QRectF, color: QColor,
-               paper: QColor | str | None = None) -> None:
-    """Draw the icon ``key`` inside ``rect`` (no-op if the key is unknown).
-
-    ``paper`` is the colour of the sheet underneath, used for the cut-outs.
-    """
-    global _PAPER
-    drawer = ICONS.get(key)
-    if drawer is None:
-        return
+def paint_icon(painter: QPainter, key: str, rect: QRectF, color: QColor) -> None:
+    """Draw the icon ``key`` inside ``rect`` (no-op if the key is unknown)."""
     painter.save()
     painter.setRenderHint(QPainter.Antialiasing, True)
-    previous = _PAPER
-    _PAPER = QColor(paper) if paper is not None else QColor("#ffffff")
-    try:
+    drawer = ICONS.get(key)
+    if drawer is not None:
         drawer(painter, rect, color)
-    finally:
-        _PAPER = previous
-        painter.restore()
+    painter.restore()
 
 
 def icon_pixmap(key: str, size: int, color: QColor) -> QPixmap:

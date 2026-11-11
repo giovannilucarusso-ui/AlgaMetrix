@@ -90,17 +90,15 @@ class Minimap(QWidget):
     def paintEvent(self, event):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing, True)
-        scene = self._view.scene()
-        dark = isinstance(scene, FlowsheetScene) and scene.theme.dark
         frame = QRectF(0.5, 0.5, self.W - 1, self.H - 1)
-        p.setPen(QPen(QColor("#24486b" if dark else "#cbd5e1"), 1.0))
-        p.setBrush(QColor(15, 34, 54, 235) if dark else QColor(255, 255, 255, 235))
+        p.setPen(QPen(QColor("#cbd5e1"), 1.0))
+        p.setBrush(QColor(255, 255, 255, 235))
         p.drawRoundedRect(frame, 7, 7)
         if self._image is not None:
             p.drawImage(QPointF(0, 0), self._image)
             vis = self._view.mapToScene(self._view.viewport().rect()).boundingRect()
             r = self._from_scene(vis).intersected(self._target.adjusted(-1, -1, 1, 1))
-            accent = QColor("#4ade80" if dark else "#15803d")
+            accent = QColor("#15803d")
             fill = QColor(accent)
             fill.setAlpha(28)
             p.setBrush(fill)
@@ -182,11 +180,6 @@ class FlowsheetView(QGraphicsView):
         self._sync_minimap()
 
     # -- overlays -------------------------------------------------------- #
-    def theme_changed(self):
-        self.resetCachedContent()
-        self.minimap.schedule()
-        self.viewport().update()
-
     def set_minimap_visible(self, on: bool):
         self._minimap_on = on
         self._sync_minimap()
@@ -313,8 +306,8 @@ class FlowsheetView(QGraphicsView):
             painter.fillRect(rect, canvas)
             area = rect
         else:
-            painter.fillRect(rect, canvas.darker(125 if theme.dark else 106))
-            shadow = QColor(0, 0, 0, 70 if theme.dark else 26)
+            painter.fillRect(rect, canvas.darker(106))
+            shadow = QColor(0, 0, 0, 26)
             for i, a in enumerate((1.0, 0.6, 0.3)):
                 c = QColor(shadow)
                 c.setAlpha(int(shadow.alpha() * a))

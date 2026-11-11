@@ -24,7 +24,6 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QPushButton,
     QScrollArea,
-    QSizePolicy,
     QSlider,
     QToolButton,
     QVBoxLayout,
@@ -34,7 +33,7 @@ from PySide6.QtWidgets import (
 from . import icons, model as M
 from . import process as P
 from .charts import ACCENT, BAD, DIM, FAINT, GWP_C, INK, Meter, ResponseChart
-from .theme import PAPER, THIN_SCROLLBAR, category_color
+from .theme import THIN_SCROLLBAR, category_color
 
 _STATUS_COLOR = {"ok": "#22c55e", "warning": "#f59e0b", "error": "#ef4444", "idle": "#a8b4c0"}
 
@@ -421,7 +420,7 @@ class Inspector(QWidget):
         scn = ctx.session.scenario
         lay = self._new_page()
         sp = node.spec
-        color = category_color(sp.category, PAPER)
+        color = category_color(sp.category)
         sec = P.section_of(node.role)
         sub = f"{sp.label}"
         if sec is not None:
@@ -511,7 +510,7 @@ class Inspector(QWidget):
         self._mode = ("free", node.id)
         lay = self._new_page()
         sp = node.spec
-        color = category_color(sp.category, PAPER)
+        color = category_color(sp.category)
         self._header(lay, sp.icon, color, node.tag, node.name, sp.label)
         self._set_status("idle", [])
         if sp.hint:

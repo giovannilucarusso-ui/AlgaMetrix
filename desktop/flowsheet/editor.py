@@ -25,7 +25,6 @@ from PySide6.QtGui import QColor, QFont, QIcon, QImage, QKeySequence, QPainter, 
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QButtonGroup,
-    QComboBox,
     QFileDialog,
     QFrame,
     QHBoxLayout,
@@ -54,7 +53,7 @@ from .builder import flowsheet_from_scenario, seed_flows
 from .charts import KpiTile, StackedBars, TornadoChart
 from .inspector import Context, Inspector
 from .scene import FlowsheetScene, NodeItem
-from .theme import LAYER_LABELS, PAPER, STREAM_LABELS, THEMES, THIN_SCROLLBAR
+from .theme import LAYER_LABELS, STREAM_LABELS, THIN_SCROLLBAR
 from .view import FlowsheetView
 
 # Palette order (category -> heading label).
@@ -403,13 +402,6 @@ class FlowsheetEditor(QWidget):
             self.toggle_btns[key] = b
         lay.addSpacing(8)
 
-        self.theme_combo = QComboBox()
-        self.theme_combo.addItems(list(THEMES))
-        self.theme_combo.setMinimumWidth(96)
-        self.theme_combo.setToolTip("Drawing sheet: Paper prints well, Blueprint is easier on the "
-                                    "eyes on screen")
-        self.theme_combo.currentTextChanged.connect(self.set_theme)
-        lay.addWidget(self.theme_combo)
         self.btn_boxes = QToolButton()
         self.btn_boxes.setText("Boxes")
         self.btn_boxes.setCheckable(True)
@@ -443,20 +435,13 @@ class FlowsheetEditor(QWidget):
         self.canvas_bar.adjustSize()
 
     def _style_canvas_bar(self):
-        dark = self.scene.theme.dark
-        bg, border, ink, dim, hover, on_bg, on_ink = (
-            ("rgba(15,34,54,236)", "#24486b", "#d6e6f5", "#5d7d99", "#13314f", "#1f4d3a", "#4ade80")
-            if dark else
-            ("rgba(255,255,255,240)", "#cbd5e1", "#334155", "#94a3b8", "#f1f5f9", "#e7f0e9", "#14532d"))
         self.canvas_bar.setStyleSheet(
-            f"#canvasBar{{background:{bg}; border:1px solid {border}; border-radius:8px;}}"
-            f"#canvasBar QLabel#cap{{color:{dim}; font-size:9px; font-weight:700; padding:0 3px;}}"
-            f"#canvasBar QToolButton{{background:transparent; color:{ink}; border:1px solid transparent;"
-            f" border-radius:4px; padding:2px 7px; font-size:11px; font-weight:600;}}"
-            f"#canvasBar QToolButton:hover{{background:{hover};}}"
-            f"#canvasBar QToolButton:checked{{background:{on_bg}; color:{on_ink}; border-color:{on_ink};}}"
-            f"#canvasBar QComboBox{{color:{ink}; background:transparent; border:1px solid {border};"
-            f" border-radius:4px; padding:1px 6px; font-size:11px;}}")
+            "#canvasBar{background:rgba(255,255,255,240); border:1px solid #cbd5e1; border-radius:8px;}"
+            "#canvasBar QLabel#cap{color:#94a3b8; font-size:9px; font-weight:700; padding:0 3px;}"
+            "#canvasBar QToolButton{background:transparent; color:#334155; border:1px solid transparent;"
+            " border-radius:4px; padding:2px 7px; font-size:11px; font-weight:600;}"
+            "#canvasBar QToolButton:hover{background:#f1f5f9;}"
+            "#canvasBar QToolButton:checked{background:#e7f0e9; color:#14532d; border-color:#14532d;}")
         self._fit_canvas_bar()
 
     def _build_palette(self) -> QWidget:
@@ -1160,7 +1145,7 @@ class FlowsheetEditor(QWidget):
                 elif c >= 4:
                     it.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
                 if c == 3:
-                    it.setForeground(QColor(PAPER.stream.get(kind, theme.stream["empty"])))
+                    it.setForeground(QColor(theme.stream.get(kind, theme.stream["empty"])))
                 table.setItem(r, c, it)
         table.blockSignals(False)
 
@@ -1489,18 +1474,6 @@ class FlowsheetEditor(QWidget):
     # ------------------------------------------------------------------ #
     # Canvas options
     # ------------------------------------------------------------------ #
-    def set_theme(self, name: str):
-        theme = THEMES.get(name)
-        if theme is None:
-            return
-        if self.theme_combo.currentText() != name:
-            self.theme_combo.setCurrentText(name)
-        self.scene.set_theme(theme)
-        self._apply_layer()
-        self._update_sheet()
-        self._style_canvas_bar()
-        self.view.theme_changed()
-
     def _toggle(self, key: str, on: bool):
         if key == "areas":
             self.scene.set_show_sections(on)
@@ -1662,23 +1635,16 @@ class FlowsheetEditor(QWidget):
         return self._logo_pm
 
     @contextmanager
-    def _clean_render(self, theme=None):
-        """Selection, hover card and (optionally) the theme set aside while rendering."""
+    def _clean_render(self):
+        """Selection and hover card set aside while rendering."""
         selected = self.scene.selectedItems()
         self.scene.blockSignals(True)
         self.scene.clearSelection()
         card = self.scene.card.isVisible()
         self.scene.card.setVisible(False)
-        old = self.scene.theme
-        if theme is not None and theme is not old:
-            self.scene.set_theme(theme)
-            self._apply_layer()
         try:
             yield
         finally:
-            if theme is not None and theme is not old:
-                self.scene.set_theme(old)
-                self._apply_layer()
             self.scene.card.setVisible(card)
             for it in selected:
                 it.setSelected(True)
@@ -1708,11 +1674,11 @@ class FlowsheetEditor(QWidget):
             QMessageBox.warning(self, "Export failed", f"Could not export the drawing:\n{exc}")
 
     def render_diagram_png(self, path: str, scale: float = 2.5) -> bool:
-        """Render the current drawing to ``path`` on the paper sheet (used by the PDF
-        report). Returns False if the canvas is empty."""
+        """Render the current drawing to ``path`` (used by the PDF report). Returns
+        False if the canvas is empty."""
         if not self.scene.node_items:
             return False
-        with self._clean_render(PAPER):
+        with self._clean_render():
             self._render_png(path, self.scene.export_rect(), scale)
         return True
 
