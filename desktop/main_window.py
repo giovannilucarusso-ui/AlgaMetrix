@@ -299,9 +299,12 @@ class MainWindow(QMainWindow):
         from .flowsheet import FlowsheetEditor
 
         self.flowsheet_editor = FlowsheetEditor()
-        # Let the designer (re)generate its diagram from the live case study.
+        # The designer reads the live case study, offers the library presets as
+        # technology choices, and hands its working copy back on "Apply".
+        self.flowsheet_editor.set_library(self.lib)
         self.flowsheet_editor.set_scenario_source(
             lambda: (self.build_scenario(), getattr(self, "results", None)))
+        self.flowsheet_editor.set_scenario_sink(self.apply_scenario)
         return self.flowsheet_editor
 
     def _on_top_tab_changed(self, index: int):

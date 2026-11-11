@@ -27,6 +27,10 @@ PROCESS_DESIGNER_MODULES = [
     'desktop.flowsheet.scene',
     'desktop.flowsheet.view',
     'desktop.flowsheet.icons',
+    'desktop.flowsheet.theme',
+    'desktop.flowsheet.charts',
+    'desktop.flowsheet.inspector',
+    'desktop.flowsheet.process',
 ]
 hiddenimports = [m for m in hiddenimports if m not in PROCESS_DESIGNER_MODULES]
 
