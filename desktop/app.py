@@ -166,14 +166,21 @@ def main(argv: list[str] | None = None) -> int:
             out = argv[index] if index < len(argv) else None
         return self_test(out)
 
+    from PySide6.QtCore import Qt
+    from PySide6.QtGui import QGuiApplication
     from PySide6.QtWidgets import QApplication
 
+    from desktop import theme
     from desktop.main_window import MainWindow
 
+    # Fractional display scaling (125 %, 150 %) is honoured as it is rather than
+    # rounded, so text stays sharp on a high-DPI laptop screen.
+    QGuiApplication.setHighDpiScaleFactorRoundingPolicy(
+        Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
     app = QApplication(sys.argv)
     app.setApplicationName("AlgaMetrix")
     app.setOrganizationName("AlgaMetrix")
-
+    theme.apply_to(app)
 
     window = MainWindow()
     # Open filling the screen so the whole two-panel layout is visible immediately
