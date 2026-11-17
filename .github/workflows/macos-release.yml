@@ -32,17 +32,20 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runner: macos-14
+          - runner: macos-15
             arch: arm64          # Apple Silicon: M1 and later
           - runner: macos-15-intel
             arch: x86_64         # Intel
     # Both labels are pinned to a version rather than to `-latest`, which points
     # at Apple Silicon and would silently stop building the Intel half.
-    # `macos-13` is NOT the Intel label any more: GitHub retired that image, and
-    # a job asking for it queues for ever instead of failing, which is what
-    # happened the first time this workflow ran. The Intel runners are
-    # `macos-15-intel` and `macos-26-intel`; the older one is used here because a
-    # bundle built on an older system runs on more of them.
+    # A pinned label stops working when GitHub retires its image. `macos-13`
+    # went first: a job asking for it queued for ever instead of failing, which
+    # is what happened the first time this workflow ran. `macos-14` was retired
+    # on 2 November 2026, and a job asking for it now fails within a second with
+    # "The configuration 'macos-14-arm64-us-default' is not supported".
+    # GitHub currently offers `macos-15` and `macos-26` for Apple Silicon and
+    # `macos-15-intel` and `macos-26-intel` for Intel. The older of each pair is
+    # used here because a bundle built on an older system runs on more Macs.
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
