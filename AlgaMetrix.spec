@@ -6,6 +6,7 @@ library and the entry point are identical and only the container differs. What
 the platform decides is written out below rather than kept in two files that
 would drift.
 """
+import os
 import re
 import sys
 from pathlib import Path
@@ -13,6 +14,12 @@ from pathlib import Path
 from PyInstaller.utils.hooks import collect_submodules
 
 MACOS = sys.platform == "darwin"
+
+# ALGAMETRIX_BUILD_DESIGNER=1 makes a preview build with the Process Designer
+# in it and switched on. It is written to dist/AlgaMetrix-Designer, so it cannot
+# be mistaken for the release build.
+WITH_DESIGNER = os.environ.get('ALGAMETRIX_BUILD_DESIGNER', '').strip().lower() in {
+    '1', 'true', 'yes', 'on'}
 
 hiddenimports = ['openpyxl']
 hiddenimports += collect_submodules('algametrix')
@@ -32,7 +39,17 @@ PROCESS_DESIGNER_MODULES = [
     'desktop.flowsheet.inspector',
     'desktop.flowsheet.process',
 ]
-hiddenimports = [m for m in hiddenimports if m not in PROCESS_DESIGNER_MODULES]
+if WITH_DESIGNER:
+    EXCLUDED_DESIGNER = []
+    # Sets ALGAMETRIX_PROCESS_DESIGNER=1 before the application starts, unless
+    # the environment already sets it.
+    RUNTIME_HOOKS = ['scripts/pyi_rth_designer.py']
+    DIST_NAME = 'AlgaMetrix-Designer'
+else:
+    hiddenimports = [m for m in hiddenimports if m not in PROCESS_DESIGNER_MODULES]
+    EXCLUDED_DESIGNER = PROCESS_DESIGNER_MODULES
+    RUNTIME_HOOKS = []
+    DIST_NAME = 'AlgaMetrix'
 
 # The icon, in the container each platform reads. Both are generated from the
 # same artwork; scripts/make_icns.py writes the .icns from the .ico so the two
@@ -62,8 +79,8 @@ a = Analysis(
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[],
-    excludes=['streamlit', 'plotly', 'tkinter', 'pytest'] + PROCESS_DESIGNER_MODULES,
+    runtime_hooks=RUNTIME_HOOKS,
+    excludes=['streamlit', 'plotly', 'tkinter', 'pytest'] + EXCLUDED_DESIGNER,
     noarchive=False,
     optimize=0,
 )
@@ -94,7 +111,7 @@ coll = COLLECT(
     strip=False,
     upx=USE_UPX,
     upx_exclude=[],
-    name='AlgaMetrix',
+    name=DIST_NAME,
 )
 
 if MACOS:
@@ -103,7 +120,7 @@ if MACOS:
     # named and iconed the way every other application is.
     app = BUNDLE(
         coll,
-        name='AlgaMetrix.app',
+        name=f'{DIST_NAME}.app',
         icon=ICON,
         bundle_identifier='io.github.giovannilucarusso-ui.algametrix',
         version=VERSION,

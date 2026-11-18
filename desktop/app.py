@@ -114,6 +114,23 @@ def self_test(out_path: str | None = None) -> int:
         ok = ok and report_bytes > 0
     else:
         report_error = "not attempted: the default scenario did not compute"
+    # A build that carries the Process Designer draws the default case on it as
+    # well. Its canvas modules are the ones the spec adds or drops, so this is
+    # where a packaging mistake in that build would show.
+    designer = "off"
+    if window.flowsheet_editor is not None:
+        editor = window.flowsheet_editor
+        try:
+            drawn = editor.generate_from_scenario(confirm=False)
+            blocks = len(editor.scene.flowsheet.nodes)
+            linked = editor.session is not None and editor.session.results is not None
+        except Exception as exc:  # noqa: BLE001 - the point is to report it
+            designer = f"FAILED {exc!r}"
+            ok = False
+        else:
+            designer = f"{blocks} blocks, " + (
+                "linked to the engine" if linked else "NOT linked to the engine")
+            ok = ok and drawn and linked and blocks > 0
     lines = [
         f"AlgaMetrix {__version__} self-test: {'PASS' if ok else 'FAIL'}",
         f"  language        : {current_language()}",
@@ -133,6 +150,7 @@ def self_test(out_path: str | None = None) -> int:
         f"  PDF report      : {report_bytes:,} bytes" if report_bytes
         else f"  PDF report      : FAILED {report_error}"
     )
+    lines.append(f"  Process Designer: {designer}")
     report = "\n".join(lines)
     if out_path:
         # A windowed build has no console attached, so the report also goes to a

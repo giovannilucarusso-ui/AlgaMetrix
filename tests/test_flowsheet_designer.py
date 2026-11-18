@@ -291,6 +291,21 @@ def test_fit_holds_until_the_user_zooms_and_the_map_stays_out_of_the_way(window,
     ed.close()
 
 
+def test_the_self_test_draws_the_designer_in_a_build_that_has_it(qapp, tmp_path, monkeypatch):
+    # The preview build (ALGAMETRIX_BUILD_DESIGNER=1) is checked with the same
+    # --self-test as the release build; with the designer on, that run has to
+    # draw the default case and link it to the engine.
+    import desktop.main_window as mw
+    from desktop.app import self_test
+
+    monkeypatch.setattr(mw, "PROCESS_DESIGNER", True)
+    out = tmp_path / "smoke.txt"
+    assert self_test(str(out)) == 0
+    report = out.read_text(encoding="utf-8")
+    assert "self-test: PASS" in report
+    assert "blocks, linked to the engine" in report
+
+
 def test_a_long_case_name_does_not_widen_the_window(window):
     ed = _editor(window, RACEWAY)
     before = ed.minimumSizeHint().width()
