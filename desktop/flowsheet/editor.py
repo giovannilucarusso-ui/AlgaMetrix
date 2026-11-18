@@ -21,7 +21,18 @@ from datetime import date
 from pathlib import Path
 
 from PySide6.QtCore import QPointF, QRectF, QSize, Qt, QTimer
-from PySide6.QtGui import QColor, QFont, QIcon, QImage, QKeySequence, QPainter, QPdfWriter, QShortcut
+from PySide6.QtGui import (
+    QAction,
+    QColor,
+    QFont,
+    QIcon,
+    QImage,
+    QKeySequence,
+    QPainter,
+    QPdfWriter,
+    QPixmap,
+    QShortcut,
+)
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QButtonGroup,
@@ -38,6 +49,7 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QSizePolicy,
     QSplitter,
+    QStackedWidget,
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
@@ -46,6 +58,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .. import theme as ui
 from . import builder as B
 from . import icons, model as M
 from . import process as P
@@ -53,7 +66,7 @@ from .builder import flowsheet_from_scenario, seed_flows
 from .charts import KpiTile, StackedBars, TornadoChart
 from .inspector import Context, Inspector
 from .scene import FlowsheetScene, NodeItem
-from .theme import LAYER_LABELS, STREAM_LABELS, THIN_SCROLLBAR
+from .theme import COMPONENT_COLORS, LAYER_LABELS, STREAM_LABELS, THIN_SCROLLBAR
 from .view import FlowsheetView
 
 # Palette order (category -> heading label).
@@ -70,33 +83,42 @@ _COMPONENT_LABELS = {"biomass": "Biomass (dry)", "water": "Water", "solvent": "S
                      "product": "Product", "substrate": "Substrate", "co2": "CO₂",
                      "other": "Salts & other"}
 
-_COST_CATS = (("energy", "Energy", "#d4a106"), ("materials", "Feeds & materials", "#8a5a44"),
-              ("capital", "Capital-related", "#475569"), ("utilities", "Utilities", "#0284c7"),
-              ("plant", "Labour, overhead & other", "#7c3aed"))
-_GWP_CATS = (("elec", "Electricity", "#d4a106"), ("heat", "Heat", "#dc2626"),
-             ("inputs", "Feeds & materials", "#8a5a44"), ("uptake", "Biogenic uptake", "#16a34a"),
-             ("credit", "Avoided treatment", "#0d9488"), ("other", "Other", "#64748b"))
-_ENERGY_CATS = (("power", "Electricity", "#d4a106"), ("heat", "Heat", "#dc2626"))
+# Chart categories take the chart palette in its fixed order, so neighbours in
+# a stack stay apart for colour-blind readers; "Other" is the neutral grey.
+_S = ui.SERIES
+_COST_CATS = (("energy", "Energy", _S[0]), ("materials", "Feeds & materials", _S[1]),
+              ("capital", "Capital-related", _S[2]), ("utilities", "Utilities", _S[3]),
+              ("plant", "Labour, overhead & other", _S[4]))
+_GWP_CATS = (("elec", "Electricity", _S[0]), ("heat", "Heat", _S[1]),
+             ("inputs", "Feeds & materials", _S[2]), ("uptake", "Biogenic uptake", _S[3]),
+             ("credit", "Avoided treatment", _S[4]), ("other", "Other", ui.CHART_EMPHASIS_GRAY))
+_ENERGY_CATS = (("power", "Electricity", _S[0]), ("heat", "Heat", _S[1]))
 
 _LINKED_ROLES = (B.CULTIVATION, B.HARVEST, B.DRYING, B.DISRUPTION, B.EXTRACTION, B.FEED_WATER,
                  B.FEED_NUTRIENTS, B.FEED_CARBON, B.FEED_SUBSTRATE, B.FEED_SOLVENT, B.FEED_CHEMICALS,
                  B.FEED_WASTE, B.PRODUCT)
 
-_TOOL_CSS = (
-    "QToolButton{background:#ffffff; color:#334155; border:1px solid #cbd5e1; border-radius:5px; "
-    "padding:4px 9px; font-weight:600;} "
-    "QToolButton:hover{background:#f1f5f9; border-color:#94a3b8;} "
-    "QToolButton:checked{background:#e7f0e9; border-color:#15803d; color:#14532d;} "
-    "QToolButton:disabled{color:#b8c2cc; border-color:#e2e8f0;} "
-    "QToolButton::menu-indicator{image:none;}")
-_PRIMARY_CSS = (
-    "QToolButton{background:#15803d; color:white; border:none; border-radius:5px; padding:5px 11px; "
-    "font-weight:700;} QToolButton:hover{background:#116330;} "
-    "QToolButton:disabled{background:#c3ccd6; color:#eef2f6;}")
-_BLUE_CSS = (
-    "QToolButton{background:#1565c0; color:white; border:none; border-radius:5px; padding:5px 11px; "
-    "font-weight:700;} QToolButton:hover{background:#0f4c99;} "
-    "QToolButton:disabled{background:#c3ccd6; color:#eef2f6;}")
+# Banner states of the editor -> the banner kinds of the app stylesheet.
+_BANNER_KIND = {"info": "info", "warn": "warning", "error": "danger", "ok": "success"}
+_BANNER_GLYPH = {"info": "i", "success": "✓", "warning": "!", "danger": "!"}
+
+_SWATCHES: dict[str, QIcon] = {}
+
+
+def _swatch(color: str) -> QIcon:
+    """A small colour key for a table cell, so the text itself stays in the ink colour."""
+    icon = _SWATCHES.get(color)
+    if icon is None:
+        pm = QPixmap(10, 10)
+        pm.fill(Qt.transparent)
+        painter = QPainter(pm)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QColor(color))
+        painter.drawRoundedRect(QRectF(0, 0, 10, 10), 2, 2)
+        painter.end()
+        icon = _SWATCHES[color] = QIcon(pm)
+    return icon
 
 
 def _stream_width(total: float, fmax: float) -> float:
@@ -206,18 +228,18 @@ class FlowsheetEditor(QWidget):
     # ------------------------------------------------------------------ #
     def _build_ui(self):
         root = QVBoxLayout(self)
-        root.setContentsMargins(6, 6, 6, 6)
-        root.setSpacing(6)
+        root.setContentsMargins(ui.SPACE_2, ui.SPACE_2, ui.SPACE_2, ui.SPACE_1)
+        root.setSpacing(ui.SPACE_2)
         root.addLayout(self._build_toolbar())
 
         self.kpi_bar = QWidget()
         kl = QHBoxLayout(self.kpi_bar)
         kl.setContentsMargins(0, 0, 0, 0)
-        kl.setSpacing(6)
+        kl.setSpacing(ui.SPACE_2)
         self.tiles: dict[str, KpiTile] = {}
         for k in P.KPIS:
             tile = KpiTile(k)
-            tile.setMinimumWidth(96)
+            tile.setMinimumWidth(104)
             kl.addWidget(tile)
             self.tiles[k.key] = tile
         root.addWidget(self.kpi_bar)
@@ -225,8 +247,15 @@ class FlowsheetEditor(QWidget):
         self.banner = QFrame()
         self.banner.setObjectName("banner")
         bl = QHBoxLayout(self.banner)
-        bl.setContentsMargins(10, 5, 6, 5)
-        bl.setSpacing(8)
+        bl.setContentsMargins(2, 0, 0, 0)
+        bl.setSpacing(10)
+        self.banner_glyph = QLabel("i")
+        glyph_font = self.banner_glyph.font()
+        glyph_font.setBold(True)
+        self.banner_glyph.setFont(glyph_font)
+        self.banner_glyph.setFixedWidth(14)
+        self.banner_glyph.setAlignment(Qt.AlignCenter)
+        bl.addWidget(self.banner_glyph)
         self.banner_text = QLabel("")
         self.banner_text.setTextFormat(Qt.RichText)
         self.banner_text.setWordWrap(True)
@@ -235,6 +264,7 @@ class FlowsheetEditor(QWidget):
         self._banner_actions: list = [None, None]
         for i in range(2):
             b = QPushButton("")
+            b.setProperty("kind", "secondary")
             b.setCursor(Qt.PointingHandCursor)
             b.clicked.connect(lambda _=False, i=i: self._banner_click(i))
             bl.addWidget(b)
@@ -253,30 +283,35 @@ class FlowsheetEditor(QWidget):
 
         canvas = QFrame()
         canvas.setObjectName("canvasFrame")
-        canvas.setStyleSheet("#canvasFrame{border:1px solid #d5dde3; border-radius:6px;}")
+        canvas.setStyleSheet(f"#canvasFrame{{background:{ui.SURFACE}; border:1px solid {ui.LINE}; "
+                             f"border-radius:{ui.RADIUS}px;}}")
         cl = QVBoxLayout(canvas)
         cl.setContentsMargins(1, 1, 1, 1)
         cl.addWidget(self.view)
         self._build_canvas_bar()
 
+        # Drawing over the charts in the middle; the inspector, where the
+        # variables are, keeps the full height on the right.
+        self.dock = self._build_dock()
+        centre = QSplitter(Qt.Vertical)
+        centre.addWidget(canvas)
+        centre.addWidget(self.dock)
+        # the canvas keeps about three quarters of the height on any window
+        centre.setStretchFactor(0, 3)
+        centre.setStretchFactor(1, 1)
+        centre.setChildrenCollapsible(False)
+        centre.setSizes([540, 200])
+
         middle = QSplitter(Qt.Horizontal)
         middle.addWidget(self.palette_box)
-        middle.addWidget(canvas)
+        middle.addWidget(centre)
         middle.addWidget(self.inspector)
         middle.setStretchFactor(0, 0)
         middle.setStretchFactor(1, 1)
         middle.setStretchFactor(2, 0)
         middle.setChildrenCollapsible(False)
-        middle.setSizes([215, 1000, 370])
-
-        self.dock = self._build_dock()
-        vsplit = QSplitter(Qt.Vertical)
-        vsplit.addWidget(middle)
-        vsplit.addWidget(self.dock)
-        vsplit.setStretchFactor(0, 1)
-        vsplit.setStretchFactor(1, 0)
-        vsplit.setSizes([640, 250])
-        root.addWidget(vsplit, 1)
+        middle.setSizes([220, 1000, 360])
+        root.addWidget(middle, 1)
 
         for seq, slot in ((QKeySequence.Undo, self.undo), (QKeySequence.Redo, self.redo),
                           (QKeySequence("Ctrl+Shift+Z"), self.redo),
@@ -285,10 +320,13 @@ class FlowsheetEditor(QWidget):
             sc.setContext(Qt.WidgetWithChildrenShortcut)
             sc.activated.connect(slot)
 
-    def _tool(self, text: str, tip: str, slot=None, checkable=False, checked=False, css=_TOOL_CSS):
-        b = QToolButton()
-        b.setText(text)
+    def _button(self, text: str, tip: str, slot=None, kind: str = "secondary",
+                checkable: bool = False, checked: bool = False) -> QPushButton:
+        """A push button of one of the app's kinds: primary, secondary or ghost."""
+        b = QPushButton(text)
         b.setToolTip(tip)
+        if kind != "primary":
+            b.setProperty("kind", kind)
         b.setCheckable(checkable)
         if checkable:
             b.setChecked(checked)
@@ -296,40 +334,40 @@ class FlowsheetEditor(QWidget):
                 b.toggled.connect(slot)
         elif slot is not None:
             b.clicked.connect(slot)
-        b.setStyleSheet(css)
         b.setCursor(Qt.PointingHandCursor)
         return b
 
     def _build_toolbar(self) -> QHBoxLayout:
         bar = QHBoxLayout()
-        bar.setSpacing(5)
-        title = QLabel("Process Designer")
-        title.setStyleSheet("font-weight:800; color:#0f172a; font-size:14px; letter-spacing:0.3px;")
-        bar.addWidget(title)
+        bar.setSpacing(ui.SPACE_2)
+        # The tab already says "Process Designer"; this line says what is linked.
         self.pfd_subtitle = _ElidedLabel()
-        self.pfd_subtitle.setStyleSheet("color:#5b6b78; font-size:11px; padding-left:8px;")
+        self.pfd_subtitle.setObjectName("subtle")
         bar.addWidget(self.pfd_subtitle, 1)
 
-        self.btn_generate = self._tool(
-            "⟳ From case study", "Build the drawing from the current TEA/LCA case study "
+        self.btn_undo = self._button("Undo", "Undo the last change (Ctrl+Z)", self.undo, "ghost")
+        self.btn_redo = self._button("Redo", "Redo (Ctrl+Y)", self.redo, "ghost")
+        self.btn_generate = self._button(
+            "From case study", "Build the drawing from the current TEA/LCA case study "
             "(organism, system, harvesting, drying, extraction) and link it to the engine.",
-            self.generate_from_scenario, css=_BLUE_CSS)
-        self.btn_undo = self._tool("↶ Undo", "Undo the last change (Ctrl+Z)", self.undo)
-        self.btn_redo = self._tool("↷ Redo", "Redo (Ctrl+Y)", self.redo)
-        self.btn_apply = self._tool(
-            "✓ Apply to case study", "Copy the designer's working copy into the case study: the "
+            self.generate_from_scenario)
+        self.btn_reset = self._button("Reset", "Back to the case study as loaded (undoable)",
+                                      self.reset_to_case)
+        self.btn_apply = self._button(
+            "Apply to case study", "Copy the designer's working copy into the case study: the "
             "Scenario tab, the KPI cards and every export will use it.", self.apply_to_case,
-            css=_PRIMARY_CSS)
-        self.btn_reset = self._tool("Reset", "Back to the case study as loaded (undoable)",
-                                    self.reset_to_case)
-        self.btn_palette = self._tool("Blocks", "Show the palette of unit operations for drawing "
-                                      "by hand", self._set_palette_visible, checkable=True)
-        for b in (self.btn_generate, self.btn_undo, self.btn_redo, self.btn_apply, self.btn_reset):
+            "primary")
+        self.btn_palette = self._button("Blocks", "Show the palette of unit operations for drawing "
+                                        "by hand", self._set_palette_visible, checkable=True)
+        for b in (self.btn_undo, self.btn_redo):
             bar.addWidget(b)
-        bar.addSpacing(8)
+        bar.addSpacing(ui.SPACE_2)
+        for b in (self.btn_generate, self.btn_reset, self.btn_apply):
+            bar.addWidget(b)
+        bar.addSpacing(ui.SPACE_2)
         bar.addWidget(self.btn_palette)
 
-        file_btn = self._tool("File ▾", "Save or load a drawing")
+        file_btn = self._button("File ▾", "Save or load a drawing")
         menu = QMenu(file_btn)
         menu.addAction("Save drawing…", self.save_flowsheet)
         menu.addAction("Load drawing…", self.load_flowsheet)
@@ -337,10 +375,9 @@ class FlowsheetEditor(QWidget):
         menu.addAction("Sketch example", self.load_example)
         menu.addAction("Clear canvas", self.clear_flowsheet)
         file_btn.setMenu(menu)
-        file_btn.setPopupMode(QToolButton.InstantPopup)
         bar.addWidget(file_btn)
 
-        exp_btn = self._tool("Export ▾", "Export the drawing or the stream table")
+        exp_btn = self._button("Export ▾", "Export the drawing or the stream table")
         emenu = QMenu(exp_btn)
         emenu.addAction("Image (PNG)…", lambda: self.export_image("png"))
         emenu.addAction("Vector PDF…", lambda: self.export_image("pdf"))
@@ -348,20 +385,20 @@ class FlowsheetEditor(QWidget):
         emenu.addSeparator()
         emenu.addAction("Stream table (CSV)…", self.export_streams_csv)
         exp_btn.setMenu(emenu)
-        exp_btn.setPopupMode(QToolButton.InstantPopup)
         bar.addWidget(exp_btn)
         return bar
 
     def _build_canvas_bar(self):
-        """Floating controls over the canvas: overlay layer, what to show, theme, zoom."""
+        """Floating controls over the canvas: overlay layer, what to show, zoom."""
         self.canvas_bar = QFrame(self.view)
         self.canvas_bar.setObjectName("canvasBar")
         lay = QHBoxLayout(self.canvas_bar)
-        lay.setContentsMargins(6, 4, 6, 4)
-        lay.setSpacing(3)
+        lay.setContentsMargins(8, 4, 6, 4)
+        lay.setSpacing(2)
 
-        cap = QLabel("HALO")
+        cap = QLabel("Halo")
         cap.setObjectName("cap")
+        cap.setToolTip("What the glow behind each block measures")
         lay.addWidget(cap)
         self.layer_group = QButtonGroup(self.canvas_bar)
         self.layer_group.setExclusive(True)
@@ -376,39 +413,45 @@ class FlowsheetEditor(QWidget):
                           "energy": "Halo sized by electric load plus heat duty",
                           "cost": "Halo sized by each block's share of the operating cost",
                           "gwp": "Halo sized by each block's GWP contribution "
-                                 "(green: a credit)"}[key])
+                                 "(red: a burden, blue: a credit)"}[key])
             b.clicked.connect(lambda _=False, k=key: self.set_layer(k))
             self.layer_group.addButton(b)
             lay.addWidget(b)
             self.layer_btns[key] = b
         lay.addSpacing(8)
 
-        self.toggle_btns: dict[str, QToolButton] = {}
+        # What the drawing shows: one menu instead of seven buttons, so the bar
+        # still fits over a narrow canvas.
+        show_btn = QToolButton()
+        show_btn.setText("Show ▾")
+        show_btn.setToolTip("Plant areas, utility lines, labels, animation, sheet, overview map")
+        show_btn.setPopupMode(QToolButton.InstantPopup)
+        show_menu = QMenu(show_btn)
+        show_menu.setToolTipsVisible(True)
+        self.toggle_btns: dict[str, QAction] = {}
         for key, label, tip, on in (
-                ("areas", "Areas", "Dashed frames around the plant areas (100–500)", True),
-                ("utilities", "Utilities", "Electricity and heat headers with a drop to each user", False),
-                ("labels", "Labels", "Flow chips and stream numbers on the lines", True),
-                ("flow", "Flow", "Moving dashes along the streams", True),
-                ("sheet", "Sheet", "Drawing border, legend and title block", True),
-                ("map", "Map", "Overview map in the corner while part of the drawing is "
-                                "off screen", True)):
-            b = QToolButton()
-            b.setText(label)
-            b.setToolTip(tip)
-            b.setCheckable(True)
-            b.setChecked(on)
-            b.toggled.connect(lambda checked, k=key: self._toggle(k, checked))
-            lay.addWidget(b)
-            self.toggle_btns[key] = b
-        lay.addSpacing(8)
-
-        self.btn_boxes = QToolButton()
-        self.btn_boxes.setText("Boxes")
+                ("areas", "Plant areas", "Dashed frames around the plant areas (100–500)", True),
+                ("utilities", "Utility lines", "Electricity and heat headers with a drop to each user",
+                 False),
+                ("labels", "Flow labels", "Flow chips and stream numbers on the lines", True),
+                ("flow", "Moving flow", "Moving dashes along the streams", True),
+                ("sheet", "Drawing sheet", "Drawing border, legend and title block", True),
+                ("map", "Overview map", "Overview map in the corner while part of the drawing is "
+                                        "off screen", True)):
+            act = show_menu.addAction(label)
+            act.setToolTip(tip)
+            act.setCheckable(True)
+            act.setChecked(on)
+            act.toggled.connect(lambda checked, k=key: self._toggle(k, checked))
+            self.toggle_btns[key] = act
+        show_menu.addSeparator()
+        self.btn_boxes = show_menu.addAction("Boxed blocks")
         self.btn_boxes.setCheckable(True)
         self.btn_boxes.setChecked(not getattr(NodeItem, "BOXLESS", True))
         self.btn_boxes.setToolTip("Boxed blocks with port labels (handier for wiring by hand)")
         self.btn_boxes.toggled.connect(self._toggle_boxes)
-        lay.addWidget(self.btn_boxes)
+        show_btn.setMenu(show_menu)
+        lay.addWidget(show_btn)
         lay.addSpacing(8)
         for text, tip, slot in (("−", "Zoom out", lambda: self.view.zoom_by(1 / 1.2)),
                                 ("100 %", "Click for 100 %. Wheel to zoom, middle-drag to pan.",
@@ -435,43 +478,53 @@ class FlowsheetEditor(QWidget):
         self.canvas_bar.adjustSize()
 
     def _style_canvas_bar(self):
+        # The bar's own rules win over the app's, so hover and checked are repeated here.
         self.canvas_bar.setStyleSheet(
-            "#canvasBar{background:rgba(255,255,255,240); border:1px solid #cbd5e1; border-radius:8px;}"
-            "#canvasBar QLabel#cap{color:#94a3b8; font-size:9px; font-weight:700; padding:0 3px;}"
-            "#canvasBar QToolButton{background:transparent; color:#334155; border:1px solid transparent;"
-            " border-radius:4px; padding:2px 7px; font-size:11px; font-weight:600;}"
-            "#canvasBar QToolButton:hover{background:#f1f5f9;}"
-            "#canvasBar QToolButton:checked{background:#e7f0e9; color:#14532d; border-color:#14532d;}")
+            f"#canvasBar{{background:rgba(255,255,255,245); border:1px solid {ui.LINE};"
+            f" border-radius:{ui.RADIUS_LG}px;}}"
+            f"#canvasBar QLabel#cap{{color:{ui.INK_3}; font-size:{ui.TEXT_SM}px; padding:0 4px 0 2px;}}"
+            f"#canvasBar QToolButton{{background:transparent; color:{ui.INK_2};"
+            f" border:1px solid transparent; border-radius:{ui.RADIUS_SM}px; padding:3px 8px;"
+            f" font-size:{ui.TEXT_SM}px; font-weight:600;}}"
+            f"#canvasBar QToolButton:hover{{background:{ui.ACCENT_SOFT}; color:{ui.ACCENT};}}"
+            f"#canvasBar QToolButton:checked{{background:{ui.ACCENT_SOFT}; color:{ui.ACCENT};"
+            f" border-color:{ui.ACCENT_SOFT_2};}}"
+            "#canvasBar QToolButton::menu-indicator{image:none; width:0;}")
         self._fit_canvas_bar()
 
     def _build_palette(self) -> QWidget:
         box = QFrame()
-        box.setObjectName("kpiCard")
+        box.setObjectName("card")
         box.setMinimumWidth(200)
         box.setMaximumWidth(260)
         lay = QVBoxLayout(box)
-        lay.setContentsMargins(8, 8, 8, 8)
-        lay.setSpacing(4)
+        lay.setContentsMargins(10, 10, 6, 10)
+        lay.setSpacing(6)
         head = QLabel("Unit operations")
-        head.setStyleSheet("font-weight:700; color:#334155;")
+        head.setObjectName("h2")
         lay.addWidget(head)
         self.palette = QListWidget()
         self.palette.setFrameShape(QFrame.NoFrame)
         self.palette.setIconSize(QSize(22, 22))
         self.palette.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.palette.setTextElideMode(Qt.ElideRight)
-        self.palette.setStyleSheet("QListWidget{background:transparent;} "
-                                   "QListWidget::item{padding:4px 4px; border-radius:6px;} "
-                                   "QListWidget::item:hover{background:#eef5ee;}")
+        self.palette.setStyleSheet(
+            "QListWidget{background:transparent; border:none;} "
+            f"QListWidget::item{{padding:4px 4px; border-radius:{ui.RADIUS}px;}} "
+            f"QListWidget::item:hover{{background:{ui.ACCENT_SOFT};}} "
+            f"QListWidget::item:selected{{background:{ui.ACCENT_SOFT_2}; color:{ui.INK};}}")
         self.palette.verticalScrollBar().setStyleSheet(THIN_SCROLLBAR)
         self.palette.itemDoubleClicked.connect(self._palette_add)
+        head_font = QFont(self.palette.font())
+        head_font.setPixelSize(ui.TEXT_SM)
+        head_font.setWeight(QFont.DemiBold)
         for cat, label in _CATEGORY_LABELS.items():
-            header = QListWidgetItem(label.upper())
+            header = QListWidgetItem(label)
             header.setFlags(Qt.NoItemFlags)
-            header.setFont(QFont("Segoe UI", 7, QFont.Bold))
-            header.setForeground(QColor("#90a0ab"))
+            header.setFont(head_font)
+            header.setForeground(QColor(ui.INK_3))
             self.palette.addItem(header)
-            color = QColor(M.CATEGORY_COLORS.get(cat, "#455a64"))
+            color = QColor(M.CATEGORY_COLORS.get(cat, ui.INK_2))
             for key, sp in M.UNIT_TYPES.items():
                 if sp.category != cat:
                     continue
@@ -483,7 +536,7 @@ class FlowsheetEditor(QWidget):
         lay.addWidget(self.palette, 1)
         tip = QLabel("Double-click to drop on the canvas · drag outlet → inlet to connect · "
                      "Del removes a hand-drawn block")
-        tip.setObjectName("subtle")
+        tip.setObjectName("caption")
         tip.setWordWrap(True)
         lay.addWidget(tip)
         return box
@@ -491,6 +544,7 @@ class FlowsheetEditor(QWidget):
     def _build_dock(self) -> QTabWidget:
         dock = QTabWidget()
         dock.setDocumentMode(True)
+        dock.setMinimumHeight(150)
 
         def scrolled(widget) -> QScrollArea:
             sa = QScrollArea()
@@ -499,12 +553,28 @@ class FlowsheetEditor(QWidget):
             sa.setWidget(widget)
             return sa
 
+        # Every chart has its table twin on the same page, one click away.
+        self._chart_tables: list = []
+
+        def chart_page(chart) -> QStackedWidget:
+            stack = QStackedWidget()
+            stack.addWidget(scrolled(chart))
+            table = QTableWidget(0, 0)
+            table.verticalHeader().setVisible(False)
+            table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+            table.setSelectionBehavior(QAbstractItemView.SelectRows)
+            table.setAlternatingRowColors(True)
+            table.horizontalHeader().setStretchLastSection(True)
+            stack.addWidget(table)
+            self._chart_tables.append((chart, table, stack))
+            return stack
+
         self.cost_chart = StackedBars("Annual operating cost by block")
         self.gwp_chart = StackedBars("GWP contribution by block")
         self.energy_chart = StackedBars("Electric load and heat duty by block")
-        dock.addTab(scrolled(self.cost_chart), "Cost")
-        dock.addTab(scrolled(self.gwp_chart), "Emissions")
-        dock.addTab(scrolled(self.energy_chart), "Energy")
+        dock.addTab(chart_page(self.cost_chart), "Cost")
+        dock.addTab(chart_page(self.gwp_chart), "Emissions")
+        dock.addTab(chart_page(self.energy_chart), "Energy")
 
         self.stream_table = QTableWidget(0, 6 + len(M.COMPONENTS))
         self.stream_table.setHorizontalHeaderLabels(
@@ -515,8 +585,7 @@ class FlowsheetEditor(QWidget):
         self.stream_table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.stream_table.setSelectionMode(QAbstractItemView.SingleSelection)
         self.stream_table.setAlternatingRowColors(True)
-        self.stream_table.setStyleSheet("QTableWidget{border:none; font-size:11px;} "
-                                        "QHeaderView::section{font-size:10px; font-weight:600;}")
+        self.stream_table.setStyleSheet(f"QTableWidget{{border:none; font-size:{ui.TEXT_SM}px;}}")
         hh = self.stream_table.horizontalHeader()
         hh.setSectionResizeMode(QHeaderView.ResizeToContents)
         hh.setStretchLastSection(True)
@@ -524,16 +593,48 @@ class FlowsheetEditor(QWidget):
         dock.addTab(self.stream_table, "Streams")
 
         self.tornado = TornadoChart()
-        self._drivers_page = scrolled(self.tornado)
+        self._drivers_page = chart_page(self.tornado)
         dock.addTab(self._drivers_page, "Key drivers")
 
         self.log_list = QListWidget()
-        self.log_list.setStyleSheet("QListWidget{border:none; font-size:11px;} "
-                                    "QListWidget::item{padding:3px 6px;}")
+        self.log_list.setStyleSheet(f"QListWidget{{border:none; font-size:{ui.TEXT_SM}px;}} "
+                                    "QListWidget::item{padding:4px 8px;}")
         self.log_list.itemClicked.connect(self._on_log_clicked)
         dock.addTab(self.log_list, "Change log")
+
+        self.btn_table = QPushButton("Show as table")
+        self.btn_table.setProperty("kind", "ghost")
+        self.btn_table.setCheckable(True)
+        self.btn_table.setCursor(Qt.PointingHandCursor)
+        self.btn_table.setToolTip("Switch the charts to the same figures as tables, and back")
+        self.btn_table.toggled.connect(self._show_chart_tables)
+        dock.setCornerWidget(self.btn_table, Qt.TopRightCorner)
         dock.currentChanged.connect(self._on_dock_tab)
         return dock
+
+    def _show_chart_tables(self, on: bool):
+        self.btn_table.setText("Show as chart" if on else "Show as table")
+        self._fill_chart_tables()
+
+    def _fill_chart_tables(self):
+        """Show the charts or their tables, and refresh the tables on show."""
+        on = self.btn_table.isChecked()
+        for chart, table, stack in self._chart_tables:
+            stack.setCurrentIndex(1 if on else 0)
+            if not on:
+                continue
+            headers, rows = chart.table()
+            table.clear()
+            table.setColumnCount(len(headers))
+            table.setRowCount(len(rows))
+            table.setHorizontalHeaderLabels(headers)
+            for r, row in enumerate(rows):
+                for c, text in enumerate(row):
+                    item = QTableWidgetItem(text)
+                    if c > 0:
+                        item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                    table.setItem(r, c, item)
+            table.resizeColumnsToContents()
 
     # ------------------------------------------------------------------ #
     # Host wiring
@@ -1054,6 +1155,7 @@ class FlowsheetEditor(QWidget):
             if st.kpis is None:
                 tile.set_unavailable("not admissible")
                 continue
+            tile.set_basis(P.kpi_basis(tile.kpi, self.session.results))
             base = self.session.baseline_kpis.get(key) if self.session.baseline_kpis else None
             tile.set_data(st.kpis[key], base, [s.kpis[key] for s in hist if s.kpis])
 
@@ -1075,7 +1177,7 @@ class FlowsheetEditor(QWidget):
                         label = f"{tags[role]}  {label}"
                     rows.append((role, label, sec.color))
         if P.PLANT in att.units:
-            rows.append((P.PLANT, "Plant-wide (labour, overhead, other)", "#7c3aed"))
+            rows.append((P.PLANT, "Plant-wide (labour, overhead, other)", ui.INK_3))
         return rows
 
     def _update_charts(self):
@@ -1113,6 +1215,7 @@ class FlowsheetEditor(QWidget):
         tot_h = sum(u.heat_kw for u in att.units.values())
         self.energy_chart.set_data(rows_e, _ENERGY_CATS, "kW (heat as kW thermal)", P.fmt_power,
                                    note=f"{P.fmt_power(tot_p)} electric · {P.fmt_power(tot_h)} heat")
+        self._fill_chart_tables()
 
     def _update_stream_table(self):
         fs, res = self.scene.flowsheet, self._solve
@@ -1145,7 +1248,7 @@ class FlowsheetEditor(QWidget):
                 elif c >= 4:
                     it.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
                 if c == 3:
-                    it.setForeground(QColor(theme.stream.get(kind, theme.stream["empty"])))
+                    it.setIcon(_swatch(theme.stream.get(kind, theme.stream["empty"])))
                 table.setItem(r, c, it)
         table.blockSignals(False)
 
@@ -1175,10 +1278,10 @@ class FlowsheetEditor(QWidget):
                 f = it.font()
                 f.setBold(True)
                 it.setFont(f)
-                it.setForeground(QColor("#14532d"))
+                it.setForeground(QColor(ui.ACCENT))
                 it.setText("▶" + text[1:])
             elif i > self.session.position:
-                it.setForeground(QColor("#a8b4c0"))
+                it.setForeground(QColor(ui.INK_DISABLED))
             self.log_list.addItem(it)
             prev = st
         self.log_list.scrollToItem(self.log_list.item(self.session.position))
@@ -1195,15 +1298,12 @@ class FlowsheetEditor(QWidget):
         return n
 
     def _set_banner(self, kind: str, html: str, buttons=()):
-        colors = {"info": ("#eff6ff", "#bfdbfe", "#1e3a5f"), "warn": ("#fffbeb", "#fcd34d", "#78350f"),
-                  "error": ("#fef2f2", "#fca5a5", "#7f1d1d"), "ok": ("#f0fdf4", "#86efac", "#14532d")}
-        bg, border, ink = colors[kind]
-        self.banner.setStyleSheet(
-            f"#banner{{background:{bg}; border:1px solid {border}; border-radius:6px;}}"
-            f"#banner QLabel{{color:{ink}; font-size:11px;}}"
-            f"#banner QPushButton{{background:#ffffff; color:{ink}; border:1px solid {border};"
-            f" border-radius:4px; padding:3px 10px; font-weight:600;}}"
-            f"#banner QPushButton:hover{{background:{border};}}")
+        qss_kind = _BANNER_KIND[kind]
+        if self.banner.property("kind") != qss_kind:
+            self.banner.setProperty("kind", qss_kind)
+            for w in (self.banner, self.banner_glyph, self.banner_text):
+                ui.repolish(w)
+        self.banner_glyph.setText(_BANNER_GLYPH[qss_kind])
         self.banner_text.setText(html)
         for i, b in enumerate(self.banner_btns):
             if i < len(buttons):
@@ -1327,6 +1427,7 @@ class FlowsheetEditor(QWidget):
         s = self.session
         if s is None or s.results is None:
             self.tornado.set_message("Build the drawing from the case study to rank the inputs.")
+            self._fill_chart_tables()
             return
         scn = s.scenario
         roles = sorted({P.role_base(n.role) for n in self.scene.flowsheet.nodes.values() if n.role})
@@ -1339,9 +1440,11 @@ class FlowsheetEditor(QWidget):
                 owner = "Plant"
             rows.append((f"{owner} · {var.label}" if owner else var.label, lo, hi))
         self.tornado.set_data(rows, P.headline(s.results)[0], 0.2)
+        self._fill_chart_tables()
 
     def _on_dock_tab(self, _index: int):
         w = self.dock.currentWidget()
+        self.btn_table.setVisible(any(w is stack for _c, _t, stack in self._chart_tables))
         if w is self.stream_table and self._table_dirty:
             self._update_stream_table()
         elif w is self._drivers_page:
@@ -1559,7 +1662,8 @@ class FlowsheetEditor(QWidget):
         for comp in M.COMPONENTS:
             v = flow.get(comp, 0.0)
             if v > 0 and total > 0:
-                rows.append((_COMPONENT_LABELS[comp], f"{P.fmt_rate(v)}   {v / total * 100:,.1f} %"))
+                rows.append((_COMPONENT_LABELS[comp], f"{P.fmt_rate(v)}   {v / total * 100:,.1f} %",
+                             COMPONENT_COLORS.get(comp)))
         bio, water = flow.get("biomass", 0.0), flow.get("water", 0.0)
         if bio > 0 and bio + water > 0:
             rows.append(("Dry solids", f"{bio / (bio + water) * 100:,.2f} %"))

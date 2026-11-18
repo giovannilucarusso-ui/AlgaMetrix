@@ -23,8 +23,10 @@ from dataclasses import dataclass, field
 from algametrix.inputcheck import InadmissibleScenarioError, InputIssue, check_inputs
 from algametrix.models import Basis, CarbonSource, Scenario, TrophicMode
 from algametrix.scenario import Results, run_scenario
+from algametrix.serialization import reference_product
 
 from . import builder as B
+from . import model as M
 
 # --------------------------------------------------------------------------- #
 # Sections (plant areas)
@@ -43,12 +45,14 @@ class Section:
 SECTIONS: tuple[Section, ...] = (
     Section("100", "Feed preparation",
             (B.FEED_WATER, B.FEED_NUTRIENTS, B.FEED_CHEMICALS, B.FEED_INOCULUM,
-             B.FEED_CARBON, B.FEED_SUBSTRATE, B.FEED_WASTE, B.MEDIA_PREP), "#607d8b"),
-    Section("200", "Cultivation", (B.CULTIVATION,), "#2e7d32"),
-    Section("300", "Harvesting", (B.HARVEST, B.EFFLUENT), "#1565c0"),
-    Section("400", "Drying", (B.DRYING, B.VAPOUR), "#e65100"),
+             B.FEED_CARBON, B.FEED_SUBSTRATE, B.FEED_WASTE, B.MEDIA_PREP),
+            M.CATEGORY_COLORS["io"]),
+    Section("200", "Cultivation", (B.CULTIVATION,), M.CATEGORY_COLORS["cultivation"]),
+    Section("300", "Harvesting", (B.HARVEST, B.EFFLUENT), M.CATEGORY_COLORS["separation"]),
+    Section("400", "Drying", (B.DRYING, B.VAPOUR), M.CATEGORY_COLORS["thermal"]),
     Section("500", "Downstream processing",
-            (B.DISRUPTION, B.EXTRACTION, B.FEED_SOLVENT, B.SPENT), "#6a1b9a"),
+            (B.DISRUPTION, B.EXTRACTION, B.FEED_SOLVENT, B.SPENT),
+            M.CATEGORY_COLORS["downstream"]),
 )
 
 ROLE_LABELS: dict[str, str] = {
@@ -483,18 +487,27 @@ class KPI:
     unit: str
     lower_is_better: bool
     decimals: int = 2
+    #: What the figure is per, or what it covers. ``{product}`` is replaced by
+    #: the reference product of the results (see :func:`kpi_basis`).
+    basis: str = ""
 
 
 KPIS: tuple[KPI, ...] = (
-    KPI("cost", "Production cost", "€/kg", True),
-    KPI("gwp", "GWP", "kg CO₂-eq/kg", True),
-    KPI("output", "Output", "t/yr", False, 0),
-    KPI("capex", "Total investment", "M€", True, 1),
-    KPI("opex", "Operating cost", "M€/yr", True, 2),
-    KPI("npv", "NPV", "M€", False, 1),
-    KPI("energy", "Specific energy", "kWh/kg DW", True, 2),
-    KPI("water", "Water", "m³/kg DW", True, 3),
+    KPI("cost", "Production cost", "€/kg", True, basis="per kg {product}, at the plant gate"),
+    KPI("gwp", "GWP", "kg CO₂-eq/kg", True, basis="per kg {product}, cradle-to-gate"),
+    KPI("output", "Output", "t/yr", False, 0, basis="{product}"),
+    KPI("capex", "Total investment", "M€", True, 1, basis="fixed and working capital, start-up"),
+    KPI("opex", "Operating cost", "M€/yr", True, 2, basis="whole plant"),
+    KPI("npv", "NPV", "M€", False, 1, basis="after tax, over the plant lifetime"),
+    KPI("energy", "Specific energy", "kWh/kg DW", True, 2, basis="electricity plus heat"),
+    KPI("water", "Water", "m³/kg DW", True, 3, basis="direct use and in the electricity"),
 )
+
+
+def kpi_basis(kpi: KPI, r: Results | None) -> str:
+    """The basis line of a KPI tile, with the reference product filled in."""
+    product = reference_product(r) if r is not None else "product"
+    return kpi.basis.format(product=product)
 
 
 def kpis(r: Results) -> dict[str, float]:

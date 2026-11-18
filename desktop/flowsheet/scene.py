@@ -46,7 +46,18 @@ from PySide6.QtWidgets import (
 from shiboken6 import isValid
 
 from . import icons, model as M
-from .theme import LAYER_LABELS, PAPER, STREAM_LABELS, Theme, category_color
+from .. import theme as ui
+from .theme import (
+    COMPONENT_COLORS,
+    LAYER_LABELS,
+    PAPER,
+    STREAM_LABELS,
+    Theme,
+    category_color,
+    mono_font_families,
+    on_fill,
+    ui_font_families,
+)
 
 # --- geometry ---------------------------------------------------------------- #
 GRID = 20
@@ -65,12 +76,13 @@ CARD_SYM = 60.0            # symbol size in the boxed look
 # Kept for callers that import the old names.
 CANVAS_BG = PAPER.canvas
 
-_UI = "Segoe UI"
-_MONO = "Consolas"
+_UI = "ui"        # the app's text font stack
+_MONO = "mono"    # its monospace stack, for equipment tags
 
 
 def _font(size: float, weight=QFont.Normal, family: str = _UI) -> QFont:
-    f = QFont(family)
+    f = QFont()
+    f.setFamilies(mono_font_families() if family == _MONO else ui_font_families())
     f.setPointSizeF(size)
     f.setWeight(weight)
     return f
@@ -266,10 +278,11 @@ class NodeItem(QGraphicsObject):
 
     def _refresh_tooltip(self):
         n = self.node
-        text = f"<b>{n.tag}</b> {n.name}<br><span style='color:#64748b'>{self.sp.label}</span>"
+        # tooltips are light text on the dark ink, so the secondary tones are light too
+        text = f"<b>{n.tag}</b> {n.name}<br><span style='color:{ui.CHART_AXIS}'>{self.sp.label}</span>"
         text += f"<br>{self.STATUS_TEXT.get(self._status, '')}"
         if self._status_note:
-            text += f"<br><span style='color:#b45309'>{self._status_note}</span>"
+            text += f"<br><span style='color:{ui.WARNING_LINE}'>{self._status_note}</span>"
         self.setToolTip(text)
 
     # -- painting -------------------------------------------------------- #
@@ -356,7 +369,7 @@ class NodeItem(QGraphicsObject):
         painter.setBrush(QBrush(self._halo_color))
         painter.drawRoundedRect(box, 7, 7)
         painter.setFont(f)
-        painter.setPen(QPen(QColor("#ffffff")))
+        painter.setPen(QPen(QColor(on_fill(self._halo_color.name()))))
         painter.drawText(box, Qt.AlignCenter, self._badge)
 
     def _paint_symbol(self, painter, sym: QRectF, accent: QColor):
@@ -784,7 +797,7 @@ class SectionItem(QGraphicsItem):
         painter.setBrush(QBrush(color))
         painter.drawRoundedRect(tab, 8, 8)
         painter.setFont(f)
-        painter.setPen(QPen(QColor("#ffffff")))
+        painter.setPen(QPen(QColor(on_fill(color.name()))))
         painter.drawText(tab, Qt.AlignCenter, title)
         if self._metric:
             f2 = _font(7, QFont.DemiBold)
@@ -916,7 +929,7 @@ class StreamCard(QGraphicsItem):
         painter.setRenderHint(painter.RenderHint.Antialiasing, True)
         rect = QRectF(0, 0, self.W, self._h)
         painter.setPen(Qt.NoPen)
-        painter.setBrush(QBrush(_alpha("#000000", 34)))
+        painter.setBrush(QBrush(_alpha(ui.INK, 34)))
         painter.drawRoundedRect(rect.translated(0, 3), 8, 8)
         painter.setBrush(QBrush(QColor(t.face_bg)))
         painter.setPen(QPen(QColor(t.face_border), 1.0))
@@ -926,17 +939,27 @@ class StreamCard(QGraphicsItem):
         painter.setFont(_font(8.5, QFont.Bold))
         painter.setPen(QPen(QColor(t.ink)))
         painter.drawText(QRectF(12, 6, self.W - 20, 18), Qt.AlignVCenter | Qt.AlignLeft, self._title)
-        painter.setFont(_font(7, QFont.DemiBold))
-        painter.setPen(QPen(color))
-        painter.drawText(QRectF(12, 22, self.W - 20, 14), Qt.AlignVCenter | Qt.AlignLeft,
-                         STREAM_LABELS.get(self._edge.kind, "Stream").upper())
+        # the stream class: a key in its colour, the words in the ink
+        painter.setPen(QPen(color, 3.0, Qt.SolidLine, Qt.RoundCap))
+        painter.drawLine(QPointF(13, 29), QPointF(25, 29))
+        painter.setFont(_font(7.5, QFont.DemiBold))
+        painter.setPen(QPen(QColor(t.ink_dim)))
+        painter.drawText(QRectF(31, 22, self.W - 40, 14), Qt.AlignVCenter | Qt.AlignLeft,
+                         STREAM_LABELS.get(self._edge.kind, "Stream"))
         y = 40.0
         f = _font(7.5)
         fb = _font(7.5, QFont.DemiBold)
-        for k, v in self._rows:
+        for row in self._rows:
+            k, v = row[0], row[1]
+            key = row[2] if len(row) > 2 else None
+            if key:
+                painter.setPen(Qt.NoPen)
+                painter.setBrush(QBrush(QColor(key)))
+                painter.drawRoundedRect(QRectF(12, y + 3, 8, 8), 2, 2)
+                painter.setBrush(Qt.NoBrush)
             painter.setFont(f)
             painter.setPen(QPen(QColor(t.ink_dim)))
-            painter.drawText(QRectF(12, y, 110, 14), Qt.AlignVCenter | Qt.AlignLeft, k)
+            painter.drawText(QRectF(24 if key else 12, y, 110, 14), Qt.AlignVCenter | Qt.AlignLeft, k)
             painter.setFont(fb)
             painter.setPen(QPen(QColor(t.face_ink)))
             painter.drawText(QRectF(110, y, self.W - 122, 14), Qt.AlignVCenter | Qt.AlignRight, v)
@@ -946,16 +969,13 @@ class StreamCard(QGraphicsItem):
         total = sum(flow.values()) or 1.0
         bar = QRectF(12, y + 8, self.W - 24, 9)
         x = bar.left()
-        comp_colors = {"biomass": "#2e7d32", "water": "#2b7bd6", "solvent": "#7c3aed",
-                       "product": "#d97706", "substrate": "#a0522d", "co2": "#4f86a6",
-                       "other": "#e8590c"}
         painter.setPen(Qt.NoPen)
         for comp, val in flow.items():
             if val <= 0:
                 continue
             w = bar.width() * val / total
-            painter.setBrush(QBrush(QColor(comp_colors.get(comp, "#94a3b8"))))
-            painter.drawRect(QRectF(x, bar.top(), max(w, 0.8), bar.height()))
+            painter.setBrush(QBrush(QColor(COMPONENT_COLORS.get(comp, ui.INK_DISABLED))))
+            painter.drawRect(QRectF(x, bar.top(), max(w - 1.0, 0.8), bar.height()))
             x += w
         painter.setBrush(Qt.NoBrush)
         painter.setPen(QPen(QColor(t.face_border), 0.8))

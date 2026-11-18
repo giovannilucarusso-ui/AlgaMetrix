@@ -22,6 +22,8 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
+from .. import theme as _ui
+
 # --------------------------------------------------------------------------- #
 # Material flow: a dict of component -> kg/h
 # --------------------------------------------------------------------------- #
@@ -110,14 +112,15 @@ class UnitSpec:
         return {p.key: p.default for p in self.params}
 
 
-# Category -> header colour (hex). Kept in sync with the palette legend.
+# Category -> symbol colour, from the app's chart palette (desktop/theme.py).
+# The plant areas in process.SECTIONS use the same hues.
 CATEGORY_COLORS: dict[str, str] = {
-    "io": "#607d8b",           # feeds / products
-    "cultivation": "#2e7d32",  # reactors, ponds, fermenters
-    "separation": "#1565c0",   # dewatering, filtration, splitters
-    "thermal": "#e65100",      # drying, evaporation
-    "downstream": "#6a1b9a",   # disruption, extraction, purification
-    "logic": "#455a64",        # mixer / splitter helpers
+    "io": _ui.INK_3,               # feeds / products
+    "cultivation": _ui.SERIES[5],  # reactors, ponds, fermenters (green)
+    "separation": _ui.SERIES[0],   # dewatering, filtration, splitters (blue)
+    "thermal": _ui.SERIES[1],      # drying, evaporation (orange)
+    "downstream": _ui.SERIES[6],   # disruption, extraction, purification (violet)
+    "logic": _ui.INK_2,            # mixer / splitter helpers
 }
 
 

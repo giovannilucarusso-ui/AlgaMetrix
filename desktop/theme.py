@@ -4,7 +4,7 @@ One place holds the colours, the type scale, the spacing steps and the radii
 that every screen uses, so a card in the results panel, a page of the setup
 wizard and a dialog on the validation page all come out of the same box of
 parts. The module imports nothing from Qt: the PDF report (matplotlib) reads
-the same tokens, and the Process Designer can adopt them once it lands.
+the same tokens, and so do the Process Designer's canvas and painted charts.
 
 Colour roles, not raw values, are what the rest of the code should name:
 ``INK`` for text, ``LINE`` for a hairline, ``ACCENT`` for the one interactive
@@ -363,6 +363,9 @@ QPushButton[kind="secondary"] {{
 }}
 QPushButton[kind="secondary"]:hover {{ background: {ACCENT_SOFT}; border-color: {ACCENT_SOFT_2}; }}
 QPushButton[kind="secondary"]:pressed {{ background: {ACCENT_SOFT_2}; }}
+QPushButton[kind="secondary"]:checked {{
+    background: {ACCENT_SOFT}; color: {ACCENT}; border-color: {ACCENT_SOFT_2};
+}}
 QPushButton[kind="secondary"]:disabled {{ color: {INK_DISABLED}; background: {SURFACE_2}; }}
 QPushButton[kind="ghost"] {{
     background: transparent;
@@ -371,7 +374,9 @@ QPushButton[kind="ghost"] {{
     font-weight: 600;
 }}
 QPushButton[kind="ghost"]:hover {{ background: {ACCENT_SOFT}; }}
+QPushButton[kind="ghost"]:disabled {{ background: transparent; color: {INK_DISABLED}; }}
 QPushButton[kind="danger"] {{ background: {DANGER_LINE}; border-color: {DANGER_LINE}; }}
+QPushButton::menu-indicator {{ image: none; width: 0; }}
 QToolButton {{
     background: transparent;
     border: 1px solid transparent;
@@ -380,6 +385,7 @@ QToolButton {{
     color: {INK_2};
 }}
 QToolButton:hover {{ background: {ACCENT_SOFT}; color: {ACCENT}; }}
+QToolButton:checked {{ background: {ACCENT_SOFT}; color: {ACCENT}; border: 1px solid {ACCENT_SOFT_2}; }}
 QToolButton:focus {{ border: 1px solid {FOCUS}; }}
 
 /* ---- inputs ----------------------------------------------------------- */

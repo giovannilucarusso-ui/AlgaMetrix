@@ -6,6 +6,7 @@ from PySide6.QtCore import QLineF, QPointF, QRectF, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QImage, QPainter, QPen
 from PySide6.QtWidgets import QGraphicsView, QWidget
 
+from .. import theme as ui
 from .scene import FlowsheetScene
 
 GRID = 20
@@ -57,7 +58,7 @@ class Minimap(QWidget):
         p = QPainter(img)
         p.setRenderHint(QPainter.Antialiasing, True)
         p.setRenderHint(QPainter.SmoothPixmapTransform, True)
-        canvas = QColor(scene.theme.canvas) if isinstance(scene, FlowsheetScene) else QColor("#ffffff")
+        canvas = QColor(scene.theme.canvas) if isinstance(scene, FlowsheetScene) else QColor(ui.SURFACE)
         p.fillRect(self._target, canvas)
         card = getattr(scene, "card", None)
         hidden = card is not None and card.isVisible()
@@ -91,14 +92,14 @@ class Minimap(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing, True)
         frame = QRectF(0.5, 0.5, self.W - 1, self.H - 1)
-        p.setPen(QPen(QColor("#cbd5e1"), 1.0))
+        p.setPen(QPen(QColor(ui.LINE), 1.0))
         p.setBrush(QColor(255, 255, 255, 235))
         p.drawRoundedRect(frame, 7, 7)
         if self._image is not None:
             p.drawImage(QPointF(0, 0), self._image)
             vis = self._view.mapToScene(self._view.viewport().rect()).boundingRect()
             r = self._from_scene(vis).intersected(self._target.adjusted(-1, -1, 1, 1))
-            accent = QColor("#15803d")
+            accent = QColor(ui.ACCENT)
             fill = QColor(accent)
             fill.setAlpha(28)
             p.setBrush(fill)
@@ -306,7 +307,7 @@ class FlowsheetView(QGraphicsView):
             painter.fillRect(rect, canvas)
             area = rect
         else:
-            painter.fillRect(rect, canvas.darker(106))
+            painter.fillRect(rect, QColor(theme.desk))
             shadow = QColor(0, 0, 0, 26)
             for i, a in enumerate((1.0, 0.6, 0.3)):
                 c = QColor(shadow)

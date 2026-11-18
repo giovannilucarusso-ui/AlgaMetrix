@@ -30,12 +30,15 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .. import theme as ui
 from . import icons, model as M
 from . import process as P
-from .charts import ACCENT, BAD, DIM, FAINT, GWP_C, INK, Meter, ResponseChart
-from .theme import THIN_SCROLLBAR, category_color
+from .charts import COST_C, GWP_C, Meter, ResponseChart
+from .theme import PAPER, THIN_SCROLLBAR, category_color, mono_family
 
-_STATUS_COLOR = {"ok": "#22c55e", "warning": "#f59e0b", "error": "#ef4444", "idle": "#a8b4c0"}
+INK, DIM, FAINT = ui.INK, ui.INK_2, ui.INK_3
+_STATUS_COLOR = {"ok": PAPER.ok, "warning": PAPER.warn, "error": PAPER.error, "idle": PAPER.idle}
+_STATUS_INK = {"warning": ui.WARNING, "error": ui.DANGER}
 
 
 @dataclass
@@ -66,16 +69,23 @@ class _ClickLabel(QLabel):
 
 
 def _section_head(text: str) -> QLabel:
-    lbl = QLabel(text.upper())
-    lbl.setStyleSheet(f"color:{FAINT}; font-size:9px; font-weight:700; letter-spacing:0.6px; "
-                      "padding:8px 0 2px 0;")
+    lbl = QLabel(text)
+    lbl.setObjectName("h3")
+    lbl.setContentsMargins(0, 12, 0, 2)
+    return lbl
+
+
+def _caption(text: str) -> QLabel:
+    lbl = QLabel(text)
+    lbl.setObjectName("caption")
+    lbl.setWordWrap(True)
     return lbl
 
 
 def _kv_table(rows) -> str:
     cells = "".join(
-        f"<tr><td style='color:{DIM}; padding:1px 8px 1px 0'>{k}</td>"
-        f"<td align='right' style='color:{INK}; font-weight:600; padding:1px 0'>{v}</td></tr>"
+        f"<tr><td style='color:{DIM}; padding:2px 8px 2px 0'>{k}</td>"
+        f"<td align='right' style='color:{INK}; font-weight:600; padding:2px 0'>{v}</td></tr>"
         for k, v in rows)
     return f"<table width='100%' cellspacing='0' cellpadding='0'>{cells}</table>"
 
@@ -101,16 +111,16 @@ class VariableRow(QWidget):
         self._lo, self._hi = self._span(value, baseline)
 
         grid = QGridLayout(self)
-        grid.setContentsMargins(0, 3, 0, 3)
+        grid.setContentsMargins(0, 4, 0, 4)
         grid.setHorizontalSpacing(6)
-        grid.setVerticalSpacing(1)
+        grid.setVerticalSpacing(2)
 
         self.dot = QLabel("●")
-        self.dot.setFixedWidth(9)
-        unit = f" <span style='color:{FAINT}; font-weight:400'>[{var.unit}]</span>" if var.unit else ""
+        self.dot.setFixedWidth(10)
+        unit = f" <span style='color:{FAINT}; font-weight:400'>{var.unit}</span>" if var.unit else ""
         self.name = _ClickLabel(f"{var.label}{unit}")
         self.name.setWordWrap(True)
-        self.name.setStyleSheet(f"color:{INK}; font-size:11px; font-weight:600;")
+        self.name.setStyleSheet(f"color:{INK}; font-size:{ui.TEXT_SM}px; font-weight:600;")
         self.name.setCursor(Qt.PointingHandCursor)
         self.name.setToolTip(var.help or var.label)
         self.name.clicked.connect(lambda: self.focused.emit(self.var))
@@ -135,15 +145,16 @@ class VariableRow(QWidget):
         self.slider = QSlider(Qt.Horizontal)
         self.slider.setRange(0, self.STEPS)
         self.slider.setStyleSheet(
-            "QSlider::groove:horizontal{height:4px; background:#e2e8f0; border-radius:2px;}"
-            f"QSlider::sub-page:horizontal{{background:{ACCENT}; border-radius:2px;}}"
-            "QSlider::handle:horizontal{width:12px; margin:-5px 0; border-radius:6px; "
-            f"background:#ffffff; border:2px solid {ACCENT};}}")
+            f"QSlider::groove:horizontal{{height:4px; background:{ui.LINE}; border-radius:2px;}}"
+            f"QSlider::sub-page:horizontal{{background:{ui.ACCENT}; border-radius:2px;}}"
+            "QSlider::handle:horizontal{width:12px; margin:-5px 0; border-radius:7px; "
+            f"background:{ui.SURFACE}; border:2px solid {ui.ACCENT};}}"
+            f"QSlider::handle:horizontal:hover{{border-color:{ui.ACCENT_HOVER};}}")
 
         self.info = QLabel("")
         self.info.setTextFormat(Qt.RichText)
         self.info.setWordWrap(True)
-        self.info.setStyleSheet("font-size:10px;")
+        self.info.setStyleSheet(f"font-size:{ui.TEXT_XS}px; color:{DIM};")
         self.info.setToolTip("Elasticity at the current point: the % change of the production "
                              "cost (and of the GWP) for a 1 % change of this input.")
 
@@ -234,7 +245,7 @@ class VariableRow(QWidget):
             self.slider.setValue(self._to_slider(value))
         self._updating = False
         changed = baseline is not None and abs(value - baseline) > 1e-12 * max(1.0, abs(baseline))
-        self.dot.setStyleSheet(f"color:{ACCENT if changed else 'transparent'}; font-size:9px;")
+        self.dot.setStyleSheet(f"color:{ui.ACCENT if changed else 'transparent'}; font-size:{ui.TEXT_XS}px;")
         self.dot.setToolTip("Changed from the case study" if changed else "")
         self.btn_reset.setEnabled(changed)
         self.btn_reset.setToolTip(
@@ -247,17 +258,20 @@ class VariableRow(QWidget):
         self._render_info()
 
     def _render_info(self):
+        # the coloured key ties each figure to its line in the response chart;
+        # the figure itself stays in the ink tones
         def chip(name, e, color):
+            key = f"<span style='color:{color}'>●</span>"
             if e is None:
-                return f"<span style='color:{FAINT}'>{name} —</span>"
-            strong = abs(e) >= 0.5
-            col = color if abs(e) >= 0.05 else FAINT
-            weight = 700 if strong else 500
-            return f"<span style='color:{col}; font-weight:{weight}'>{name} {e:+.2f}</span>"
+                return f"{key} <span style='color:{FAINT}'>{name} —</span>"
+            col = INK if abs(e) >= 0.05 else FAINT
+            weight = 700 if abs(e) >= 0.5 else 400
+            num = f"{e:+.2f}".replace("-", "−")
+            return f"{key} <span style='color:{col}; font-weight:{weight}'>{name} {num}</span>"
 
-        parts = ["<span style='color:#94a3b8'>ε</span> " + chip("cost", self._ecost, ACCENT),
+        parts = [f"<span style='color:{FAINT}'>Elasticity</span> " + chip("cost", self._ecost, COST_C),
                  chip("GWP", self._egwp, GWP_C)]
-        text = " &nbsp;·&nbsp; ".join(parts)
+        text = " &nbsp; ".join(parts)
         b = self._baseline
         if b is not None and self.btn_reset.isEnabled():
             text += (f" &nbsp;&nbsp;<span style='color:{FAINT}'>case "
@@ -293,13 +307,11 @@ class Inspector(QWidget):
         outer.addWidget(self.scroll, 1)
 
         self.response = ResponseChart()
-        self.response.setFixedHeight(200)
-        self.response.setStyleSheet("background:#ffffff;")
+        self.response.setFixedHeight(220)      # follows the panel height, see resizeEvent
         frame = QFrame()
-        frame.setObjectName("respFrame")
-        frame.setStyleSheet("#respFrame{background:#ffffff; border:1px solid #e2e8f0; border-radius:8px;}")
+        frame.setObjectName("card")
         fl = QVBoxLayout(frame)
-        fl.setContentsMargins(4, 4, 4, 4)
+        fl.setContentsMargins(8, 8, 8, 6)
         fl.addWidget(self.response)
         outer.addWidget(frame, 0)
         self._response_frame = frame
@@ -314,12 +326,17 @@ class Inspector(QWidget):
         self._items: QLabel | None = None
         self.show_empty("Select a block on the canvas to inspect it.")
 
+    def resizeEvent(self, event):
+        # On a short window the chart gives up height so the knobs above it
+        # stay in view; on a tall one it stops growing at a readable size.
+        self.response.setFixedHeight(max(180, min(250, int(event.size().height() * 0.4))))
+        super().resizeEvent(event)
+
     # -- helpers -------------------------------------------------------- #
     def _new_page(self) -> QVBoxLayout:
         page = QWidget()
-        page.setStyleSheet("background:transparent;")
         lay = QVBoxLayout(page)
-        lay.setContentsMargins(4, 2, 10, 8)
+        lay.setContentsMargins(2, 0, 10, 8)
         lay.setSpacing(2)
         self.scroll.setWidget(page)
         # the response chart only means something for knobs wired to the engine
@@ -341,31 +358,30 @@ class Inspector(QWidget):
 
     def _header(self, lay, icon_key: str, color: str, tag: str, name: str, sub: str):
         box = QFrame()
-        box.setObjectName("inspHead")
-        box.setStyleSheet("#inspHead{background:#ffffff; border:1px solid #e2e8f0; border-radius:8px;}")
+        box.setObjectName("card")
         h = QHBoxLayout(box)
-        h.setContentsMargins(10, 8, 10, 8)
-        h.setSpacing(10)
+        h.setContentsMargins(12, 10, 12, 10)
+        h.setSpacing(12)
         if icon_key:
             ic = QLabel()
-            ic.setPixmap(icons.icon_pixmap(icon_key, 46, QColor(color)))
-            ic.setFixedSize(46, 46)
-            h.addWidget(ic)
+            ic.setPixmap(icons.icon_pixmap(icon_key, 40, QColor(color)))
+            ic.setFixedSize(40, 40)
+            h.addWidget(ic, 0, Qt.AlignTop)
         col = QVBoxLayout()
-        col.setSpacing(1)
-        t = QLabel(f"<span style='font-family:Consolas; font-weight:800; font-size:15px; color:{INK}'>"
-                   f"{tag}</span>&nbsp; <span style='font-size:12px; font-weight:600; color:{INK}'>"
-                   f"{name}</span>")
+        col.setSpacing(2)
+        t = QLabel(f'<span style="font-family:{mono_family()}; font-weight:700; font-size:{ui.TEXT_MD}px; '
+                   f'color:{INK}">{tag}</span>&nbsp; <span style="font-size:{ui.TEXT_BASE}px; '
+                   f'font-weight:600; color:{INK}">{name}</span>')
         t.setTextFormat(Qt.RichText)
         t.setWordWrap(True)
         s = QLabel(sub)
         s.setTextFormat(Qt.RichText)
         s.setWordWrap(True)
-        s.setStyleSheet(f"color:{color}; font-size:10px; font-weight:600;")
+        s.setStyleSheet(f"color:{DIM}; font-size:{ui.TEXT_SM}px;")
         st = QLabel("")
         st.setTextFormat(Qt.RichText)
         st.setWordWrap(True)
-        st.setStyleSheet("font-size:10px;")
+        st.setStyleSheet(f"font-size:{ui.TEXT_SM}px;")
         col.addWidget(t)
         col.addWidget(s)
         col.addWidget(st)
@@ -380,7 +396,7 @@ class Inspector(QWidget):
                 "error": "Linked · input refused by the engine", "idle": "Drawn by hand"}[level]
         html = f"<span style='color:{_STATUS_COLOR[level]}'>●</span> <span style='color:{DIM}'>{text}</span>"
         for m in messages[:3]:
-            html += f"<br><span style='color:{BAD if level == 'error' else '#b45309'}'>{m}</span>"
+            html += f"<br><span style='color:{_STATUS_INK.get(level, ui.WARNING)}'>{m}</span>"
         self._header_status.setText(html)
 
     def _add_rows(self, lay, variables, scn, session):
@@ -408,10 +424,21 @@ class Inspector(QWidget):
     def show_empty(self, text: str):
         self._mode = ("empty", None)
         lay = self._new_page()
+        box = QFrame()
+        box.setObjectName("emptyState")
+        bl = QVBoxLayout(box)
+        bl.setContentsMargins(16, 24, 16, 24)
+        bl.setSpacing(6)
+        title = QLabel("Nothing selected")
+        title.setObjectName("emptyTitle")
+        title.setAlignment(Qt.AlignCenter)
         msg = QLabel(text)
+        msg.setObjectName("emptyHint")
+        msg.setAlignment(Qt.AlignCenter)
         msg.setWordWrap(True)
-        msg.setStyleSheet(f"color:{DIM}; padding:12px 4px;")
-        lay.addWidget(msg)
+        bl.addWidget(title)
+        bl.addWidget(msg)
+        lay.addWidget(box)
         lay.addStretch(1)
         self.response.clear("")
 
@@ -424,7 +451,8 @@ class Inspector(QWidget):
         sec = P.section_of(node.role)
         sub = f"{sp.label}"
         if sec is not None:
-            sub += f" &nbsp;·&nbsp; <span style='color:{sec.color}'>AREA {sec.code} {sec.label}</span>"
+            sub += (f" &nbsp;·&nbsp; <span style='color:{sec.color}'>●</span> "
+                    f"Area {sec.code}, {sec.label.lower()}")
         self._header(lay, sp.icon, color, node.tag, node.name, sub)
         base = P.role_base(node.role)
 
@@ -449,39 +477,38 @@ class Inspector(QWidget):
 
         variables = P.variables_for(node.role, scn)
         if node.role != base:
-            note = QLabel("Second stage of the dewatering train. The engine treats the train as one "
-                          "step, so both stages share these variables.")
-            note.setWordWrap(True)
-            note.setStyleSheet(f"color:{DIM}; font-size:10px; padding-top:4px;")
-            lay.addWidget(note)
+            lay.addWidget(_caption("Second stage of the dewatering train. The engine treats the train "
+                                   "as one step, so both stages share these variables."))
         if variables:
             self._add_rows(lay, variables, scn, ctx.session)
 
         lay.addWidget(_section_head("At this operating point"))
         self._specs = QLabel("")
         self._specs.setTextFormat(Qt.RichText)
-        self._specs.setStyleSheet("font-size:11px;")
+        self._specs.setStyleSheet(f"font-size:{ui.TEXT_SM}px;")
         lay.addWidget(self._specs)
 
         if ctx.att is not None and base in ctx.att.units:
             lay.addWidget(_section_head("Share of the plant"))
-            for key, label, color_ in (("annual_cost", "Operating cost", ACCENT),
-                                       ("capital", "Fixed capital", "#0f766e"),
-                                       ("power_kw", "Electric load", "#d4a106"),
-                                       ("heat_kw", "Heat duty", "#dc2626"),
-                                       ("gwp", "GWP", GWP_C)):
+            # each meter is a one-series figure, so each takes the first chart
+            # colour; GWP has a sign and takes burden or credit
+            for key, label, color_ in (("annual_cost", "Operating cost", ui.CHART_PRIMARY),
+                                       ("capital", "Fixed capital", ui.CHART_PRIMARY),
+                                       ("power_kw", "Electric load", ui.CHART_PRIMARY),
+                                       ("heat_kw", "Heat duty", ui.CHART_PRIMARY),
+                                       ("gwp", "GWP", ui.BURDEN)):
                 m = Meter(label, color_)
                 lay.addWidget(m)
                 self._meters[key] = m
             self._items = QLabel("")
             self._items.setTextFormat(Qt.RichText)
-            self._items.setStyleSheet("font-size:10px;")
+            self._items.setStyleSheet(f"font-size:{ui.TEXT_SM}px;")
             lay.addWidget(self._items)
 
         lay.addWidget(_section_head("Streams"))
         self._streams = QLabel("")
         self._streams.setTextFormat(Qt.RichText)
-        self._streams.setStyleSheet("font-size:10px;")
+        self._streams.setStyleSheet(f"font-size:{ui.TEXT_SM}px;")
         lay.addWidget(self._streams)
         lay.addStretch(1)
         self.refresh(ctx, node)
@@ -490,18 +517,16 @@ class Inspector(QWidget):
         self._mode = ("plant", None)
         scn = ctx.session.scenario
         lay = self._new_page()
-        self._header(lay, "", ACCENT, "PLANT", scn.organism.name,
+        self._header(lay, "", ui.ACCENT, "PLANT", scn.organism.name,
                      f"{scn.system.name} &nbsp;·&nbsp; plant-wide inputs")
         self._add_rows(lay, P.variables_for(P.PLANT, scn), scn, ctx.session)
         lay.addWidget(_section_head("Plant summary"))
         self._specs = QLabel("")
         self._specs.setTextFormat(Qt.RichText)
-        self._specs.setStyleSheet("font-size:11px;")
+        self._specs.setStyleSheet(f"font-size:{ui.TEXT_SM}px;")
         lay.addWidget(self._specs)
-        tip = QLabel("Click a block on the drawing to tune its own variables.")
-        tip.setWordWrap(True)
-        tip.setStyleSheet(f"color:{DIM}; font-size:10px; padding-top:6px;")
-        lay.addWidget(tip)
+        lay.addSpacing(6)
+        lay.addWidget(_caption("Click a block on the drawing to tune its own variables."))
         lay.addStretch(1)
         self.refresh(ctx)
 
@@ -514,10 +539,7 @@ class Inspector(QWidget):
         self._header(lay, sp.icon, color, node.tag, node.name, sp.label)
         self._set_status("idle", [])
         if sp.hint:
-            h = QLabel(sp.hint)
-            h.setWordWrap(True)
-            h.setStyleSheet(f"color:{DIM}; font-size:10px;")
-            lay.addWidget(h)
+            lay.addWidget(_caption(sp.hint))
         lay.addWidget(_section_head("Name"))
         name = QLineEdit(node.name)
         name.textChanged.connect(lambda t, nid=node.id: self.nodeRenamed.emit(nid, t))
@@ -528,7 +550,7 @@ class Inspector(QWidget):
         grid.setHorizontalSpacing(8)
         for i, prm in enumerate(sp.params):
             lbl = QLabel(prm.label)
-            lbl.setStyleSheet(f"color:{INK}; font-size:11px;")
+            lbl.setStyleSheet(f"color:{DIM}; font-size:{ui.TEXT_SM}px;")
             if prm.key == "component":
                 combo = QComboBox()
                 for idx in sorted(M._FEED_COMPONENT):
@@ -553,20 +575,18 @@ class Inspector(QWidget):
             grid.addWidget(lbl, i, 0)
             grid.addWidget(w, i, 1)
         lay.addLayout(grid)
-        note = QLabel("Drawn by hand: this block is part of the sketch balance on the canvas, "
-                      "not of the TEA/LCA case study.")
-        note.setWordWrap(True)
-        note.setStyleSheet(f"color:{DIM}; font-size:10px; padding-top:6px;")
-        lay.addWidget(note)
+        lay.addSpacing(6)
+        lay.addWidget(_caption("Drawn by hand: this block is part of the sketch balance on the "
+                               "canvas, not of the TEA/LCA case study."))
         lay.addWidget(_section_head("Streams"))
         self._streams = QLabel(self._stream_html(stream_rows))
         self._streams.setTextFormat(Qt.RichText)
-        self._streams.setStyleSheet("font-size:10px;")
+        self._streams.setStyleSheet(f"font-size:{ui.TEXT_SM}px;")
         lay.addWidget(self._streams)
         lay.addStretch(1)
         btn = QPushButton("Delete block")
-        btn.setStyleSheet("QPushButton{background:#b0392f; color:white; border:none; border-radius:5px; "
-                          "padding:6px;} QPushButton:hover{background:#8f2d25;}")
+        btn.setProperty("kind", "danger")
+        btn.setCursor(Qt.PointingHandCursor)
         btn.clicked.connect(lambda _=False, nid=node.id: self.deleteRequested.emit(nid))
         lay.addWidget(btn)
         self.response.clear("Sketch blocks are not linked to the engine, so there is no cost "
@@ -620,10 +640,10 @@ class Inspector(QWidget):
                     gw = sorted(u.gwp_items.items(), key=lambda kv: -abs(kv[1]))[:4]
                     html = ""
                     if items:
-                        html += "<b style='color:#334155'>Cost lines</b>" + _kv_table(
+                        html += f"<b style='color:{DIM}'>Cost lines</b>" + _kv_table(
                             [(k, P.fmt_money(v) + "/yr") for k, v in items])
                     if gw:
-                        html += "<br><b style='color:#334155'>GWP lines (per kg DW)</b>" + _kv_table(
+                        html += f"<br><b style='color:{DIM}'>GWP lines, per kg DW</b>" + _kv_table(
                             [(k, f"{v:+,.3f}") for k, v in gw])
                     if u.purchase_cost:
                         html += "<br>" + _kv_table(
