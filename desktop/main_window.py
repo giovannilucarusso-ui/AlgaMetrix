@@ -1874,7 +1874,10 @@ class MainWindow(QMainWindow):
                 bold.append(i)
             rows.append([
                 f"{p.name} (main)" if p.is_main else p.name,
-                f"{p.annual_kg / 1000:,.0f}",
+                # Three significant figures, not whole tonnes: a 10 t/yr plant
+                # listed its products as 2, 4 and 4, and anything under half a
+                # tonne read 0.
+                sig(p.annual_kg / 1000, 3),
                 f"{p.production_cost_eur_per_kg:,.2f}",
                 f"{p.price:,.2f}",
                 f"{p.allocation_share * 100:,.1f}",

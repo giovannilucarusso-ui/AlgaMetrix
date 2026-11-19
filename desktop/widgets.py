@@ -446,6 +446,13 @@ class Banner(QFrame):
 class EmptyState(QFrame):
     """What a page shows before it has anything to show: a title, a hint, an action."""
 
+    #: The widest the title and the hint may grow. Each sits in its own row
+    #: between two stretches, so it fills the row up to this width and stays
+    #: centred. Centring the whole layout instead drew each wrapped label at its
+    #: size-hint width (about 270 px) with only the height it needs at the full
+    #: width, which cut off the last lines of the hint.
+    TEXT_WIDTH = 560
+
     def __init__(self, title: str, hint: str = "", action_text: str = "",
                  slot: Callable | None = None):
         super().__init__()
@@ -453,18 +460,15 @@ class EmptyState(QFrame):
         lay = QVBoxLayout(self)
         lay.setContentsMargins(24, 28, 24, 28)
         lay.setSpacing(6)
-        lay.setAlignment(Qt.AlignCenter)
-        self._title = QLabel(title)
-        self._title.setObjectName("emptyTitle")
-        self._title.setAlignment(Qt.AlignCenter)
-        self._title.setWordWrap(True)
-        self._hint = QLabel(hint)
-        self._hint.setObjectName("emptyHint")
-        self._hint.setAlignment(Qt.AlignCenter)
-        self._hint.setWordWrap(True)
+        self._title = self._text_label(title, "emptyTitle")
+        self._hint = self._text_label(hint, "emptyHint")
         self._hint.setVisible(bool(hint))
-        lay.addWidget(self._title)
-        lay.addWidget(self._hint)
+        for lbl in (self._title, self._hint):
+            row = QHBoxLayout()
+            row.addStretch(1)
+            row.addWidget(lbl, 100)
+            row.addStretch(1)
+            lay.addLayout(row)
         self.action = None
         if action_text:
             self.action = button(action_text, "secondary", slot)
@@ -474,6 +478,14 @@ class EmptyState(QFrame):
             row.addStretch(1)
             lay.addSpacing(6)
             lay.addLayout(row)
+
+    def _text_label(self, text: str, name: str) -> QLabel:
+        lbl = QLabel(text)
+        lbl.setObjectName(name)
+        lbl.setAlignment(Qt.AlignHCenter | Qt.AlignTop)
+        lbl.setWordWrap(True)
+        lbl.setMaximumWidth(self.TEXT_WIDTH)
+        return lbl
 
     def set_text(self, title: str, hint: str = ""):
         self._title.setText(title)
