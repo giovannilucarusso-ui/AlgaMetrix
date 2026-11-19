@@ -15,30 +15,70 @@ The mapping is deliberately transparent:
 * drying block        <- ``scenario.drying``     (skipped when "wet paste")
 * disruption + extractor <- ``scenario.extraction``
 
+Every generated block carries a ``role`` naming what it stands for in the
+scenario (see the constants below). The designer uses it to tie the block to the
+engine: which fields it exposes, and which share of the results it carries.
+
 When a solved :class:`~algametrix.scenario.Results` is passed, the block
 parameters and feed flows are seeded with the case's real numbers (from the
 per-kg :class:`~algametrix.inventory.Inventory`), so the first-pass
 balance on the canvas lands in the same ballpark as the rigorous engine.
+:func:`seed_flows` repeats that seeding on an existing diagram, which is how the
+designer keeps the drawing in step with the engine without moving any block.
 
-The function is pure (no Qt): it returns a :class:`~desktop.flowsheet.model.Flowsheet`
+The module is pure (no Qt): it returns a :class:`~desktop.flowsheet.model.Flowsheet`
 and can be unit-tested against the engine alone.
 """
 
 from __future__ import annotations
+
+import math
+from dataclasses import dataclass
 
 from algametrix.models import CarbonSource, Scenario, TrophicMode
 
 from . import model as M
 
 # --------------------------------------------------------------------------- #
-# Layout geometry (scene coordinates; a NodeItem is ~182 x 122)
+# Roles: what a generated block stands for in the scenario
 # --------------------------------------------------------------------------- #
-DX = 250.0          # horizontal spacing between spine columns
-DY = 170.0          # vertical spacing for feeds / sinks off the spine
+CULTIVATION = "cultivation"
+HARVEST = "harvest"            # a second dewatering stage is "harvest:2"
+DRYING = "drying"
+DISRUPTION = "disruption"
+EXTRACTION = "extraction"
+MEDIA_PREP = "media_prep"
+FEED_WATER = "feed_water"
+FEED_NUTRIENTS = "feed_nutrients"
+FEED_CHEMICALS = "feed_chemicals"
+FEED_INOCULUM = "feed_inoculum"
+FEED_CARBON = "feed_carbon"
+FEED_SUBSTRATE = "feed_substrate"
+FEED_WASTE = "feed_waste"
+FEED_SOLVENT = "feed_solvent"
+PRODUCT = "product"
+EFFLUENT = "effluent"          # one per dewatering stage: "effluent", "effluent:2"
+VAPOUR = "vapour"
+SPENT = "spent_biomass"
+
+# Plant area of each role, used for the equipment tag numbers (FD-101, PD-201...).
+_AREA = {
+    FEED_WATER: 1, FEED_NUTRIENTS: 1, FEED_CHEMICALS: 1, FEED_INOCULUM: 1, FEED_CARBON: 1,
+    FEED_SUBSTRATE: 1, FEED_WASTE: 1, MEDIA_PREP: 1,
+    CULTIVATION: 2,
+    HARVEST: 3, EFFLUENT: 3,
+    DRYING: 4, VAPOUR: 4,
+    DISRUPTION: 5, EXTRACTION: 5, FEED_SOLVENT: 5, SPENT: 5,
+    PRODUCT: 6,
+}
+
+# --------------------------------------------------------------------------- #
+# Layout geometry (scene coordinates; a block is about 190 x 150)
+# --------------------------------------------------------------------------- #
+DX = 280.0          # horizontal spacing between spine columns
+DY = 205.0          # vertical spacing for feeds / sinks off the spine
 X0 = -560.0         # x of the feed column (spine starts one column to its right)
 Y_SPINE = -20.0     # baseline y of the main process spine
-Y_FEED_HI = Y_SPINE - 78.0   # upper feed (media / water)
-Y_FEED_LO = Y_SPINE + 78.0   # lower feed (carbon source / substrate)
 Y_SINK = Y_SPINE + DY        # effluent / waste sinks sit below their source
 Y_SOLVENT = Y_SPINE - DY     # solvent feed sits above the extractor
 
@@ -61,7 +101,9 @@ def cultivation_kind(scn: Scenario) -> str:
         return "flat_panel_pbr"
     if "bubble" in n or "airlift" in n or "column" in n:
         return "bubble_column_pbr"
-    # raceway, open pond, thin-layer cascade, and any other open system
+    if "thin" in n or "cascade" in n:
+        return "thin_layer"
+    # raceway, open pond, and any other open system
     return "raceway"
 
 
@@ -76,7 +118,11 @@ def _dewater_kind(name: str) -> str:
         return "decanter"
     if "centrifug" in n:
         return "centrifuge"
-    if "screen" in n or "rotary" in n or "drum filter" in n or "press" in n or "filter" in n:
+    if "screen" in n:
+        return "screen_filter"
+    if "rotary" in n or "drum filter" in n:
+        return "drum_filter"
+    if "press" in n or "filter" in n:
         return "filter_press"
     if "settl" in n or "floccul" in n:
         return "settler"
@@ -143,42 +189,71 @@ def _clamp(x: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, x))
 
 
-class _Flows:
-    """Hourly stream flows derived from the case (per-hour, not per-kg)."""
+@dataclass
+class HourlyFlows:
+    """Stream rates of the generated diagram, in kg/h (not per kg of product)."""
 
-    def __init__(self, scn: Scenario, results) -> None:
-        op_h = _op_hours(scn)
-        rec = _clamp(scn.harvesting.recovery, 1e-3, 1.0)
-        # Extraction yield that makes the canvas product stream equal the engine's
-        # main product rate: main_kg = biomass_kg * (main_annual / biomass_annual).
-        self.extract_yield = None
-        if results is not None and results.inventory.annual_biomass_kg > 0:
-            inv = results.inventory
-            self.net_kg_h = inv.annual_biomass_kg / op_h        # product leaving the gate
-            self.gross_kg_h = self.net_kg_h / rec               # biomass out of cultivation
-            self.water_kg_h = inv.water_m3_per_kg * 1000.0 * self.net_kg_h
-            self.co2_kg_h = inv.co2_supply_per_kg * self.net_kg_h
-            self.bicarb_kg_h = inv.bicarbonate_supply_per_kg * self.net_kg_h
-            self.substrate_kg_h = inv.substrate_per_kg * self.net_kg_h
-            self.nutrients_kg_h = (inv.nitrogen_per_kg + inv.phosphorus_per_kg) * self.net_kg_h
-            mp = getattr(results, "main_product", None)
-            if mp is not None and mp.annual_kg > 0:
-                self.extract_yield = _clamp(mp.annual_kg / inv.annual_biomass_kg, 1e-4, 1.0)
-            self.known = True
-        else:
-            self.gross_kg_h = 100.0
-            self.net_kg_h = self.gross_kg_h * rec
-            conc = _clamp(scn.system.biomass_conc, 1e-3, 1e6)
-            self.water_kg_h = self.gross_kg_h * (1000.0 / conc - 1.0)
-            self.co2_kg_h = 200.0
-            self.bicarb_kg_h = 0.0
-            self.substrate_kg_h = 0.0
-            self.nutrients_kg_h = self.gross_kg_h * 0.02
-            self.known = False
-        self.solvent_kg_h = scn.extraction.solvent_kg_per_kg * self.net_kg_h
-        # Recipe chemicals (media components, process aids) and a seed inoculum.
-        self.chemicals_kg_h = sum(m.amount_per_kg for m in scn.materials) * self.net_kg_h
-        self.inoculum_kg_h = self.gross_kg_h * 0.05
+    net: float              # dry biomass leaving the gate
+    gross: float            # dry biomass out of cultivation
+    water: float
+    co2: float
+    bicarbonate: float
+    substrate: float
+    nutrients: float
+    chemicals: float
+    inoculum: float
+    solvent: float          # solvent contacted in the extractor
+    solvent_makeup: float
+    waste_feed: float
+    extract_yield: float | None   # main product per kg biomass entering extraction
+    main_product: float | None
+    known: bool             # False when there was no solved case to read
+
+
+def hourly_flows(scn: Scenario, results=None) -> HourlyFlows:
+    op_h = _op_hours(scn)
+    rec = _clamp(scn.harvesting.recovery, 1e-3, 1.0)
+    chem_per_kg = sum(m.amount_per_kg for m in scn.materials)
+    if results is not None and results.inventory.annual_biomass_kg > 0:
+        inv = results.inventory
+        net = inv.annual_biomass_kg / op_h
+        mp = getattr(results, "main_product", None)
+        extract_yield = main = None
+        if mp is not None and mp.annual_kg > 0:
+            # Makes the canvas product stream equal the engine's main product rate.
+            extract_yield = _clamp(mp.annual_kg / inv.annual_biomass_kg, 1e-4, 1.0)
+            main = mp.annual_kg / op_h
+        per_unit = 1000.0 if scn.waste_feed.unit == "m3" else 1.0
+        return HourlyFlows(
+            net=net, gross=net / rec,
+            water=inv.water_m3_per_kg * 1000.0 * net,
+            co2=inv.co2_supply_per_kg * net,
+            bicarbonate=inv.bicarbonate_supply_per_kg * net,
+            substrate=inv.substrate_purchased_per_kg * net,
+            nutrients=(inv.nitrogen_purchased_per_kg + inv.phosphorus_purchased_per_kg) * net,
+            chemicals=chem_per_kg * net,
+            inoculum=net / rec * 0.05,
+            solvent=scn.extraction.solvent_kg_per_kg * net,
+            solvent_makeup=inv.solvent_net_per_kg * net,
+            waste_feed=inv.waste_feed_per_kg * net * per_unit,
+            extract_yield=extract_yield, main_product=main, known=True,
+        )
+    gross = 100.0
+    net = gross * rec
+    conc = _clamp(scn.system.biomass_conc, 1e-3, 1e6)
+    return HourlyFlows(
+        net=net, gross=gross, water=gross * (1000.0 / conc - 1.0), co2=200.0,
+        bicarbonate=0.0, substrate=0.0, nutrients=gross * 0.02,
+        chemicals=chem_per_kg * net, inoculum=gross * 0.05,
+        solvent=scn.extraction.solvent_kg_per_kg * net, solvent_makeup=0.0, waste_feed=0.0,
+        extract_yield=None, main_product=None, known=False,
+    )
+
+
+# Concentrate solids after the first stage of a two-stage train: gravity
+# settling or flocculation reaches a few percent, a membrane pre-concentration
+# somewhat more. Only the drawing uses it; the engine has one harvesting step.
+_STAGE1_SOLIDS = {"settler": 0.02, "crossflow_uf": 0.06, "membrane": 0.06}
 
 
 def _set(node: M.UnitNode, **params: float) -> None:
@@ -189,9 +264,79 @@ def _set(node: M.UnitNode, **params: float) -> None:
             node.params[k] = float(v)
 
 
+def seed_flows(fs: M.Flowsheet, scn: Scenario, results=None) -> None:
+    """Write the case's rates and performance onto the role-tagged blocks.
+
+    Positions, names and wiring are left alone. Blocks without a role (drawn by
+    hand from the palette) keep whatever parameters they have.
+    """
+    f = hourly_flows(scn, results)
+    harv = scn.harvesting
+    stages = sorted((n for n in fs.nodes.values() if n.role.split(":")[0] == HARVEST),
+                    key=lambda n: n.role)
+    if len(stages) > 1:
+        # Split the recovery evenly so the train as a whole recovers what the
+        # engine assumes; the first stage stops short of the final solids.
+        each = harv.recovery ** (1.0 / len(stages))
+        for i, node in enumerate(stages):
+            if i < len(stages) - 1:
+                fs1 = min(_STAGE1_SOLIDS.get(node.kind, 0.05), 0.5 * harv.final_solids)
+                _set(node, solids_recovery=each, final_solids=max(fs1, 1e-3))
+            else:
+                _set(node, solids_recovery=each, final_solids=harv.final_solids)
+    elif stages:
+        _set(stages[0], solids_recovery=harv.recovery, final_solids=harv.final_solids)
+
+    for node in fs.nodes.values():
+        role = node.role
+        if role == CULTIVATION:
+            _set(node, biomass_kg_h=f.gross, harvest_conc_g_l=scn.system.biomass_conc)
+        elif role == FEED_WATER:
+            _set(node, flow_kg_h=f.water)
+        elif role == FEED_NUTRIENTS:
+            _set(node, flow_kg_h=f.nutrients)
+        elif role == FEED_CHEMICALS:
+            _set(node, flow_kg_h=f.chemicals)
+        elif role == FEED_INOCULUM:
+            _set(node, flow_kg_h=f.inoculum)
+        elif role == FEED_CARBON:
+            bicarb = scn.system.carbon_source == CarbonSource.BICARBONATE
+            _set(node, flow_kg_h=f.bicarbonate if bicarb else f.co2)
+        elif role == FEED_SUBSTRATE:
+            _set(node, flow_kg_h=f.substrate)
+        elif role == FEED_WASTE:
+            _set(node, flow_kg_h=f.waste_feed)
+        elif role == DRYING:
+            _set(node, final_solids=scn.drying.final_solids)
+        elif role == EXTRACTION:
+            _set(node, solvent_recovery=scn.extraction.solvent_recovery)
+            if f.extract_yield is not None:
+                _set(node, extract_yield=f.extract_yield)
+        elif role == FEED_SOLVENT:
+            _set(node, flow_kg_h=f.solvent)
+
+
 # --------------------------------------------------------------------------- #
 # The builder
 # --------------------------------------------------------------------------- #
+def _tag(fs: M.Flowsheet, node: M.UnitNode) -> str:
+    """Equipment tag numbered by plant area: FD-101, PD-201, ST-301, CF-302, ..."""
+    area = _AREA.get(node.role.split(":")[0], 9)
+    used = 0
+    for n in fs.nodes.values():
+        digits = n.tag.rsplit("-", 1)[-1]
+        if n is not node and n.role and digits.isdigit() and int(digits) // 100 == area:
+            used += 1
+    return f"{node.spec.tag_prefix}-{area * 100 + used + 1}"
+
+
+def _add(fs: M.Flowsheet, kind: str, col: int, y: float, name: str, role: str) -> M.UnitNode:
+    node = fs.add_node(kind, _col_x(col), y, name)
+    node.role = role
+    node.tag = _tag(fs, node)
+    return node
+
+
 def flowsheet_from_scenario(scn: Scenario, results=None) -> M.Flowsheet:
     """Construct a process :class:`Flowsheet` mirroring ``scn``.
 
@@ -199,51 +344,52 @@ def flowsheet_from_scenario(scn: Scenario, results=None) -> M.Flowsheet:
     seeds realistic flows; without it, nominal defaults keep the canvas sensible.
     """
     fs = M.Flowsheet()
-    flows = _Flows(scn, results)
     phototrophic = scn.system.mode == TrophicMode.PHOTOTROPHIC
 
-    # -- cultivation (spine column 2) ----------------------------------- #
-    cult = fs.add_node(cultivation_kind(scn), _col_x(2), Y_SPINE, scn.system.name)
-    _set(cult, biomass_kg_h=flows.gross_kg_h, harvest_conc_g_l=scn.system.biomass_conc)
-
-    # -- media preparation (column 1) ----------------------------------- #
+    # -- feeds (column 0) and media preparation (column 1) ---------------- #
     # Water + nutrient salts + recipe chemicals are blended in a prep tank whose
     # medium feeds the reactor; the seed inoculum and the carbon source connect
     # to the reactor directly.
-    prep = fs.add_node("media_prep", _col_x(1), Y_SPINE, "Media prep")
-    fs.add_link(prep.id, "media", cult.id, "media")
-
-    water = fs.add_node("feed", _col_x(0), Y_SPINE - DY, "Water")
-    _set(water, component=1, flow_kg_h=flows.water_kg_h)
+    water = _add(fs, "feed", 0, Y_SPINE - DY, "Water", FEED_WATER)
+    _set(water, component=1)
+    nutrients = _add(fs, "feed", 0, Y_SPINE, "Nutrients (N, P)", FEED_NUTRIENTS)
+    _set(nutrients, component=5)
+    prep = _add(fs, "media_prep", 1, Y_SPINE, "Media prep", MEDIA_PREP)
     fs.add_link(water.id, "out", prep.id, "water")
-
-    nutrients = fs.add_node("feed", _col_x(0), Y_SPINE, "Nutrients (N, P)")
-    _set(nutrients, component=5, flow_kg_h=flows.nutrients_kg_h)
     fs.add_link(nutrients.id, "out", prep.id, "nutrients")
 
-    if flows.chemicals_kg_h > 0.0:
+    row = Y_SPINE + DY
+    if scn.materials:
         label = scn.materials[0].name if len(scn.materials) == 1 else "Media chemicals"
-        chem = fs.add_node("feed", _col_x(0), Y_SPINE + DY, label)
-        _set(chem, component=5, flow_kg_h=flows.chemicals_kg_h)
+        chem = _add(fs, "feed", 0, row, label, FEED_CHEMICALS)
+        _set(chem, component=5)
         fs.add_link(chem.id, "out", prep.id, "chemicals")
+        row += DY
+    if scn.waste_feed.enabled:
+        waste = _add(fs, "feed", 0, row, scn.waste_feed.name or "Waste-derived feed", FEED_WASTE)
+        _set(waste, component=1)
+        fs.add_link(waste.id, "out", prep.id, "waste")
+
+    # -- cultivation (spine column 2) ----------------------------------- #
+    cult = _add(fs, cultivation_kind(scn), 2, Y_SPINE, scn.system.name, CULTIVATION)
+    fs.add_link(prep.id, "media", cult.id, "media")
 
     # seed inoculum -> reactor (above the prep tank)
-    inoc = fs.add_node("feed", _col_x(1), Y_SPINE - DY, "Inoculum (seed)")
-    _set(inoc, component=0, flow_kg_h=flows.inoculum_kg_h)
+    inoc = _add(fs, "feed", 1, Y_SPINE - DY, "Inoculum (seed)", FEED_INOCULUM)
+    _set(inoc, component=0)
     fs.add_link(inoc.id, "out", cult.id, "inoculum")
 
     # carbon source -> reactor (below the prep tank)
     if phototrophic:
         if scn.system.carbon_source == CarbonSource.BICARBONATE:
-            carbon = fs.add_node("feed", _col_x(1), Y_SPINE + DY, "NaHCO₃ (carbon source)")
-            _set(carbon, component=2, flow_kg_h=flows.bicarb_kg_h)
+            carbon = _add(fs, "feed", 1, Y_SPINE + DY, "NaHCO₃ (carbon source)", FEED_CARBON)
+            _set(carbon, component=2)
         else:
-            carbon = fs.add_node("co2_supply", _col_x(1), Y_SPINE + DY, "CO₂ supply")
-            _set(carbon, flow_kg_h=flows.co2_kg_h)
+            carbon = _add(fs, "co2_supply", 1, Y_SPINE + DY, "CO₂ supply", FEED_CARBON)
         fs.add_link(carbon.id, "out", cult.id, "co2")
     else:
-        substrate = fs.add_node("feed", _col_x(1), Y_SPINE + DY, "Organic substrate")
-        _set(substrate, component=2, flow_kg_h=flows.substrate_kg_h)
+        substrate = _add(fs, "feed", 1, Y_SPINE + DY, "Organic substrate", FEED_SUBSTRATE)
+        _set(substrate, component=2)
         fs.add_link(substrate.id, "out", cult.id, "substrate")
 
     # The spine advances one node at a time; ``prev`` tracks the live outlet.
@@ -254,10 +400,10 @@ def flowsheet_from_scenario(scn: Scenario, results=None) -> M.Flowsheet:
     stages = harvest_chain(scn)
     for i, kind in enumerate(stages):
         name = scn.harvesting.name if len(stages) == 1 else f"{scn.harvesting.name} ({i + 1})"
-        dw = fs.add_node(kind, _col_x(col), Y_SPINE, name)
-        _set(dw, solids_recovery=scn.harvesting.recovery, final_solids=scn.harvesting.final_solids)
+        dw = _add(fs, kind, col, Y_SPINE, name, HARVEST if i == 0 else f"{HARVEST}:{i + 1}")
         fs.add_link(prev_node, prev_port, dw.id, "feed")
-        eff = fs.add_node("waste", _col_x(col), Y_SINK, "Effluent" if i == 0 else f"Effluent {i + 1}")
+        eff = _add(fs, "waste", col, Y_SINK, "Effluent" if i == 0 else f"Effluent {i + 1}",
+                   EFFLUENT if i == 0 else f"{EFFLUENT}:{i + 1}")
         fs.add_link(dw.id, "effluent", eff.id, "in")
         prev_node, prev_port = dw.id, "concentrate"
         col += 1
@@ -265,10 +411,9 @@ def flowsheet_from_scenario(scn: Scenario, results=None) -> M.Flowsheet:
     # -- drying --------------------------------------------------------- #
     dk = dryer_kind(scn)
     if dk is not None:
-        dry = fs.add_node(dk, _col_x(col), Y_SPINE, scn.drying.name)
-        _set(dry, final_solids=scn.drying.final_solids)
+        dry = _add(fs, dk, col, Y_SPINE, scn.drying.name, DRYING)
         fs.add_link(prev_node, prev_port, dry.id, "feed")
-        vap = fs.add_node("waste", _col_x(col), Y_SINK, "Evaporated water")
+        vap = _add(fs, "waste", col, Y_SINK, "Evaporated water", VAPOUR)
         fs.add_link(dry.id, "vapour", vap.id, "in")
         prev_node, prev_port = dry.id, "dry"
         col += 1
@@ -277,29 +422,27 @@ def flowsheet_from_scenario(scn: Scenario, results=None) -> M.Flowsheet:
     if scn.extraction.enabled:
         drk = disruption_kind(scn)
         if drk is not None:
-            disr = fs.add_node(drk, _col_x(col), Y_SPINE, "Cell disruption")
+            disr = _add(fs, drk, col, Y_SPINE, "Cell disruption", DISRUPTION)
             fs.add_link(prev_node, prev_port, disr.id, "feed")
             prev_node, prev_port = disr.id, "out"
             col += 1
 
-        ext = fs.add_node(extractor_kind(scn), _col_x(col), Y_SPINE, scn.extraction.name)
-        _set(ext, solvent_recovery=scn.extraction.solvent_recovery)
-        if flows.extract_yield is not None:
-            _set(ext, extract_yield=flows.extract_yield)
+        ext = _add(fs, extractor_kind(scn), col, Y_SPINE, scn.extraction.name, EXTRACTION)
         fs.add_link(prev_node, prev_port, ext.id, "feed")
-        if flows.solvent_kg_h > 0.0 or scn.extraction.solvent_kg_per_kg > 0.0:
-            solv = fs.add_node("feed", _col_x(col), Y_SOLVENT, scn.extraction.solvent_name)
-            _set(solv, component=4, flow_kg_h=flows.solvent_kg_h)
+        if scn.extraction.solvent_kg_per_kg > 0.0:
+            solv = _add(fs, "feed", col, Y_SOLVENT, scn.extraction.solvent_name, FEED_SOLVENT)
+            _set(solv, component=4)
             fs.add_link(solv.id, "out", ext.id, "solvent")
-        raff = fs.add_node("waste", _col_x(col), Y_SINK, "Spent biomass")
+        raff = _add(fs, "waste", col, Y_SINK, "Spent biomass", SPENT)
         fs.add_link(ext.id, "raffinate", raff.id, "in")
         prev_node, prev_port = ext.id, "extract"
         col += 1
 
     # -- product sink --------------------------------------------------- #
-    prod = fs.add_node("product", _col_x(col), Y_SPINE, _product_name(scn, results))
+    prod = _add(fs, "product", col, Y_SPINE, _product_name(scn, results), PRODUCT)
     fs.add_link(prev_node, prev_port, prod.id, "in")
 
+    seed_flows(fs, scn, results)
     return fs
 
 
@@ -310,3 +453,9 @@ def _product_name(scn: Scenario, results) -> str:
         main = next((p for p in scn.products if p.is_main), scn.products[0])
         return main.name
     return (scn.product_name or "Dry biomass").strip().capitalize()
+
+
+def harvest_recovery_on_canvas(fs: M.Flowsheet) -> float:
+    """Overall solids recovery of the drawn dewatering train (for checks)."""
+    stages = [n for n in fs.nodes.values() if n.role.split(":")[0] == HARVEST]
+    return math.prod(n.params.get("solids_recovery", 1.0) for n in stages) if stages else 1.0

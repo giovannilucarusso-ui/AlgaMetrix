@@ -400,6 +400,7 @@ def test_self_test_builds_the_default_scenario(qapp, tmp_path, capsys):
     assert "production cost" in report
     assert "PDF report" in report      # the report module survived the bundling
     assert "language" in report        # and the language the build starts in
+    assert "Process Designer: off" in report
 
 
 def test_the_entry_point_says_what_to_install(monkeypatch, capsys):

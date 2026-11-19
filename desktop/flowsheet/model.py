@@ -22,6 +22,8 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
+from .. import theme as _ui
+
 # --------------------------------------------------------------------------- #
 # Material flow: a dict of component -> kg/h
 # --------------------------------------------------------------------------- #
@@ -110,14 +112,15 @@ class UnitSpec:
         return {p.key: p.default for p in self.params}
 
 
-# Category -> header colour (hex). Kept in sync with the palette legend.
+# Category -> symbol colour, from the app's chart palette (desktop/theme.py).
+# The plant areas in process.SECTIONS use the same hues.
 CATEGORY_COLORS: dict[str, str] = {
-    "io": "#607d8b",           # feeds / products
-    "cultivation": "#2e7d32",  # reactors, ponds, fermenters
-    "separation": "#1565c0",   # dewatering, filtration, splitters
-    "thermal": "#e65100",      # drying, evaporation
-    "downstream": "#6a1b9a",   # disruption, extraction, purification
-    "logic": "#455a64",        # mixer / splitter helpers
+    "io": _ui.INK_3,               # feeds / products
+    "cultivation": _ui.SERIES[5],  # reactors, ponds, fermenters (green)
+    "separation": _ui.SERIES[0],   # dewatering, filtration, splitters (blue)
+    "thermal": _ui.SERIES[1],      # drying, evaporation (orange)
+    "downstream": _ui.SERIES[6],   # disruption, extraction, purification (violet)
+    "logic": _ui.INK_2,            # mixer / splitter helpers
 }
 
 
@@ -327,6 +330,12 @@ UNIT_TYPES: dict[str, UnitSpec] = {
         params=_p_cult(1.5), transfer=_t_cultivation, icon="bubble_column", tag_prefix="BCR",
         hint="Bubble-column / airlift photobioreactor.",
     ),
+    "thin_layer": UnitSpec(
+        "thin_layer", "Thin-layer cascade", "🦠", "cultivation",
+        inputs=("inoculum", "media", "co2"), outputs=("broth",),
+        params=_p_cult(10.0), transfer=_t_cultivation, icon="thin_layer", tag_prefix="TL",
+        hint="Thin-layer cascade: culture runs as a shallow film down sloping lanes.",
+    ),
     "fermenter": UnitSpec(
         "fermenter", "Stirred-tank fermenter", "🧫", "cultivation",
         inputs=("inoculum", "media", "substrate"), outputs=("broth",),
@@ -364,6 +373,18 @@ UNIT_TYPES: dict[str, UnitSpec] = {
         inputs=("feed",), outputs=("concentrate", "effluent"),
         params=_p_dewater(0.97, 0.30), transfer=_t_dewatering, icon="filter_press", tag_prefix="FP",
         hint="Plate-and-frame filter press producing a dewatered cake.",
+    ),
+    "drum_filter": UnitSpec(
+        "drum_filter", "Rotary drum filter", "💧", "separation",
+        inputs=("feed",), outputs=("concentrate", "effluent"),
+        params=_p_dewater(0.90, 0.18), transfer=_t_dewatering, icon="drum_filter", tag_prefix="RF",
+        hint="Rotary vacuum drum filter: continuous cake discharge by a scraper.",
+    ),
+    "screen_filter": UnitSpec(
+        "screen_filter", "Vibrating screen", "💧", "separation",
+        inputs=("feed",), outputs=("concentrate", "effluent"),
+        params=_p_dewater(0.90, 0.15), transfer=_t_dewatering, icon="screen", tag_prefix="VS",
+        hint="Vibrating screen filter for filamentous strains (Arthrospira).",
     ),
     "settler": UnitSpec(
         "settler", "Settling tank", "💧", "separation",
@@ -436,7 +457,7 @@ UNIT_TYPES: dict[str, UnitSpec] = {
     # --- logic / auxiliary -------------------------------------------- #
     "media_prep": UnitSpec(
         "media_prep", "Media prep", "🧪", "logic",
-        inputs=("water", "nutrients", "chemicals"), outputs=("media",),
+        inputs=("water", "nutrients", "chemicals", "waste"), outputs=("media",),
         params=(), transfer=_t_media_prep, icon="stirred_tank", tag_prefix="MP",
         hint="Media preparation tank: blends water, nutrient salts and chemicals "
              "into the culture medium fed to the reactor.",
@@ -485,6 +506,9 @@ class UnitNode:
     y: float = 0.0
     params: dict[str, float] = field(default_factory=dict)
     tag: str = ""              # equipment tag, e.g. "FR-101"
+    # What the block stands for in the case study (see builder): "" for a block
+    # drawn by hand, which the engine knows nothing about.
+    role: str = ""
 
     @property
     def spec(self) -> UnitSpec:
@@ -496,6 +520,7 @@ class UnitNode:
             "kind": self.kind,
             "name": self.name,
             "tag": self.tag,
+            "role": self.role,
             "x": self.x,
             "y": self.y,
             "params": dict(self.params),
@@ -508,6 +533,7 @@ class UnitNode:
             kind=str(d["kind"]),
             name=str(d.get("name", "")),
             tag=str(d.get("tag", "")),
+            role=str(d.get("role", "")),
             x=float(d.get("x", 0.0)),
             y=float(d.get("y", 0.0)),
             params=dict(d.get("params", {})),

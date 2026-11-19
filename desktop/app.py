@@ -114,6 +114,23 @@ def self_test(out_path: str | None = None) -> int:
         ok = ok and report_bytes > 0
     else:
         report_error = "not attempted: the default scenario did not compute"
+    # A build that carries the Process Designer draws the default case on it as
+    # well. Its canvas modules are the ones the spec adds or drops, so this is
+    # where a packaging mistake in that build would show.
+    designer = "off"
+    if window.flowsheet_editor is not None:
+        editor = window.flowsheet_editor
+        try:
+            drawn = editor.generate_from_scenario(confirm=False)
+            blocks = len(editor.scene.flowsheet.nodes)
+            linked = editor.session is not None and editor.session.results is not None
+        except Exception as exc:  # noqa: BLE001 - the point is to report it
+            designer = f"FAILED {exc!r}"
+            ok = False
+        else:
+            designer = f"{blocks} blocks, " + (
+                "linked to the engine" if linked else "NOT linked to the engine")
+            ok = ok and drawn and linked and blocks > 0
     lines = [
         f"AlgaMetrix {__version__} self-test: {'PASS' if ok else 'FAIL'}",
         f"  language        : {current_language()}",
@@ -133,6 +150,7 @@ def self_test(out_path: str | None = None) -> int:
         f"  PDF report      : {report_bytes:,} bytes" if report_bytes
         else f"  PDF report      : FAILED {report_error}"
     )
+    lines.append(f"  Process Designer: {designer}")
     report = "\n".join(lines)
     if out_path:
         # A windowed build has no console attached, so the report also goes to a
@@ -166,14 +184,21 @@ def main(argv: list[str] | None = None) -> int:
             out = argv[index] if index < len(argv) else None
         return self_test(out)
 
+    from PySide6.QtCore import Qt
+    from PySide6.QtGui import QGuiApplication
     from PySide6.QtWidgets import QApplication
 
+    from desktop import theme
     from desktop.main_window import MainWindow
 
+    # Fractional display scaling (125 %, 150 %) is honoured as it is rather than
+    # rounded, so text stays sharp on a high-DPI laptop screen.
+    QGuiApplication.setHighDpiScaleFactorRoundingPolicy(
+        Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
     app = QApplication(sys.argv)
     app.setApplicationName("AlgaMetrix")
     app.setOrganizationName("AlgaMetrix")
-
+    theme.apply_to(app)
 
     window = MainWindow()
     # Open filling the screen so the whole two-panel layout is visible immediately

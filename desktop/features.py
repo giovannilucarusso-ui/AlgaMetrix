@@ -13,7 +13,8 @@ maintain.
 
     The released Windows build goes further and leaves the canvas modules out of
     the bundle entirely (see ``AlgaMetrix.spec``), so this flag cannot resurrect
-    a half-finished feature in somebody else's hands.
+    a half-finished feature in somebody else's hands. A preview build made with
+    ``ALGAMETRIX_BUILD_DESIGNER=1`` keeps them and starts with the flag on.
 """
 
 from __future__ import annotations
