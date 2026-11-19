@@ -22,20 +22,27 @@ from matplotlib.backends.backend_pdf import PdfPages  # noqa: E402
 
 from algametrix import __version__ as VERSION  # noqa: E402
 from algametrix.models import Basis  # noqa: E402
+from algametrix.serialization import functional_unit, reference_product  # noqa: E402
 
-from . import resources  # noqa: E402
+from . import resources, theme  # noqa: E402
 from .flowsheet import model as M  # noqa: E402
+from .fmt import sig  # noqa: E402
 
 PORTRAIT = (8.27, 11.69)  # A4 portrait, inches
 
-# palette
-GREEN = "#2e7d32"
-INK = "#1f2d3a"
-SUBTLE = "#6b7a88"
-RULE = "#d5dde3"
-ALT = "#f4f7f9"
-BURDEN = "#c0392b"
-PIE_COLORS = ["#1565c0", "#e67e22", "#2e7d32", "#c0392b", "#8e44ad", "#7f8c8d", "#d81b8c"]
+# Palette: the same tokens as the screens (desktop/theme.py).
+GREEN = theme.ACCENT          # table header fill (the name predates the blue accent)
+BAR = theme.CHART_PRIMARY
+INK = theme.INK
+SUBTLE = theme.INK_2
+RULE = theme.LINE
+ALT = theme.SURFACE_2
+BURDEN = theme.BURDEN
+CREDIT = theme.CREDIT
+PIE_COLORS = list(theme.SERIES)
+
+#: What the price figures are denominated in. docs/PRICE_BASIS.md.
+PRICE_BASIS = "EUR as entered; no inflation, currency conversion or price year applied"
 
 _LOGO_CACHE: list = []
 
@@ -165,33 +172,39 @@ def _cover(results, scenario, page, total):
     ax.plot([0.07, 0.93], [0.815, 0.815], color=RULE, lw=1, transform=ax.transAxes)
 
     unit = "m²" if scenario.system.basis == Basis.AREA else "m³"
+    ref = reference_product(results)
+    mp = results.main_product
+    allocation = (f"{scenario.extraction.allocation}: {mp.allocation_share:.0%} of cost and "
+                  f"burden to {mp.name}" if mp else "single product, none")
     meta = [f"Organism:  {scenario.organism.name}",
-            f"System:  {scenario.system.name}",
-            f"Scale:  {scenario.scale:,.0f} {unit}",
-            "Functional unit:  1 kg " + ("product" if results.main_product else "dry biomass")]
+            f"System:  {scenario.system.name}  ·  {scenario.scale:,.0f} {unit}",
+            f"Functional unit:  {functional_unit(results)} at the plant gate",
+            "System boundary:  cradle-to-gate, attributional",
+            f"Allocation:  {allocation}",
+            f"Price basis:  {PRICE_BASIS}"]
     y = 0.785
     for line in meta:
-        ax.text(0.07, y, line, fontsize=12, color=INK, transform=ax.transAxes)
-        y -= 0.026
+        ax.text(0.07, y, line, fontsize=11, color=INK, transform=ax.transAxes)
+        y -= 0.024
 
-    ax.text(0.07, 0.655, "Key results", fontsize=16, fontweight="bold", color=INK,
+    ax.text(0.07, 0.615, "Key results", fontsize=16, fontweight="bold", color=INK,
             transform=ax.transAxes)
 
     m = _product_metrics(results)
     tea = results.tea
     rows = [
-        ("Production cost", f"{m['cost']:,.2f}", "€ / kg"),
-        ("NPV", f"{tea.npv / 1e6:,.1f}", "€ M"),
+        ("Production cost", f"{m['cost']:,.2f}", f"€ / kg {ref}"),
+        ("NPV", f"{tea.npv / 1e6:,.1f}", "€ M, after tax"),
         ("Payback", f"{tea.payback_years:,.1f}" if tea.payback_years and tea.payback_years > 0 else "n/a", "years"),
         ("ROI", f"{tea.roi * 100:,.0f}", "% / yr"),
-        ("GWP", f"{m['gwp']:,.2f}", "kg CO₂-eq / kg"),
-        ("Annual output", f"{m['annual_t']:,.0f}", "t / yr"),
+        ("GWP", f"{m['gwp']:,.2f}", f"kg CO₂-eq / kg {ref}"),
+        ("Annual output", f"{m['annual_t']:,.0f}", f"t {ref} / yr"),
     ]
-    _table(ax, ["Metric", "Value", "Unit"], rows, [0.46, 0.20, 0.20],
-           y_top=0.62, cell_h=0.043, aligns=["left", "right", "right"])
+    _table(ax, ["Metric", "Value", "Unit and basis"], rows, [0.34, 0.16, 0.36],
+           y_top=0.58, cell_h=0.038, aligns=["left", "right", "left"])
 
     # techno-economic text block
-    ax.text(0.07, 0.285, "Techno-economics", fontsize=13, fontweight="bold", color=INK,
+    ax.text(0.07, 0.275, "Techno-economics", fontsize=13, fontweight="bold", color=INK,
             transform=ax.transAxes)
     irr_str = f"{tea.irr * 100:,.1f}%" if tea.irr is not None else "n/a"
     te = (
@@ -200,18 +213,18 @@ def _cover(results, scenario, page, total):
         f"Net profit: {_money(tea.net_profit)}/yr\n"
         f"NPV: {_money(tea.npv)}    ·    IRR: {irr_str}    ·    "
         f"ROI: {tea.roi * 100:,.1f}%    ·    Payback: {tea.payback_years:,.1f} yr\n"
-        f"Net production cost: {_money(tea.net_production_cost_eur_per_kg)}/kg")
-    ax.text(0.07, 0.26, te, fontsize=9.5, color=INK, transform=ax.transAxes, va="top")
+        f"Net production cost: € {tea.net_production_cost_eur_per_kg:,.2f}/kg dry biomass")
+    ax.text(0.07, 0.25, te, fontsize=9.5, color=INK, transform=ax.transAxes, va="top")
 
     # life-cycle text block
-    ax.text(0.07, 0.155, "Life-cycle", fontsize=13, fontweight="bold", color=INK,
-            transform=ax.transAxes)
+    ax.text(0.07, 0.15, "Life-cycle (per kg dry biomass processed)", fontsize=13,
+            fontweight="bold", color=INK, transform=ax.transAxes)
     lca = results.lca
     lc = (f"Net GWP: {lca.gwp_kg_co2eq_per_kg:,.2f} kg CO₂-eq/kg    ·    "
           f"CED: {lca.ced_mj_per_kg:,.1f} MJ/kg    ·    "
           f"Water: {lca.water_m3_per_kg:,.2f} m³/kg    ·    "
           f"Land: {lca.land_m2a_per_kg:,.2f} m²·a/kg")
-    ax.text(0.07, 0.13, lc, fontsize=9.5, color=INK, transform=ax.transAxes, va="top")
+    ax.text(0.07, 0.125, lc, fontsize=9.5, color=INK, transform=ax.transAxes, va="top")
 
     _footer(fig, page, total)
     return fig
@@ -228,20 +241,34 @@ def _tea_charts(results, page, total):
     labels = [k for k, _ in items]
     vals = [v / 1e6 for _, v in items]
     ax1 = fig.add_axes([0.30, 0.56, 0.62, 0.34])
-    ax1.barh(labels, vals, color=GREEN)
-    ax1.set_title("Annual operating cost breakdown (€ M/yr)", fontsize=11, color=INK)
+    ax1.barh(labels, vals, color=BAR, height=0.62)
+    ax1.set_title("Annual operating cost by item (M€ / yr, plant total)", fontsize=11,
+                  color=INK, loc="left")
+    ax1.set_xlabel("M€ / yr")
     ax1.tick_params(labelsize=8.5)
-    for s in ("top", "right"):
+    ax1.grid(True, axis="x", color=theme.CHART_GRID, linewidth=0.8)
+    ax1.set_axisbelow(True)
+    for s in ("top", "right", "left"):
         ax1.spines[s].set_visible(False)
 
-    # CAPEX pie
-    citems = [(k, v) for k, v in tea.capex_breakdown.items() if v > 0]
-    ax2 = fig.add_axes([0.16, 0.06, 0.68, 0.42])
-    ax2.set_title("CAPEX breakdown", fontsize=11, color=INK)
-    ax2.pie([v for _, v in citems], labels=[k for k, _ in citems],
-            autopct="%1.0f%%", startangle=90, colors=PIE_COLORS,
-            textprops={"fontsize": 8.5}, pctdistance=0.75)
-    ax2.axis("equal")
+    # CAPEX as ranked bars: a pie with seven slices cannot be read to the percent.
+    citems = sorted(((k, v) for k, v in tea.capex_breakdown.items() if v > 0),
+                    key=lambda kv: kv[1])
+    ax2 = fig.add_axes([0.30, 0.10, 0.62, 0.34])
+    total = tea.total_investment or 1.0
+    ax2.barh([k for k, _ in citems], [v / 1e6 for _, v in citems], color=BAR, height=0.62)
+    for i, (_, v) in enumerate(citems):
+        ax2.annotate(f"{v / 1e6:,.2f}  ({v / total * 100:.0f}%)", xy=(v / 1e6, i),
+                     xytext=(4, 0), textcoords="offset points", va="center", fontsize=8,
+                     color=SUBTLE)
+    ax2.set_xlim(0, max(v for _, v in citems) / 1e6 * 1.3)
+    ax2.set_title("Capital investment by item (M€)", fontsize=11, color=INK, loc="left")
+    ax2.set_xlabel("M€")
+    ax2.tick_params(labelsize=8.5)
+    ax2.grid(True, axis="x", color=theme.CHART_GRID, linewidth=0.8)
+    ax2.set_axisbelow(True)
+    for s in ("top", "right", "left"):
+        ax2.spines[s].set_visible(False)
 
     _footer(fig, page, total)
     return fig
@@ -254,20 +281,32 @@ def _cost_table(results, page, total):
     ax = fig.add_axes([0, 0, 1, 1]); ax.axis("off")
 
     tea = results.tea
-    annual_kg = max(results.inventory.annual_biomass_kg, 1e-9)
+    # The € / kg column is per kg of the reported product and carries the same
+    # allocation share as the cover's production cost, so the last row of this
+    # table is that number. The € / yr column is the plant total.
+    mp = results.main_product
+    ref = reference_product(results)
+    denom = max(mp.annual_kg if mp else results.inventory.annual_biomass_kg, 1e-9)
+    share = mp.allocation_share if mp else 1.0
     aoc = tea.annual_opex
     items = sorted(tea.opex_breakdown.items(), key=lambda kv: kv[1], reverse=True)
     rows = []
     for name, v in items:
-        rows.append((name, f"{v / annual_kg:,.3f}", _money(v) + "/yr",
+        rows.append((name, f"{v * share / denom:,.3f}", _money(v) + "/yr",
                      f"{100 * v / aoc:,.1f}%"))
     raw = tea.opex_categories.get("Raw materials", 0.0)
-    rows.append(("Raw materials (subtotal)", f"{raw / annual_kg:,.3f}", _money(raw) + "/yr",
+    rows.append(("Raw materials (subtotal)", f"{raw * share / denom:,.3f}", _money(raw) + "/yr",
                  f"{100 * raw / aoc:,.1f}%"))
-    rows.append(("Annual operating cost", f"{aoc / annual_kg:,.3f}", _money(aoc) + "/yr", "100.0%"))
-    _table(ax, ["Cost item", "€ / kg", "€ / yr", "% of total"], rows,
-           [0.40, 0.16, 0.20, 0.14], y_top=0.90, cell_h=0.05,
+    rows.append(("Annual operating cost", f"{aoc * share / denom:,.3f}", _money(aoc) + "/yr",
+                 "100.0%"))
+    _table(ax, ["Cost item", f"€ / kg {ref}", "€ / yr (plant)", "% of total"], rows,
+           [0.36, 0.22, 0.18, 0.12], y_top=0.90, cell_h=0.05,
            aligns=["left", "right", "right", "right"])
+    note = (f"The € / kg column is allocated: {share * 100:.0f}% of each line goes to {ref} "
+            f"under {results.scenario.extraction.allocation} allocation." if mp else
+            "Single product: the whole operating cost is carried by the dry biomass.")
+    ax.text(0.07, 0.90 - 0.05 * (len(rows) + 1) - 0.03, note + f"  Amounts: {PRICE_BASIS}.",
+            fontsize=8.5, color=SUBTLE, transform=ax.transAxes, wrap=True)
 
     _footer(fig, page, total)
     return fig
@@ -282,20 +321,32 @@ def _lca(results, page, total):
     items = sorted(lca.gwp_breakdown.items(), key=lambda kv: kv[1])
     labels = [k for k, _ in items]
     vals = [v for _, v in items]
-    colors = [GREEN if v < 0 else BURDEN for v in vals]
+    colors = [CREDIT if v < 0 else BURDEN for v in vals]
     ax1 = fig.add_axes([0.34, 0.58, 0.58, 0.32])
-    ax1.barh(labels, vals, color=colors)
-    ax1.axvline(lca.gwp_kg_co2eq_per_kg, ls="--", color=INK, lw=1)
-    ax1.set_title("GWP contribution (kg CO₂-eq / kg)", fontsize=11, color=INK)
+    ax1.barh(labels, vals, color=colors, height=0.62)
+    ax1.axvline(0, color=theme.CHART_AXIS, lw=0.8)
+    ax1.axvline(lca.gwp_kg_co2eq_per_kg, color=INK, lw=1)
+    ax1.annotate(f"net {lca.gwp_kg_co2eq_per_kg:,.2f}", xy=(lca.gwp_kg_co2eq_per_kg, 1.0),
+                 xycoords=("data", "axes fraction"), xytext=(4, -2), textcoords="offset points",
+                 va="top", fontsize=8.5, color=INK)
+    ax1.set_title("GWP contributions (kg CO₂-eq / kg dry biomass processed)", fontsize=11,
+                  color=INK, loc="left")
+    ax1.set_xlabel("kg CO₂-eq / kg dry biomass processed")
     ax1.tick_params(labelsize=8.5)
-    for s in ("top", "right"):
+    ax1.grid(True, axis="x", color=theme.CHART_GRID, linewidth=0.8)
+    ax1.set_axisbelow(True)
+    for s in ("top", "right", "left"):
         ax1.spines[s].set_visible(False)
+    from matplotlib.patches import Patch
+
+    ax1.legend(handles=[Patch(color=BURDEN, label="Burden"), Patch(color=CREDIT, label="Credit")],
+               loc="lower right", frameon=False, fontsize=8.5)
 
     ax = fig.add_axes([0, 0, 1, 1]); ax.axis("off")
-    ax.text(0.07, 0.50, "Impact categories (per kg product)", fontsize=12,
+    ax.text(0.07, 0.50, "Impact categories (per kg dry biomass processed)", fontsize=12,
             fontweight="bold", color=INK, transform=ax.transAxes)
-    rows = [(k, f"{v:,.4g}") for k, v in lca.impacts.items()]
-    _table(ax, ["Impact category", "per kg product"], rows, [0.56, 0.28],
+    rows = [(k, sig(v, 3)) for k, v in lca.impacts.items()]
+    _table(ax, ["Impact category (unit)", "per kg dry biomass"], rows, [0.56, 0.28],
            y_top=0.46, cell_h=0.05, aligns=["left", "right"])
 
     _footer(fig, page, total)
@@ -413,9 +464,13 @@ def _inventory_chart(results, page, total):
 
     eb = results.inventory.elec_breakdown
     ax = fig.add_axes([0.12, 0.42, 0.78, 0.44])
-    ax.bar(list(eb.keys()), list(eb.values()), color=GREEN, width=0.6)
-    ax.set_title("Electricity by stage (kWh/kg)", fontsize=11, color=INK)
+    ax.bar(list(eb.keys()), list(eb.values()), color=BAR, width=0.6)
+    ax.set_title("Electricity by stage (kWh / kg dry biomass)", fontsize=11, color=INK,
+                 loc="left")
+    ax.set_ylabel("kWh / kg dry biomass")
     ax.tick_params(labelsize=9)
+    ax.grid(True, axis="y", color=theme.CHART_GRID, linewidth=0.8)
+    ax.set_axisbelow(True)
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)
 
@@ -538,8 +593,8 @@ def _sensitivity(sens, page, total):
     _watermark(fig)
     fig.text(0.07, 0.945, "Sensitivity analysis", fontsize=16, fontweight="bold", color=INK)
     ax = fig.add_axes([0.14, 0.42, 0.78, 0.44])
-    ax.plot(sens["xs"], sens["ys"], marker="o", color=GREEN)
-    ax.axhline(0, color="#bbbbbb", lw=0.8)
+    ax.plot(sens["xs"], sens["ys"], marker="o", color=BAR, lw=2, ms=6)
+    ax.axhline(0, color=theme.CHART_AXIS, lw=0.8)
     ax.set_xlabel(f"{sens['param']} ({sens['unit']})", fontsize=10)
     ax.set_ylabel(sens["output"], fontsize=10)
     ax.set_title(f"{sens['output']} vs {sens['param']}", fontsize=11, color=INK)
@@ -555,10 +610,13 @@ def _uncertainty(unc, page, total):
     _watermark(fig)
     fig.text(0.07, 0.945, "Uncertainty (Monte Carlo)", fontsize=16, fontweight="bold", color=INK)
     ax = fig.add_axes([0.14, 0.44, 0.78, 0.42])
-    ax.hist(unc["vals"], bins=30, color=GREEN, alpha=0.85)
+    ax.hist(unc["vals"], bins=30, color=BAR, edgecolor="white", linewidth=0.8)
     s = unc["stats"]
-    for q, col in ((s["p10"], "#888888"), (s["p50"], BURDEN), (s["p90"], "#888888")):
-        ax.axvline(q, color=col, ls="--", lw=1)
+    for name, q, col in (("P10", s["p10"], SUBTLE), ("P50", s["p50"], INK),
+                         ("P90", s["p90"], SUBTLE)):
+        ax.axvline(q, color=col, lw=1)
+        ax.annotate(name, xy=(q, 1.0), xycoords=("data", "axes fraction"), xytext=(3, -2),
+                    textcoords="offset points", va="top", fontsize=8, color=col)
     ax.set_title(f"{unc['output']}   (n = {unc['n']})", fontsize=11, color=INK)
     ax.set_xlabel(unc["output"], fontsize=10); ax.tick_params(labelsize=9)
     for sp in ("top", "right"):

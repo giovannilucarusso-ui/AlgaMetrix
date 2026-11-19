@@ -1,23 +1,28 @@
 """Guided setup wizard for a researcher's TEA/LCA case study.
 
 Seven steps that build a scenario either from the closest validated example or
-from scratch, then hand it to the main window. Every step is pre-filled.
+from scratch, then hand it to the main window. Every step is pre-filled, every
+numeric field carries its unit, and a step list on the left says where the
+user is.
 """
 
 from __future__ import annotations
 
 import copy
 
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QButtonGroup,
-    QCheckBox,
     QComboBox,
-    QDoubleSpinBox,
     QFormLayout,
+    QFrame,
+    QHBoxLayout,
     QLabel,
     QMessageBox,
     QRadioButton,
     QVBoxLayout,
+    QWidget,
     QWizard,
     QWizardPage,
 )
@@ -36,7 +41,15 @@ from algametrix.templates import (
     set_scale_from_target,
 )
 
+from desktop import resources, theme
+from desktop.fields import plain_tooltip
+from desktop.fields import spec as field_spec
+from desktop.fmt import sig
 from desktop.i18n import tr
+from desktop.inputs_panel import number
+
+STEP_TITLES = ("Start", "Product goal", "Organism", "Cultivation & scale", "Downstream",
+               "Economic context", "Review")
 
 
 def _default_scenario(lib: Library) -> Scenario:
@@ -52,6 +65,78 @@ def _default_scenario(lib: Library) -> Scenario:
     )
 
 
+def _form(page: QWizardPage) -> QFormLayout:
+    f = QFormLayout(page)
+    f.setHorizontalSpacing(14)
+    f.setVerticalSpacing(10)
+    f.setLabelAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+    f.setFieldGrowthPolicy(QFormLayout.ExpandingFieldsGrow)
+    return f
+
+
+def _caption(text: str = "") -> QLabel:
+    lbl = QLabel(text)
+    lbl.setObjectName("caption")
+    lbl.setWordWrap(True)
+    return lbl
+
+
+def _with_unit(field: QWidget, unit: str) -> QWidget:
+    """A field followed by its unit tag; the holder is what the form registers."""
+    if not unit:
+        return field
+    holder = QWidget()
+    hl = QHBoxLayout(holder)
+    hl.setContentsMargins(0, 0, 0, 0)
+    hl.setSpacing(6)
+    hl.addWidget(field, 1)
+    tag = QLabel(unit)
+    tag.setObjectName("unit")
+    hl.addWidget(tag)
+    return holder
+
+
+class StepList(QFrame):
+    """The column on the left: which step this is, which are done."""
+
+    def __init__(self, titles):
+        super().__init__()
+        self.setObjectName("wizardSide")
+        self.setFixedWidth(200)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(18, 18, 18, 18)
+        lay.setSpacing(4)
+        path = resources.logo_path()
+        pm = QPixmap(path) if path else QPixmap()
+        if not pm.isNull():
+            logo = QLabel()
+            logo.setPixmap(pm.scaledToWidth(150, Qt.SmoothTransformation))
+            lay.addWidget(logo)
+            lay.addSpacing(10)
+        title = QLabel(tr("Set up a case"))
+        title.setObjectName("h2")
+        lay.addWidget(title)
+        lay.addWidget(_caption(tr("Seven steps, every field pre-filled. You can change "
+                                  "anything later in the full tool.")))
+        lay.addSpacing(10)
+        self._labels = []
+        for i, t in enumerate(titles):
+            lbl = QLabel(f"{i + 1}.  {tr(t)}")
+            lbl.setObjectName("wizardStep")
+            lbl.setWordWrap(True)
+            lay.addWidget(lbl)
+            self._labels.append(lbl)
+        lay.addStretch(1)
+
+    def set_current(self, index: int):
+        for i, lbl in enumerate(self._labels):
+            name = ("wizardStepCurrent" if i == index
+                    else "wizardStepDone" if i < index else "wizardStep")
+            if lbl.objectName() != name:
+                lbl.setObjectName(name)
+                theme.repolish(lbl)
+
+
 class StartPage(QWizardPage):
     def __init__(self, wiz):
         super().__init__()
@@ -59,6 +144,7 @@ class StartPage(QWizardPage):
         self.setTitle(tr("Start your case study"))
         self.setSubTitle(tr("Begin from the closest validated example, or from scratch."))
         v = QVBoxLayout(self)
+        v.setSpacing(10)
         self.grp = QButtonGroup(self)
         self.rb_example = QRadioButton(tr("Start from a validated example (recommended)"))
         self.rb_scratch = QRadioButton(tr("Build from scratch"))
@@ -68,6 +154,9 @@ class StartPage(QWizardPage):
         v.addWidget(self.rb_example)
         self.cmb = QComboBox()
         self.cmb.addItems([t.name for t in TEMPLATES])
+        self.cmb.setToolTip(plain_tooltip(
+            "Validated examples", "Each template rebuilds a published or reference case; the "
+            "description below says what it was checked against."))
         v.addWidget(self.cmb)
         self.lbl = QLabel()
         self.lbl.setWordWrap(True)
@@ -75,6 +164,10 @@ class StartPage(QWizardPage):
         v.addWidget(self.lbl)
         v.addSpacing(8)
         v.addWidget(self.rb_scratch)
+        v.addWidget(_caption(tr("From scratch: Chlorella vulgaris in an open raceway pond, "
+                                "10 ha, spray-dried. Every default is a literature-typical "
+                                "placeholder you will replace.")))
+        v.addStretch(1)
         self.cmb.currentTextChanged.connect(self._describe)
         self.rb_example.toggled.connect(self.cmb.setEnabled)
         self._describe()
@@ -98,6 +191,13 @@ class GoalPage(QWizardPage):
     LABELS = [("Whole biomass (food / feed)", "biomass"), ("Oil / omega-3", "oil"),
               ("Protein (single-cell protein)", "protein"),
               ("Pigment (phycocyanin, astaxanthin)", "pigment"), ("Biofuel (biodiesel)", "biofuel")]
+    HINTS = {
+        "biomass": "No extraction: the dried biomass is the product.",
+        "oil": "Solvent extraction of the lipid fraction; protein meal and residue as co-products.",
+        "protein": "Cell disruption and aqueous extraction; the protein fraction is the product.",
+        "pigment": "Extraction and purification of a pigment; low yield, high value.",
+        "biofuel": "Lipid extraction and transesterification to biodiesel.",
+    }
 
     def __init__(self, wiz):
         super().__init__()
@@ -105,13 +205,20 @@ class GoalPage(QWizardPage):
         self.setTitle(tr("Product goal"))
         self.setSubTitle(tr("What is the main product? This sets up the downstream and products."))
         v = QVBoxLayout(self)
+        v.setSpacing(8)
         self.grp = QButtonGroup(self)
         self.rbs = {}
         for text, key in self.LABELS:
             rb = QRadioButton(tr(text))
+            rb.setToolTip(self.HINTS[key])
             self.grp.addButton(rb)
             v.addWidget(rb)
             self.rbs[key] = rb
+        v.addSpacing(6)
+        v.addWidget(_caption(tr("The cost and the GWP are reported per kg of the main product; "
+                                "co-products take their share by the allocation method of the "
+                                "template (economic by default).")))
+        v.addStretch(1)
 
     def initializePage(self):
         self.rbs.get(self.wiz.guess_goal(), self.rbs["biomass"]).setChecked(True)
@@ -132,27 +239,35 @@ class OrganismPage(QWizardPage):
         self.wiz = wiz
         self.setTitle(tr("Organism"))
         self.setSubTitle(tr("Pick a strain, then adjust its composition if you have your own data."))
-        f = QFormLayout(self)
+        f = _form(self)
         self.cmb = QComboBox()
         self.cmb.addItems(list(wiz.lib.organisms))
         f.addRow(tr("Strain"), self.cmb)
+        self.lbl_notes = _caption()
+        f.addRow("", self.lbl_notes)
 
-        def _spin(hi, step, dec):
-            sb = QDoubleSpinBox(); sb.setRange(0, hi); sb.setSingleStep(step); sb.setDecimals(dec)
-            sb.valueChanged.connect(self._update_sum)
+        def _spin(hi, step, dec, tip):
+            sb = number(0, hi, 0.0, step, dec, self._update_sum, plain_tooltip(tip[0], tip[1]))
             return sb
 
-        self.protein = _spin(1, 0.01, 3); self.lipid = _spin(1, 0.01, 3)
-        self.carb = _spin(1, 0.01, 3); self.ash = _spin(1, 0.01, 3)
-        self.c = _spin(1, 0.01, 3); self.n = _spin(0.3, 0.005, 3); self.p = _spin(0.1, 0.001, 3)
-        f.addRow(tr("Protein (fraction DW)"), self.protein)
-        f.addRow(tr("Lipid (fraction DW)"), self.lipid)
-        f.addRow(tr("Carbohydrate (fraction DW)"), self.carb)
-        f.addRow(tr("Ash (fraction DW)"), self.ash)
-        f.addRow(tr("Carbon (fraction DW)"), self.c)
-        f.addRow(tr("Nitrogen (fraction DW)"), self.n)
-        f.addRow(tr("Phosphorus (fraction DW)"), self.p)
-        self.lbl_sum = QLabel(); self.lbl_sum.setObjectName("subtle")
+        self.protein = _spin(1, 0.01, 3, ("Protein", "Mass fraction of the dry weight."))
+        self.lipid = _spin(1, 0.01, 3, ("Lipid", "Mass fraction of the dry weight."))
+        self.carb = _spin(1, 0.01, 3, ("Carbohydrate", "Mass fraction of the dry weight."))
+        self.ash = _spin(1, 0.01, 3, ("Ash", "Mass fraction of the dry weight."))
+        self.c = _spin(1, 0.01, 3, ("Carbon", "Elemental carbon; drives the CO₂ or substrate demand."))
+        self.n = _spin(0.3, 0.005, 3, ("Nitrogen", "Elemental nitrogen; drives the N demand."))
+        self.p = _spin(0.1, 0.001, 3, ("Phosphorus", "Elemental phosphorus; drives the P demand."))
+        unit = "kg/kg DW"
+        f.addRow(tr("Protein (fraction DW)"), _with_unit(self.protein, unit))
+        f.addRow(tr("Lipid (fraction DW)"), _with_unit(self.lipid, unit))
+        f.addRow(tr("Carbohydrate (fraction DW)"), _with_unit(self.carb, unit))
+        f.addRow(tr("Ash (fraction DW)"), _with_unit(self.ash, unit))
+        f.addRow(tr("Carbon (fraction DW)"), _with_unit(self.c, unit))
+        f.addRow(tr("Nitrogen (fraction DW)"), _with_unit(self.n, unit))
+        f.addRow(tr("Phosphorus (fraction DW)"), _with_unit(self.p, unit))
+        self.lbl_sum = QLabel()
+        self.lbl_sum.setObjectName("subtle")
+        self.lbl_sum.setWordWrap(True)
         f.addRow("", self.lbl_sum)
         self.cmb.currentTextChanged.connect(self._load_strain)
 
@@ -164,20 +279,29 @@ class OrganismPage(QWizardPage):
         o = self.wiz.lib.organisms.get(name)
         if o:
             for attr, sb in self._fields().items():
-                sb.blockSignals(True); sb.setValue(getattr(o, attr)); sb.blockSignals(False)
+                sb.blockSignals(True)
+                sb.setValue(getattr(o, attr))
+                sb.blockSignals(False)
+            self.lbl_notes.setText(" ".join((o.notes or "").split()))
             self._update_sum()
 
     def _update_sum(self):
         s = self.protein.value() + self.lipid.value() + self.carb.value() + self.ash.value()
         self.lbl_sum.setText(tr("Composition sums to {s:.0%} (should be ~100%).").format(s=s))
+        self.lbl_sum.setStyleSheet("" if 0.95 <= s <= 1.05 else f"color: {theme.WARNING};")
 
     def initializePage(self):
         o = self.wiz.scenario.organism
         i = self.cmb.findText(o.name)
         if i >= 0:
-            self.cmb.blockSignals(True); self.cmb.setCurrentIndex(i); self.cmb.blockSignals(False)
+            self.cmb.blockSignals(True)
+            self.cmb.setCurrentIndex(i)
+            self.cmb.blockSignals(False)
         for attr, sb in self._fields().items():
-            sb.blockSignals(True); sb.setValue(getattr(o, attr)); sb.blockSignals(False)
+            sb.blockSignals(True)
+            sb.setValue(getattr(o, attr))
+            sb.blockSignals(False)
+        self.lbl_notes.setText(" ".join((o.notes or "").split()))
         self._update_sum()
 
     def validatePage(self):
@@ -198,7 +322,7 @@ class OrganismPage(QWizardPage):
             # On the page as well as in the box: a Next button that silently does
             # nothing is its own kind of bug.
             self.lbl_sum.setText(" ".join(i.message for i in blocking))
-            self.lbl_sum.setStyleSheet("color: #8b1a17;")
+            self.lbl_sum.setStyleSheet(f"color: {theme.DANGER};")
             QMessageBox.warning(self, tr("Composition is not possible"),
                                 format_issues(blocking))
             return False
@@ -219,44 +343,73 @@ class CultivationPage(QWizardPage):
         self.wiz = wiz
         self.setTitle(tr("Cultivation & scale"))
         self.setSubTitle(tr("Choose the system, how to size the plant, and batch or continuous operation."))
-        f = QFormLayout(self)
+        f = _form(self)
         self.form = f
-        self.cmb_sys = QComboBox(); self.cmb_sys.addItems(list(wiz.lib.systems))
+        self._holders: dict[int, QWidget] = {}
+        self.cmb_sys = QComboBox()
+        self.cmb_sys.addItems(list(wiz.lib.systems))
         f.addRow(tr("System"), self.cmb_sys)
+        self.lbl_sys_notes = _caption()
+        f.addRow("", self.lbl_sys_notes)
         self.cmb_mode = QComboBox()
         self.cmb_mode.addItems([tr("By target production (t/yr)"), tr("By cultivation size")])
+        self.cmb_mode.setToolTip(plain_tooltip(
+            "How to size the plant", "Give the output you want and let the scale follow, or "
+            "give the area or volume and read the output."))
         f.addRow(tr("Specify scale"), self.cmb_mode)
-        self.spn_target = QDoubleSpinBox(); self.spn_target.setRange(0.1, 1e7); self.spn_target.setDecimals(0)
-        self.spn_target.setGroupSeparatorShown(True); self.spn_target.setValue(100)
-        f.addRow(tr("Target product (t/yr)"), self.spn_target)
-        self.spn_size = QDoubleSpinBox(); self.spn_size.setRange(1, 1e9); self.spn_size.setDecimals(0)
-        self.spn_size.setGroupSeparatorShown(True)
+        self.spn_target = number(0.1, 1e7, 100, 10, 0, grouped=True,
+                                 tooltip=plain_tooltip("Target production",
+                                                       "Main product leaving the gate per year."))
+        self._add(f, QLabel(tr("Target product (t/yr)")), self.spn_target, "t/yr")
+        self.spn_size = number(1, 1e9, 100_000, 1000, 0, grouped=True)
         self.lbl_size = QLabel(tr("Cultivation size (m²)"))
-        f.addRow(self.lbl_size, self.spn_size)
-        self.cmb_batch = QComboBox(); self.cmb_batch.addItems([tr("Continuous"), tr("Batch")])
+        self.lbl_size_unit = QLabel("m²")
+        self.lbl_size_unit.setObjectName("unit")
+        self._add(f, self.lbl_size, self.spn_size, unit_label=self.lbl_size_unit)
+        self.cmb_batch = QComboBox()
+        self.cmb_batch.addItems([tr("Continuous"), tr("Batch")])
         f.addRow(tr("Operation"), self.cmb_batch)
+
+        # The two numbers that set the area when sizing by target. They used to
+        # come from the system preset without being shown, so a target turned
+        # into an area with no visible basis. Productivity has no meaning at
+        # zero, hence the floor.
+        fp = field_spec("system", "productivity")
+        self.spn_productivity = number(
+            max(fp.lo, 0.1), fp.hi, 20.0, fp.step, fp.decimals, tooltip=plain_tooltip(
+                tr("Productivity"),
+                tr("Annual mean over the operating days, for the site's climate.")))
+        self.lbl_productivity = QLabel(tr("Productivity (g/m²/d)"))
+        self.lbl_productivity_unit = QLabel("g/m²/d")
+        self._add(f, self.lbl_productivity, self.spn_productivity,
+                  unit_label=self.lbl_productivity_unit)
+        fd = field_spec("system", "operating_days")
+        self.spn_days = number(
+            fd.lo, fd.hi, 330.0, fd.step, fd.decimals, tooltip=plain_tooltip(
+                tr("Operating days"),
+                tr("Days a year the plant produces. In batch operation it also sets the "
+                   "number of batches a year.")))
+        self._add(f, QLabel(tr("Operating days (d/yr)")), self.spn_days, "d/yr")
 
         # The three numbers that make a batch a batch. Without them "batch size"
         # is a free parameter and the reactor volume is decoration.
-        self.spn_titer = QDoubleSpinBox(); self.spn_titer.setRange(0.1, 500.0); self.spn_titer.setDecimals(1)
-        self.spn_titer.setToolTip(tr(
+        self.spn_titer = number(0.1, 500.0, 50.0, 1.0, 1, tooltip=tr(
             "Dry biomass concentration at harvest. In g/L and kg/m³ this is the "
             "same number, so one batch holds volume × working volume × titer."))
         self.lbl_titer = QLabel(tr("Final titer (g/L)"))
-        f.addRow(self.lbl_titer, self.spn_titer)
-        self.spn_working = QDoubleSpinBox(); self.spn_working.setRange(0.05, 1.0)
-        self.spn_working.setDecimals(2); self.spn_working.setSingleStep(0.05)
-        self.spn_working.setToolTip(tr(
+        self._add(f, self.lbl_titer, self.spn_titer, "g/L")
+        self.spn_working = number(0.05, 1.0, 0.8, 0.05, 2, tooltip=tr(
             "Fraction of the nominal reactor volume the culture occupies; "
             "headspace, foam and impeller clearance take the rest."))
         self.lbl_working = QLabel(tr("Working volume (fraction)"))
-        f.addRow(self.lbl_working, self.spn_working)
-        self.spn_cycle = QDoubleSpinBox(); self.spn_cycle.setRange(1.0, 2000.0)
-        self.spn_cycle.setDecimals(1); self.spn_cycle.setValue(48.0)
+        self._add(f, self.lbl_working, self.spn_working, "fraction (0-1)")
+        self.spn_cycle = number(1.0, 2000.0, 48.0, 1.0, 1, tooltip=plain_tooltip(
+            "Cycle time", "Hours from one batch start to the next, turnaround included."))
         self.lbl_cycle = QLabel(tr("Batch cycle time (h, incl. turnaround)"))
-        f.addRow(self.lbl_cycle, self.spn_cycle)
+        self._add(f, self.lbl_cycle, self.spn_cycle, "h")
 
-        self.lbl_derived = QLabel(""); self.lbl_derived.setObjectName("subtle")
+        self.lbl_derived = QLabel("")
+        self.lbl_derived.setObjectName("subtle")
         self.lbl_derived.setWordWrap(True)
         f.addRow("", self.lbl_derived)
 
@@ -264,8 +417,23 @@ class CultivationPage(QWizardPage):
         self.cmb_sys.currentTextChanged.connect(self._sys_changed)
         self.cmb_batch.currentIndexChanged.connect(self._toggle)
         for w in (self.spn_size, self.spn_titer, self.spn_working, self.spn_cycle,
-                  self.spn_target):
+                  self.spn_target, self.spn_productivity, self.spn_days):
             w.valueChanged.connect(self._update_derived)
+
+    def _add(self, form, label, field, unit: str = "", unit_label: QLabel | None = None):
+        holder = QWidget()
+        hl = QHBoxLayout(holder)
+        hl.setContentsMargins(0, 0, 0, 0)
+        hl.setSpacing(6)
+        hl.addWidget(field, 1)
+        tag = unit_label if unit_label is not None else QLabel(unit)
+        tag.setObjectName("unit")
+        hl.addWidget(tag)
+        form.addRow(label, holder)
+        self._holders[id(field)] = holder
+
+    def _row_visible(self, field, on: bool):
+        self.form.setRowVisible(self._holders.get(id(field), field), on)
 
     # -- state ------------------------------------------------------------
     def _system(self):
@@ -278,24 +446,32 @@ class CultivationPage(QWizardPage):
         by_target = self.cmb_mode.currentIndex() == 0
         sysm = self._system()
         volume = sysm is not None and sysm.basis == Basis.VOLUME
-        self.form.setRowVisible(self.spn_target, by_target)
-        self.form.setRowVisible(self.spn_size, not by_target)
+        self._row_visible(self.spn_target, by_target)
+        self._row_visible(self.spn_size, not by_target)
         # Titer and working volume only mean something for a vessel, and only a
         # batch schedule reads them.
         for widget in (self.spn_titer, self.spn_working):
-            self.form.setRowVisible(widget, volume and self._is_batch())
-        self.form.setRowVisible(self.spn_cycle, self._is_batch())
+            self._row_visible(widget, volume and self._is_batch())
+        self._row_visible(self.spn_cycle, self._is_batch())
+        # A batch's output is batch size × batches a year; productivity only
+        # enters continuous operation. Operating days count in both.
+        self._row_visible(self.spn_productivity, not self._is_batch())
         self._update_derived()
 
     def _sys_changed(self, name):
         s = self.wiz.lib.systems.get(name)
         if not s:
             return
-        self.lbl_size.setText(tr("Reactor volume (m³)") if s.basis == Basis.VOLUME
-                              else tr("Cultivation size (m²)"))
+        self._set_basis_labels(s.basis)
+        self.lbl_sys_notes.setText(" ".join((s.notes or "").split()))
         self.cmb_batch.setCurrentIndex(1 if s.mode.value == "heterotrophic" else 0)
         self.spn_titer.setValue(s.biomass_conc)
         self.spn_working.setValue(s.working_volume)
+        for sb, value in ((self.spn_productivity, s.productivity),
+                          (self.spn_days, s.operating_days)):
+            sb.blockSignals(True)
+            sb.setValue(value)
+            sb.blockSignals(False)
         # A basis change makes the old number mean something else: 100,000 m² of
         # pond is not 100,000 m³ of fermenter. Never carry it across.
         if s.basis != getattr(self, "_basis", None):
@@ -303,12 +479,57 @@ class CultivationPage(QWizardPage):
             self.spn_size.setValue(self.DEFAULT_SIZE[s.basis])
         self._toggle()
 
+    def _set_basis_labels(self, basis):
+        volume = basis == Basis.VOLUME
+        self.lbl_size.setText(tr("Reactor volume (m³)") if volume else tr("Cultivation size (m²)"))
+        self.lbl_size_unit.setText("m³" if volume else "m²")
+        self.spn_size.setSingleStep(10 if volume else 1000)
+        self.lbl_productivity.setText(
+            tr("Productivity (g/L/d)") if volume else tr("Productivity (g/m²/d)"))
+        self.lbl_productivity_unit.setText("g/L/d" if volume else "g/m²/d")
+        self.spn_productivity.setSingleStep(0.1 if volume else 1.0)
+
+    def _sized_system(self, sysm):
+        """The selected system with the productivity and operating days typed here."""
+        sized = copy.deepcopy(sysm)
+        sized.productivity = self.spn_productivity.value()
+        sized.operating_days = self.spn_days.value()
+        return sized
+
+    def _continuous_text(self, sized, by_target: bool) -> str:
+        """The area (or volume) a target needs, or the output a size gives, with its basis."""
+        volume = sized.basis == Basis.VOLUME
+        if volume:
+            unit, p_unit, y_unit = "m³", "g/L/d", "kg/m³/yr"
+            per_unit = sized.productivity * sized.operating_days           # g/L/d = kg/m³/d
+        else:
+            unit, p_unit, y_unit = "m²", "g/m²/d", "kg/m²/yr"
+            per_unit = sized.productivity * sized.operating_days / 1000.0
+        recovery = self.wiz.scenario.harvesting.recovery
+        values = dict(u=unit, p=sig(sized.productivity, 3), pu=p_unit,
+                      d=f"{sized.operating_days:.0f}", r=f"{recovery:.0%}")
+        if by_target:
+            # Sized on a copy, the way validatePage will size it, so the yield
+            # of the main product for the chosen goal is in the number.
+            trial = copy.copy(self.wiz.scenario)
+            trial.system = sized
+            trial.batch_mode = False
+            set_scale_from_target(trial, self.spn_target.value())
+            return tr("{t} t/yr → {a} {u} at {p} {pu} × {d} d = {y} {yu}, with {r} harvest "
+                      "recovery.").format(t=sig(self.spn_target.value(), 3),
+                                          a=sig(trial.scale, 3), y=sig(per_unit, 3),
+                                          yu=y_unit, **values)
+        gross_t = self.spn_size.value() * per_unit / 1000.0
+        return tr("{s} {u} × {p} {pu} × {d} d = {g} t/yr of gross dry biomass, before {r} "
+                  "harvest recovery.").format(s=sig(self.spn_size.value(), 3),
+                                              g=sig(gross_t, 3), **values)
+
     def _update_derived(self):
         sysm = self._system()
         if sysm is None:
             return
         by_target = self.cmb_mode.currentIndex() == 0
-        batches = sysm.operating_days * 24.0 / max(self.spn_cycle.value(), 1e-9)
+        batches = self.spn_days.value() * 24.0 / max(self.spn_cycle.value(), 1e-9)
         if self._is_batch() and sysm.basis == Basis.VOLUME:
             if by_target:
                 self.lbl_derived.setText(tr(
@@ -334,9 +555,7 @@ class CultivationPage(QWizardPage):
                 "not enter it."
             ).format(n=batches))
         else:
-            self.lbl_derived.setText(tr(
-                "Continuous: output = scale × productivity × {d:.0f} operating days."
-            ).format(d=sysm.operating_days))
+            self.lbl_derived.setText(self._continuous_text(self._sized_system(sysm), by_target))
 
     def initializePage(self):
         scn = self.wiz.scenario
@@ -346,19 +565,23 @@ class CultivationPage(QWizardPage):
             self.cmb_sys.blockSignals(True)
             self.cmb_sys.setCurrentIndex(i)
             self.cmb_sys.blockSignals(False)
+        self.lbl_sys_notes.setText(" ".join((scn.system.notes or "").split()))
         self.spn_size.setValue(scn.scale)
         self.spn_titer.setValue(scn.system.biomass_conc)
         self.spn_working.setValue(scn.system.working_volume)
+        self.spn_productivity.setValue(scn.system.productivity)
+        self.spn_days.setValue(scn.system.operating_days)
         self.cmb_batch.setCurrentIndex(1 if scn.batch_mode else 0)
         if scn.batch_cycle_time_h > 0:
             self.spn_cycle.setValue(scn.batch_cycle_time_h)
-        self.lbl_size.setText(tr("Reactor volume (m³)") if scn.system.basis == Basis.VOLUME
-                              else tr("Cultivation size (m²)"))
+        self._set_basis_labels(scn.system.basis)
         self._toggle()
 
     def validatePage(self):
         scn = self.wiz.scenario
         scn.system = copy.deepcopy(self.wiz.lib.systems[self.cmb_sys.currentText()])
+        scn.system.productivity = self.spn_productivity.value()
+        scn.system.operating_days = self.spn_days.value()
         scn.system.biomass_conc = self.spn_titer.value()
         scn.system.working_volume = self.spn_working.value()
         scn.materials = list(scn.system.materials)
@@ -367,8 +590,12 @@ class CultivationPage(QWizardPage):
         if scn.batch_mode:
             scn.batch_cycle_time_h = self.spn_cycle.value()
         if self.cmb_mode.currentIndex() == 0:
-            set_scale_from_target(scn, self.spn_target.value())
+            # Kept on the wizard: the downstream page sizes again once the
+            # harvesting, and so the recovery, is known.
+            self.wiz.target_t_yr = self.spn_target.value()
+            set_scale_from_target(scn, self.wiz.target_t_yr)
         else:
+            self.wiz.target_t_yr = None
             scn.scale = self.spn_size.value()
             if scn.batch_mode and scn.system.basis == Basis.VOLUME:
                 # One batch is what the vessel holds. Sizing by volume therefore
@@ -385,15 +612,39 @@ class DownstreamPage(QWizardPage):
         self.wiz = wiz
         self.setTitle(tr("Downstream"))
         self.setSubTitle(tr("How the biomass is harvested, dried and (if needed) processed into the product."))
-        f = QFormLayout(self)
-        self.cmb_harv = QComboBox(); self.cmb_harv.addItems(list(wiz.lib.harvesting))
-        self.cmb_dry = QComboBox(); self.cmb_dry.addItems(list(wiz.lib.drying))
+        f = _form(self)
+        self.cmb_harv = QComboBox()
+        self.cmb_harv.addItems(list(wiz.lib.harvesting))
+        self.cmb_dry = QComboBox()
+        self.cmb_dry.addItems(list(wiz.lib.drying))
         f.addRow(tr("Harvesting"), self.cmb_harv)
+        self.lbl_harv_notes = _caption()
+        f.addRow("", self.lbl_harv_notes)
         f.addRow(tr("Drying"), self.cmb_dry)
-        self.cmb_ext = QComboBox(); self.cmb_ext.addItems(list(wiz.lib.extraction))
+        self.lbl_dry_notes = _caption()
+        f.addRow("", self.lbl_dry_notes)
+        self.cmb_ext = QComboBox()
+        self.cmb_ext.addItems(list(wiz.lib.extraction))
         f.addRow(tr("Extraction technology"), self.cmb_ext)
-        self.lbl = QLabel(); self.lbl.setObjectName("subtle"); self.lbl.setWordWrap(True)
+        self.lbl = QLabel()
+        self.lbl.setObjectName("subtle")
+        self.lbl.setWordWrap(True)
         f.addRow("", self.lbl)
+        self.lbl_ext_notes = _caption()
+        f.addRow("", self.lbl_ext_notes)
+        self.cmb_harv.currentTextChanged.connect(self._notes)
+        self.cmb_dry.currentTextChanged.connect(self._notes)
+        self.cmb_ext.currentTextChanged.connect(self._notes)
+
+    def _notes(self, *_):
+        lib = self.wiz.lib
+        harv = lib.harvesting.get(self.cmb_harv.currentText())
+        dry = lib.drying.get(self.cmb_dry.currentText())
+        ext = lib.extraction.get(self.cmb_ext.currentText())
+        self.lbl_harv_notes.setText(" ".join((harv.notes if harv else "").split()))
+        self.lbl_dry_notes.setText(" ".join((dry.notes if dry else "").split()))
+        self.lbl_ext_notes.setText(
+            " ".join((ext.notes if ext else "").split()) if self.cmb_ext.isEnabled() else "")
 
     def _guess_preset(self, ext) -> str | None:
         """Best-matching catalogue preset for the goal-set extraction, by solvent."""
@@ -417,6 +668,7 @@ class DownstreamPage(QWizardPage):
             tr("Extraction step active — pick the technology above.") if ext.enabled
             else tr("No extraction for this product goal (whole biomass / protein).")
         )
+        self._notes()
 
     def validatePage(self):
         self.wiz.scenario.harvesting = copy.deepcopy(self.wiz.lib.harvesting[self.cmb_harv.currentText()])
@@ -430,6 +682,11 @@ class DownstreamPage(QWizardPage):
             new_ext.enabled = True
             new_ext.allocation = ext.allocation
             self.wiz.scenario.extraction = new_ext
+        # The cultivation page sized a target with the harvesting the scenario
+        # had then. Recoveries differ between methods, so size again with the
+        # one chosen here, or the plant misses its target by the difference.
+        if self.wiz.target_t_yr is not None:
+            set_scale_from_target(self.wiz.scenario, self.wiz.target_t_yr)
         return True
 
 
@@ -439,7 +696,7 @@ class ContextPage(QWizardPage):
         self.wiz = wiz
         self.setTitle(tr("Economic & environmental context"))
         self.setSubTitle(tr("Regional energy, finance and selling price. Defaults are fine to start."))
-        f = QFormLayout(self)
+        f = _form(self)
         # A region fills the two electricity inputs from data/regions.yaml, where
         # each value has a source. The first entry keeps the scenario's own
         # values, so a template is not overwritten unless the user asks.
@@ -448,21 +705,34 @@ class ContextPage(QWizardPage):
         self.cmb_region = QComboBox()
         self.cmb_region.addItem(tr("Keep the scenario's values"))
         self.cmb_region.addItems([r.name for r in self.regions])
+        self.cmb_region.setToolTip(plain_tooltip(
+            "Region", "Sets the electricity price and the grid emission factor from "
+            "data/regions.yaml, each with its source and year. The other background "
+            "factors stay as declared in data/lcia.yaml."))
         f.addRow(tr("Region (electricity)"), self.cmb_region)
-        self.spn_elec_price = QDoubleSpinBox(); self.spn_elec_price.setRange(0, 5); self.spn_elec_price.setSingleStep(0.01); self.spn_elec_price.setDecimals(4)
-        self.spn_elec_gwp = QDoubleSpinBox(); self.spn_elec_gwp.setRange(0, 5); self.spn_elec_gwp.setSingleStep(0.01); self.spn_elec_gwp.setDecimals(4)
-        f.addRow(tr("Electricity price (€/kWh)"), self.spn_elec_price)
-        f.addRow(tr("Grid emission factor (kg CO₂-eq/kWh)"), self.spn_elec_gwp)
-        self.lbl_region = QLabel(); self.lbl_region.setWordWrap(True)
+        self.spn_elec_price = number(0, 5, 0.15, 0.01, 4)
+        self.spn_elec_gwp = number(0, 5, 0.35, 0.01, 4)
+        f.addRow(tr("Electricity price (€/kWh)"), _with_unit(self.spn_elec_price, "€/kWh"))
+        f.addRow(tr("Grid emission factor (kg CO₂-eq/kWh)"),
+                 _with_unit(self.spn_elec_gwp, "kg CO₂-eq/kWh"))
+        self.lbl_region = QLabel()
+        self.lbl_region.setWordWrap(True)
+        self.lbl_region.setObjectName("caption")
         f.addRow("", self.lbl_region)
         self._shown: tuple[float, float] = (0.0, 0.0)
         self.cmb_region.currentIndexChanged.connect(self._region_changed)
-        self.spn_disc = QDoubleSpinBox(); self.spn_disc.setRange(0, 0.25); self.spn_disc.setSingleStep(0.01); self.spn_disc.setDecimals(3)
-        self.spn_life = QDoubleSpinBox(); self.spn_life.setRange(1, 40); self.spn_life.setDecimals(0)
-        self.spn_price = QDoubleSpinBox(); self.spn_price.setRange(0, 100000); self.spn_price.setDecimals(2)
-        f.addRow(tr("Discount rate"), self.spn_disc)
-        f.addRow(tr("Plant lifetime (yr)"), self.spn_life)
-        f.addRow(tr("Product selling price (€/kg)"), self.spn_price)
+        self.spn_disc = number(0, 0.25, 0.08, 0.01, 3, tooltip=plain_tooltip(
+            "Discount rate", "For the NPV and the capital recovery factor."))
+        self.spn_life = number(1, 40, 20, 1, 0, tooltip=plain_tooltip(
+            "Plant lifetime", "Project evaluation horizon."))
+        self.spn_price = number(0, 100000, 8.0, 0.5, 2, tooltip=plain_tooltip(
+            "Selling price", "Of the main product, per kg. Check the Market prices page in "
+            "the full tool for published ranges."))
+        f.addRow(tr("Discount rate"), _with_unit(self.spn_disc, "fraction (0-1)"))
+        f.addRow(tr("Plant lifetime (yr)"), _with_unit(self.spn_life, "yr"))
+        f.addRow(tr("Product selling price (€/kg)"), _with_unit(self.spn_price, "€/kg"))
+        f.addRow("", _caption(tr("Prices are in EUR as entered: the model applies no inflation "
+                                 "and no currency conversion.")))
 
     def initializePage(self):
         scn = self.wiz.scenario
@@ -517,8 +787,16 @@ class ReviewPage(QWizardPage):
         self.setTitle(tr("Review"))
         self.setSubTitle(tr("Finish to open this scenario in the full tool for analysis."))
         v = QVBoxLayout(self)
-        self.lbl = QLabel(); self.lbl.setWordWrap(True)
+        v.setSpacing(10)
+        self.lbl = QLabel()
+        self.lbl.setWordWrap(True)
+        self.lbl.setTextFormat(Qt.RichText)
+        self.lbl.setTextInteractionFlags(Qt.TextSelectableByMouse)
         v.addWidget(self.lbl)
+        v.addWidget(_caption(tr("Costs per kg of the main product at the plant gate, in EUR "
+                                "as entered; GWP cradle-to-gate. Every number can be revisited "
+                                "in the full tool.")))
+        v.addStretch(1)
         self._blocking: list = []
 
     def isComplete(self) -> bool:
@@ -531,8 +809,9 @@ class ReviewPage(QWizardPage):
         self._blocking = [i for i in check_inputs(scn) if i.is_error]
         if self._blocking:
             self.lbl.setText(
-                tr("This scenario cannot be computed. Go back and fix:") + "\n\n"
-                + format_issues(self._blocking)
+                f"<p style='color:{theme.DANGER}'><b>"
+                + tr("This scenario cannot be computed. Go back and fix:") + "</b></p><pre>"
+                + format_issues(self._blocking) + "</pre>"
             )
             self.completeChanged.emit()
             return
@@ -540,20 +819,39 @@ class ReviewPage(QWizardPage):
         r = run_scenario(scn)
         mp = r.main_product
         cost = mp.production_cost_eur_per_kg if mp else r.tea.production_cost_eur_per_kg
+        gwp = mp.gwp_kg_co2eq_per_kg if mp else r.lca.gwp_kg_co2eq_per_kg
         prod = mp.name if mp else tr("Whole biomass (food / feed)")
         unit = "m²" if scn.system.basis == Basis.AREA else "m³"
         op = tr("Batch") if scn.batch_mode else tr("Continuous")
         closest = ""
         if self.wiz.from_example:
             t = get_template(self.wiz.from_example)
-            closest = "\n\n" + tr("Validated against: {v}").format(v=f"{t.name} — {t.validation}")
+            closest = ("<p style='margin-top:8px'>"
+                       + tr("Validated against: {v}").format(v=f"{t.name} — {t.validation}")
+                       + "</p>")
+        per = mp.name if mp else "dry biomass"
+        system = f"{scn.system.name}  ·  {scn.scale:,.0f} {unit}  ·  {op}"
+        if not scn.batch_mode:
+            p_unit = "g/m²/d" if scn.system.basis == Basis.AREA else "g/L/d"
+            system += (f"  ·  {sig(scn.system.productivity, 3)} {p_unit} × "
+                       f"{scn.system.operating_days:.0f} d")
+
+        def row(k, v):
+            return (f"<tr><td style='color:{theme.INK_3}; padding:2px 14px 2px 0'>{k}</td>"
+                    f"<td style='padding:2px 0'>{v}</td></tr>")
+
         self.lbl.setText(
-            f"{tr('Organism')}: {scn.organism.name}\n"
-            f"{tr('System')}: {scn.system.name}  ·  {scn.scale:,.0f} {unit}  ·  {op}\n"
-            f"{tr('Product goal')}: {prod}\n\n"
-            f"{tr('Production cost')}: € {cost:,.2f}/kg  ·  "
-            f"{tr('Annual output')}: {r.inventory.annual_biomass_kg/1000:,.0f} t/yr  ·  "
-            f"NPV: € {r.tea.npv/1e6:,.1f} M{closest}"
+            "<table cellspacing='0'>"
+            + row(tr("Organism"), scn.organism.name)
+            + row(tr("System"), system)
+            + row(tr("Product goal"), prod)
+            + "</table><table cellspacing='0' style='margin-top:10px'>"
+            + row(tr("Production cost"), f"<b>€ {cost:,.2f}</b> / kg {per}")
+            + row("GWP", f"<b>{gwp:,.2f}</b> kg CO₂-eq / kg {per}")
+            + row(tr("Annual output"), f"<b>{r.inventory.annual_biomass_kg / 1000:,.0f}</b> t dry biomass / yr")
+            + row("NPV", f"<b>€ {r.tea.npv / 1e6:,.1f} M</b> over {scn.economics.plant_lifetime:.0f} yr "
+                         f"at {scn.economics.discount_rate:.1%}")
+            + "</table>" + closest
         )
 
 
@@ -564,17 +862,29 @@ class SetupWizard(QWizard):
         self.scenario = _default_scenario(lib)
         self.from_example: str | None = None
         self.goal = "biomass"
+        #: Set when the cultivation page sizes by target, so the downstream page
+        #: can size again with the harvesting it picks.
+        self.target_t_yr: float | None = None
         self.setWindowTitle("AlgaMetrix")
         self.setWizardStyle(QWizard.ModernStyle)
         self.setOption(QWizard.NoBackButtonOnStartPage, True)
+        self.setOption(QWizard.HaveHelpButton, False)
         self.setButtonText(QWizard.CancelButton, tr("Skip to full tool"))
         self.setButtonText(QWizard.FinishButton, tr("Open in full tool"))
         self.setButtonText(QWizard.BackButton, "‹ " + tr("Back"))
         self.setButtonText(QWizard.NextButton, tr("Next") + " ›")
-        self.resize(660, 520)
+        self.resize(860, 620)
+        self.steps = StepList(STEP_TITLES)
+        self.setSideWidget(self.steps)
         for page in (StartPage(self), GoalPage(self), OrganismPage(self), CultivationPage(self),
                      DownstreamPage(self), ContextPage(self), ReviewPage(self)):
             self.addPage(page)
+        self.currentIdChanged.connect(self._sync_steps)
+        self._sync_steps(self.startId())
+
+    def _sync_steps(self, page_id: int):
+        ids = self.pageIds()
+        self.steps.set_current(ids.index(page_id) if page_id in ids else 0)
 
     def guess_goal(self) -> str:
         mp = main_product(self.scenario)

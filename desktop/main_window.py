@@ -1,30 +1,35 @@
-"""The main application window: inputs on the left, live results on the right."""
+"""The main application window: inputs on the left, live results on the right.
+
+The window owns the editable case (organism, system, economics, products and
+so on), hands it to the engine on every change, and renders what comes back.
+The widgets themselves are laid out by :mod:`desktop.inputs_panel` and
+:mod:`desktop.results_panel`; this module holds the state, the signal handlers
+and the rendering.
+"""
 
 from __future__ import annotations
 
 import copy
-import json
-from dataclasses import asdict
-from pathlib import Path
+import re
+import time
+from contextlib import contextmanager
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QAction, QIcon, QKeySequence, QPixmap
 from PySide6.QtWidgets import (
-    QCheckBox,
+    QApplication,
     QComboBox,
     QDialog,
     QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
-    QGridLayout,
-    QGroupBox,
+    QFrame,
     QHBoxLayout,
     QInputDialog,
     QLabel,
     QMainWindow,
     QMessageBox,
     QPushButton,
-    QScrollArea,
-    QSpinBox,
     QSplitter,
     QTableWidget,
     QTableWidgetItem,
@@ -33,13 +38,6 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from algametrix import library as _lib
-from algametrix.benchmarks import (
-    check_benchmarks,
-    infer_category,
-    load_market_prices,
-    load_validation_references,
-)
 from algametrix.comparison import KPI_ORDER, scenario_kpis
 from algametrix.inputcheck import check_inputs, format_issues
 from algametrix.library import DEFAULT_DATA_DIR, load_library
@@ -55,39 +53,53 @@ from algametrix.models import (
     WasteFeed,
 )
 from algametrix.scenario import minimum_selling_price, run_scenario
+from algametrix.sensitivity import OUTPUTS, PARAMETERS, run_sweep, skipped_values
 from algametrix.serialization import (
     ScenarioFormatError,
     functional_unit,
     reference_product,
 )
-from algametrix.serialization import save_results as save_results_file
 from algametrix.serialization import load_scenario as load_scenario_file
+from algametrix.serialization import save_results as save_results_file
 from algametrix.serialization import save_scenario as save_scenario_file
-from algametrix.sensitivity import OUTPUTS, PARAMETERS, run_sweep
 from algametrix.uncertainty import run_montecarlo
-from algametrix.validation import (
-    METRICS,
-    compare,
-    parse_reference_csv,
-    parse_superpro_excel,
+from algametrix.validation import parse_reference_csv, parse_superpro_excel
+
+from . import charts, fields, inputs_panel, report_panel, resources, results_panel, theme
+from . import validation_panel
+from .features import PROCESS_DESIGNER
+from .fmt import DASH, fixed, money, pct, sig
+from .i18n import tr
+from .inputs_panel import number
+from .results_panel import (
+    TAB_COMPARE,
+    TAB_OVERVIEW,
+    TAB_REPORT,
+    TAB_SENSITIVITY,
+    TAB_TITLES,
+    TAB_UNCERTAINTY,
+    TAB_VALIDATION,
+)
+from .validation_panel import SUB_BENCHMARKS, SUB_LIBRARY, SUB_MARKET, SUB_REFERENCE
+from .widgets import chip, fill_table, fit_rows, form_row_of
+
+# Kept for scripts that import the chart accent from here.
+ACCENT = theme.CHART_PRIMARY
+
+#: The impact-table rows, matched to the method declaration by their leading words.
+_IMPACT_INDICATOR = (
+    ("GWP", "gwp"), ("Energy demand", "ced"), ("Water", "water"), ("Land", "land"),
+    ("Marine eutrophication", "eutroph_n"), ("Freshwater eutrophication", "eutroph_p"),
+    ("Acidification", "acid"),
 )
 
-from .features import PROCESS_DESIGNER
-from .i18n import tr
-from .style import STYLESHEET
-from .widgets import KpiCard, MplCanvas, NEG, POS
-
-# Chart accent is kept independent of the Blueprint UI accent: the plots keep their
-# original green so the figures read as before, while the interface stays blue.
-ACCENT = "#2e7d32"
+#: What the price figures are denominated in. docs/PRICE_BASIS.md.
+PRICE_BASIS = ("EUR as entered: the model applies no inflation, no currency conversion "
+               "and no price year")
 
 
 def _money(v: float) -> str:
-    if abs(v) >= 1e6:
-        return f"€ {v / 1e6:,.2f} M"
-    if abs(v) >= 1e3:
-        return f"€ {v / 1e3:,.1f} k"
-    return f"€ {v:,.0f}"
+    return money(v)
 
 
 class TableEditorDialog(QDialog):
@@ -96,8 +108,10 @@ class TableEditorDialog(QDialog):
     def __init__(self, title, headers, rows, parent=None, hint: str = ""):
         super().__init__(parent)
         self.setWindowTitle(title)
-        self.resize(620, 340)
+        self.resize(720, 380)
         lay = QVBoxLayout(self)
+        lay.setContentsMargins(16, 16, 16, 16)
+        lay.setSpacing(10)
         if hint:
             lbl = QLabel(hint)
             lbl.setObjectName("subtle")
@@ -106,18 +120,24 @@ class TableEditorDialog(QDialog):
         self.table = QTableWidget(len(rows), len(headers))
         self.table.setHorizontalHeaderLabels(headers)
         self.table.horizontalHeader().setStretchLastSection(True)
+        self.table.setAlternatingRowColors(True)
         for r, row in enumerate(rows):
             for c, val in enumerate(row):
                 self.table.setItem(r, c, QTableWidgetItem(str(val)))
+        self.table.resizeColumnsToContents()
         lay.addWidget(self.table)
         btns = QHBoxLayout()
         add = QPushButton(tr("Add row"))
+        add.setProperty("kind", "secondary")
         add.clicked.connect(lambda: self.table.insertRow(self.table.rowCount()))
         rem = QPushButton(tr("Remove selected"))
+        rem.setProperty("kind", "secondary")
         rem.clicked.connect(self._remove_selected)
         ok = QPushButton(tr("OK"))
+        ok.setDefault(True)
         ok.clicked.connect(self.accept)
         cancel = QPushButton(tr("Cancel"))
+        cancel.setProperty("kind", "secondary")
         cancel.clicked.connect(self.reject)
         btns.addWidget(add)
         btns.addWidget(rem)
@@ -143,13 +163,18 @@ class TableEditorDialog(QDialog):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        theme.apply_to(QApplication.instance())
         self.setWindowTitle(tr("AlgaMetrix  ·  Techno-economic & LCA for microalgae"))
-        self.resize(1280, 820)
-        self.setStyleSheet(STYLESHEET)
+        self.resize(1360, 860)
+        self.setMinimumSize(1000, 640)
+        icon = resources.asset_path("algametrix.ico")
+        if icon:
+            self.setWindowIcon(QIcon(icon))
 
         self.lib = load_library()
         self._loading = True          # suppress recompute while (re)building controls
         self.reference: dict[str, float] = {}
+        self.reference_name = ""
 
         # Live, editable copies of the current building blocks.
         self.organism = copy.deepcopy(next(iter(self.lib.organisms.values())))
@@ -181,37 +206,77 @@ class MainWindow(QMainWindow):
         # A greyed-out row explains itself in its tooltip; this remembers the
         # tooltip it had when it applies again.
         self._base_tooltips: dict[int, str] = {}
-        self._checks: dict[tuple[str, str], QCheckBox] = {}
+        self._checks: dict[tuple[str, str], object] = {}
         self._snapshots: list[tuple[str, dict]] = []
+        self._last_sensitivity = None
+        self._last_uncertainty = None
+        self._basis_html = ""
         self.issues: list = []          # input admissibility, refreshed on every run
         self.results = None
+        self.reference_product = "dry biomass"
 
         self._build_menu()
         self._build_ui()
+        # Every field's clean tooltip is remembered now, before any row is greyed
+        # out or flagged, so that un-flagging restores the right text.
+        self._refresh_tooltips()
         self._update_carbon_labels()
         self._sync_extraction_widgets()
+        self._update_preset_notes()
         self._loading = False
         self.recompute()
 
     # ------------------------------------------------------------------ #
     # UI construction
     # ------------------------------------------------------------------ #
+    def _action(self, menu, text, slot, shortcut: str = "", tip: str = "") -> QAction:
+        act = QAction(text, self)
+        act.triggered.connect(slot)
+        if shortcut:
+            act.setShortcut(QKeySequence(shortcut))
+        if tip:
+            act.setStatusTip(tip)
+            act.setToolTip(tip)
+        menu.addAction(act)
+        return act
+
     def _build_menu(self):
         bar = self.menuBar()
         file_menu = bar.addMenu(tr("&File"))
-        file_menu.addAction(tr("New case study (wizard)…"), self.open_wizard)
-        file_menu.addAction(tr("New / reset"), self.reset_defaults)
-        file_menu.addAction(tr("Open scenario…"), self.load_scenario)
-        file_menu.addAction(tr("Save scenario…"), self.save_scenario)
+        self._action(file_menu, tr("New case study (wizard)…"), self.open_wizard, "Ctrl+N",
+                     "Guided setup from a validated example or from scratch")
+        self._action(file_menu, tr("New / reset"), self.reset_defaults, "Ctrl+Shift+N",
+                     "Every field back to its default")
+        self._action(file_menu, tr("Open scenario…"), self.load_scenario, "Ctrl+O")
+        self._action(file_menu, tr("Save scenario…"), self.save_scenario, "Ctrl+S")
         file_menu.addSeparator()
-        file_menu.addAction(tr("Export results (JSON)…"), self.export_results)
-        file_menu.addAction(
+        self._action(file_menu, tr("Export results (JSON)…"), self.export_results, "Ctrl+E")
+        self._action(
+            file_menu,
             tr("Export process report (PDF)…") if PROCESS_DESIGNER
             else tr("Export full report (PDF)…"),
-            self.export_process_report,
+            self.export_process_report, "Ctrl+P",
         )
         file_menu.addSeparator()
-        file_menu.addAction(tr("Exit"), self.close)
+        self._action(file_menu, tr("Exit"), self.close, "Ctrl+Q")
+
+        view_menu = bar.addMenu(tr("&View"))
+        for i, title in enumerate(TAB_TITLES):
+            key = "Ctrl+0" if i == 9 else f"Ctrl+{i + 1}"
+            self._action(view_menu, tr(title), lambda _=False, n=i: self.tabs.setCurrentIndex(n),
+                         key)
+        view_menu.addSeparator()
+        self._action(view_menu, tr("Find parameter"), self._focus_search, "Ctrl+F")
+        self._action(view_menu, tr("Expand all input sections"),
+                     lambda: self._set_sections_expanded(True))
+        self._action(view_menu, tr("Collapse all input sections"),
+                     lambda: self._set_sections_expanded(False))
+
+        an_menu = bar.addMenu(tr("&Analysis"))
+        self._action(an_menu, tr("Run sensitivity sweep"), self.run_sensitivity, "F5")
+        self._action(an_menu, tr("Run Monte Carlo"), self.run_uncertainty, "F6")
+        self._action(an_menu, tr("Snapshot scenario"), self.snapshot_scenario, "F7")
+        self._action(an_menu, tr("Clear snapshots"), self.clear_snapshots)
 
         val_menu = bar.addMenu(tr("&Validation"))
         val_menu.addAction(
@@ -240,42 +305,148 @@ class MainWindow(QMainWindow):
         help_menu.addAction(tr("Language…"), self.change_language)
         help_menu.addAction(tr("About"), self.show_about)
 
-    def _spin(self, obj: str, attr: str, lo: float, hi: float, step: float, decimals: int = 3):
-        sb = QDoubleSpinBox()
-        sb.setRange(lo, hi)
-        sb.setSingleStep(step)
-        sb.setDecimals(decimals)
-        sb.setValue(float(getattr(getattr(self, obj), attr)))
+    def _basis_key(self) -> str:
+        return fields.AREA if self.system.basis == Basis.AREA else fields.VOLUME
+
+    def _tooltip_for(self, fs: fields.FieldSpec) -> str:
+        """The field's tooltip for the presets currently selected."""
+        preset, default_label, source = None, "", ""
+        if fs.obj == "organism":
+            preset = self.lib.organisms.get(self.organism.name)
+            default_label = self.organism.name
+        elif fs.obj == "system":
+            preset = self.lib.systems.get(self.system.name)
+            default_label = self.system.name
+            if fs.attr == "capex_per_unit":
+                source = fields.scaling_source(self.system.capex_scaling)
+        elif fs.obj == "harvesting":
+            preset = self.lib.harvesting.get(self.harvesting.name)
+            default_label = self.harvesting.name
+        elif fs.obj == "drying":
+            preset = self.lib.drying.get(self.drying.name)
+            default_label = self.drying.name
+        elif fs.obj == "economics":
+            preset = self.lib.economics
+            default_label = "library"
+            if fs.attr == "harvest_capex_per_kgyr":
+                source = fields.scaling_source(self.economics.harvest_capex_scaling)
+            elif fs.attr == "drying_capex_per_kgyr":
+                source = fields.scaling_source(self.economics.drying_capex_scaling)
+            elif fs.attr == "labor_cost_per_year":
+                source = fields.scaling_source(self.economics.labor_scaling)
+        elif fs.obj == "lcia":
+            preset = self.lib.lcia
+            default_label = "data/lcia.yaml"
+            source = fields.lcia_source(self.lib, fs.attr)
+        default = getattr(preset, fs.attr, None) if preset is not None else None
+        return fields.tooltip(fs, basis=self._basis_key(), default=default,
+                              default_label=default_label, source=source)
+
+    def _spin(self, obj: str, attr: str, lo=None, hi=None, step=None, decimals=None):
+        fs = fields.spec(obj, attr)
+        sb = number(fs.lo if lo is None else lo, fs.hi if hi is None else hi,
+                    float(getattr(getattr(self, obj), attr)),
+                    fs.step if step is None else step,
+                    fs.decimals if decimals is None else decimals,
+                    tooltip=self._tooltip_for(fs), grouped=fs.hi >= 1e5)
+        sb.setAccessibleName(fs.label)
         sb.valueChanged.connect(lambda v, o=obj, a=attr: self._on_field(o, a, v))
         self._spins[(obj, attr)] = sb
         return sb
 
     def _check(self, obj: str, attr: str, text: str):
+        from PySide6.QtWidgets import QCheckBox
+
         cb = QCheckBox(tr(text))
         cb.setChecked(bool(getattr(getattr(self, obj), attr)))
         cb.toggled.connect(lambda v, o=obj, a=attr: self._on_field(o, a, v))
         self._checks[(obj, attr)] = cb
         return cb
 
+    def _build_header(self) -> QWidget:
+        bar = QFrame()
+        bar.setObjectName("header")
+        h = QHBoxLayout(bar)
+        h.setContentsMargins(16, 8, 16, 8)
+        h.setSpacing(14)
+        logo_path = resources.logo_path()
+        pm = QPixmap(logo_path) if logo_path else QPixmap()
+        if not pm.isNull():
+            logo = QLabel()
+            logo.setPixmap(pm.scaledToHeight(30, Qt.SmoothTransformation))
+            logo.setToolTip("AlgaMetrix")
+            h.addWidget(logo)
+        else:
+            brand = QLabel("AlgaMetrix")
+            brand.setObjectName("brand")
+            h.addWidget(brand)
+        text = QVBoxLayout()
+        text.setSpacing(1)
+        self.lbl_case_title = QLabel("")
+        self.lbl_case_title.setObjectName("caseTitle")
+        self.subtitle = QLabel("")
+        self.subtitle.setObjectName("subtle")
+        # Wrap instead of forcing the whole window as wide as this one-line summary.
+        self.subtitle.setWordWrap(True)
+        text.addWidget(self.lbl_case_title)
+        text.addWidget(self.subtitle)
+        h.addLayout(text, 1)
+        chips = QHBoxLayout()
+        chips.setSpacing(6)
+        self.chip_fu = chip("", accent=True, tooltip="Functional unit: what every per-kg "
+                                                     "number is per.")
+        self.chip_boundary = chip("cradle-to-gate", tooltip="System boundary of the LCA: from "
+                                                           "raw-material extraction to the "
+                                                           "plant gate. Attributional.")
+        self.chip_price = chip("EUR as entered", tooltip=PRICE_BASIS + ". docs/PRICE_BASIS.md.")
+        for c in (self.chip_fu, self.chip_boundary, self.chip_price):
+            chips.addWidget(c)
+        h.addLayout(chips)
+        from .widgets import button
+
+        h.addWidget(button(tr("New case…"), "secondary", self.open_wizard,
+                           "Guided setup from a validated example or from scratch", "Ctrl+N"))
+        h.addWidget(button(tr("Open…"), "secondary", self.load_scenario, "Open a saved scenario",
+                           "Ctrl+O"))
+        h.addWidget(button(tr("Save…"), "secondary", self.save_scenario, "Save the whole case",
+                           "Ctrl+S"))
+        h.addWidget(button(tr("Export PDF…"), "primary", self.export_process_report,
+                           "Export the full report", "Ctrl+P"))
+        return bar
+
     def _build_ui(self):
         central = QWidget()
         central.setObjectName("central")
         self.setCentralWidget(central)
         root = QVBoxLayout(central)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+        root.addWidget(self._build_header())
+
+        body = QWidget()
+        body.setObjectName("page")
+        bl = QVBoxLayout(body)
+        bl.setContentsMargins(12, 10, 12, 8)
+        bl.setSpacing(0)
 
         # Classic parametric view: inputs on the left, live results on the right.
         scenario_tab = QWidget()
         scenario_layout = QVBoxLayout(scenario_tab)
         scenario_layout.setContentsMargins(0, 0, 0, 0)
         splitter = QSplitter(Qt.Horizontal)
-        splitter.addWidget(self._build_input_panel())
-        splitter.addWidget(self._build_results_panel())
+        splitter.addWidget(inputs_panel.build(self))
+        splitter.addWidget(results_panel.build(self))
         splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
         splitter.setChildrenCollapsible(False)  # neither panel can be dragged to zero
-        splitter.setSizes([480, 1120])
+        splitter.setSizes([470, 1120])
         self.splitter = splitter
         scenario_layout.addWidget(splitter)
+
+        self.statusBar().showMessage(tr("Ready"))
+        self.lbl_status_right = QLabel("")
+        self.lbl_status_right.setObjectName("caption")
+        self.statusBar().addPermanentWidget(self.lbl_status_right)
 
         # Top-level mode switch: parametric scenario vs. the visual flowsheet.
         # With the designer off there is one view, so there is no switch: a tab
@@ -284,14 +455,16 @@ class MainWindow(QMainWindow):
         self._flowsheet_tab_index = -1
         if not PROCESS_DESIGNER:
             self.top_tabs = None
-            root.addWidget(scenario_tab)
+            bl.addWidget(scenario_tab)
+            root.addWidget(body, 1)
             return
         self.top_tabs = QTabWidget()
-        self.top_tabs.addTab(scenario_tab, tr("⚗  Scenario"))
+        self.top_tabs.addTab(scenario_tab, tr("Scenario"))
         self._flowsheet_tab_index = self.top_tabs.addTab(
-            self._build_flowsheet_tab(), tr("🧩  Process Designer"))
+            self._build_flowsheet_tab(), tr("Process Designer"))
         self.top_tabs.currentChanged.connect(self._on_top_tab_changed)
-        root.addWidget(self.top_tabs)
+        bl.addWidget(self.top_tabs)
+        root.addWidget(body, 1)
 
     def _build_flowsheet_tab(self) -> QWidget:
         """The SuperPro-style visual process editor (lazy import to keep startup
@@ -309,602 +482,41 @@ class MainWindow(QMainWindow):
         if index == getattr(self, "_flowsheet_tab_index", -1):
             self.flowsheet_editor.maybe_autogenerate()
 
-    def _build_input_panel(self) -> QWidget:
-        container = QWidget()
-        v = QVBoxLayout(container)
-        v.setContentsMargins(4, 4, 4, 4)
+    def _focus_search(self):
+        self.input_search.setFocus(Qt.ShortcutFocusReason)
+        self.input_search.selectAll()
 
-        # --- Organism -------------------------------------------------
-        g_org = QGroupBox(tr("Organism"))
-        f = QFormLayout(g_org)
-        self.cmb_org = QComboBox()
-        self.cmb_org.addItems(list(self.lib.organisms))
-        self.cmb_org.currentTextChanged.connect(self._on_organism)
-        f.addRow(tr("Strain"), self.cmb_org)
-        f.addRow(tr("Carbon (frac. DW)"), self._spin("organism", "carbon", 0.0, 1.0, 0.01))
-        f.addRow(tr("Nitrogen (frac. DW)"), self._spin("organism", "nitrogen", 0.0, 0.3, 0.005))
-        f.addRow(tr("Phosphorus (frac. DW)"), self._spin("organism", "phosphorus", 0.0, 0.1, 0.001))
-        f.addRow(tr("Phycocyanin (frac. DW)"), self._spin("organism", "phycocyanin", 0.0, 0.3, 0.01, 3))
-        v.addWidget(g_org)
+    def _set_sections_expanded(self, on: bool):
+        for s in self.sections:
+            s.set_expanded(on)
 
-        # --- Cultivation ---------------------------------------------
-        g_sys = QGroupBox(tr("Cultivation system"))
-        f = QFormLayout(g_sys)
-        self.cmb_sys = QComboBox()
-        self.cmb_sys.addItems(list(self.lib.systems))
-        self.cmb_sys.currentTextChanged.connect(self._on_system)
-        f.addRow(tr("System"), self.cmb_sys)
-        self.lbl_prod = QLabel(tr("Productivity (g/m²/d)"))
-        f.addRow(self.lbl_prod, self._spin("system", "productivity", 0.0, 300.0, 1.0, 1))
-        f.addRow(tr("Operating days / yr"), self._spin("system", "operating_days", 1.0, 365.0, 5.0, 0))
-        f.addRow(tr("Cultivation elec. (kWh/kg)"), self._spin("system", "elec_kwh_per_kg", 0.0, 50.0, 0.1, 2))
-        self.cmb_carbon = QComboBox()
-        self.cmb_carbon.addItems([tr("CO₂ (gas)"), tr("Sodium bicarbonate (NaHCO₃)")])
-        self.cmb_carbon.currentIndexChanged.connect(self._on_carbon_source)
-        f.addRow(tr("Carbon source"), self.cmb_carbon)
-        self.lbl_util = QLabel(tr("CO₂ utilization"))
-        f.addRow(self.lbl_util, self._spin("system", "co2_utilization", 0.05, 1.0, 0.05, 2))
-        f.addRow(tr("Nutrient uptake eff."), self._spin("system", "nutrient_uptake", 0.1, 1.0, 0.05, 2))
-        f.addRow(tr("Water use (m³/kg)"), self._spin("system", "water_m3_per_kg", 0.0, 5.0, 0.05, 2))
-        f.addRow(tr("Cultivation heat (MJ/kg)"), self._spin("system", "cultivation_heat_mj_per_kg", 0.0, 200.0, 2.0, 1))
-        self.cmb_heatfuel = QComboBox()
-        self.cmb_heatfuel.addItems([tr("Natural gas"), tr("Electricity")])
-        self.cmb_heatfuel.currentIndexChanged.connect(self._on_heat_fuel)
-        f.addRow(tr("Heat fuel"), self.cmb_heatfuel)
-        f.addRow(tr("Substrate yield (kg/kg)"), self._spin("system", "substrate_yield", 0.0, 1.0, 0.05, 2))
-        self.lbl_capex = QLabel(tr("Cultivation CAPEX (€/m²)"))
-        f.addRow(self.lbl_capex, self._spin("system", "capex_per_unit", 0.0, 5000.0, 5.0, 1))
-        self.lbl_scale = QLabel(tr("Plant scale (m²)"))
-        self.spn_scale = QDoubleSpinBox()
-        self.spn_scale.setRange(1.0, 1e9)
-        self.spn_scale.setDecimals(0)
-        self.spn_scale.setGroupSeparatorShown(True)
-        self.spn_scale.setValue(self.scale)
-        self.spn_scale.valueChanged.connect(self._on_scale)
-        f.addRow(self.lbl_scale, self.spn_scale)
-        v.addWidget(g_sys)
+    def _filter_inputs(self, text: str):
+        shown = sum(s.apply_filter(text) for s in self.sections)
+        total = sum(len(s._rows) for s in self.sections)
+        if text.strip():
+            self.lbl_input_count.setText(
+                tr("{n} of {total} rows match").format(n=shown, total=total))
+        else:
+            self.lbl_input_count.setText("")
 
-        # --- Downstream ----------------------------------------------
-        g_dn = QGroupBox(tr("Downstream (harvesting & drying)"))
-        f = QFormLayout(g_dn)
-        self.cmb_harv = QComboBox()
-        self.cmb_harv.addItems(list(self.lib.harvesting))
-        self.cmb_harv.currentTextChanged.connect(self._on_harvesting)
-        f.addRow(tr("Harvesting"), self.cmb_harv)
-        f.addRow(tr("Biomass recovery"), self._spin("harvesting", "recovery", 0.1, 1.0, 0.02, 2))
-        f.addRow(tr("Harvesting elec. (kWh/kg)"), self._spin("harvesting", "elec_kwh_per_kg", 0.0, 20.0, 0.1, 2))
-        f.addRow(tr("Concentrate solids"), self._spin("harvesting", "final_solids", 0.02, 0.5, 0.01, 2))
-        self.cmb_dry = QComboBox()
-        self.cmb_dry.addItems(list(self.lib.drying))
-        self.cmb_dry.currentTextChanged.connect(self._on_drying)
-        f.addRow(tr("Drying"), self.cmb_dry)
-        f.addRow(tr(""), self._check("drying", "enabled", "Drying enabled"))
-        f.addRow(tr("Drying heat (MJ/kg water)"), self._spin("drying", "thermal_mj_per_kg_water", 0.0, 6.0, 0.1, 2))
-        f.addRow(tr("Dried product solids"), self._spin("drying", "final_solids", 0.5, 1.0, 0.01, 2))
-        v.addWidget(g_dn)
+    @contextmanager
+    def _busy(self, message: str, button=None):
+        """A wait cursor and a status line while an analysis runs."""
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        if button is not None:
+            button.setEnabled(False)
+        self.statusBar().showMessage(message)
+        QApplication.processEvents()
+        try:
+            yield
+        finally:
+            QApplication.restoreOverrideCursor()
+            if button is not None:
+                button.setEnabled(True)
 
-        # --- Economics -----------------------------------------------
-        g_eco = QGroupBox(tr("Economic assumptions"))
-        f = QFormLayout(g_eco)
-        f.addRow(tr("Electricity price (€/kWh)"), self._spin("economics", "electricity_price", 0.0, 1.0, 0.01, 3))
-        f.addRow(tr("Heat price (€/MJ)"), self._spin("economics", "heat_price", 0.0, 0.2, 0.005, 3))
-        f.addRow(tr("CO₂ price (€/kg)"), self._spin("economics", "co2_price", -0.2, 1.0, 0.01, 3))
-        f.addRow(tr("Bicarbonate price (€/kg)"), self._spin("economics", "bicarbonate_price", 0.0, 2.0, 0.01, 3))
-        f.addRow(tr("Nitrogen price (€/kg N)"), self._spin("economics", "nitrogen_price", 0.0, 10.0, 0.1, 2))
-        f.addRow(tr("Phosphorus price (€/kg P)"), self._spin("economics", "phosphorus_price", 0.0, 15.0, 0.1, 2))
-        f.addRow(tr("Substrate price (€/kg)"), self._spin("economics", "substrate_price", 0.0, 3.0, 0.05, 2))
-        f.addRow(tr("Water price (€/m³)"), self._spin("economics", "water_price", 0.0, 5.0, 0.05, 2))
-        f.addRow(tr("Land price (€/m²)"), self._spin("economics", "land_price", 0.0, 200.0, 1.0, 1))
-        f.addRow(tr("Harvest CAPEX (€/kg·yr)"), self._spin("economics", "harvest_capex_per_kgyr", 0.0, 50.0, 0.5, 2))
-        f.addRow(tr("Drying CAPEX (€/kg·yr)"), self._spin("economics", "drying_capex_per_kgyr", 0.0, 50.0, 0.5, 2))
-        f.addRow(tr("Installation factor"), self._spin("economics", "installation_factor", 1.0, 6.0, 0.1, 2))
-        f.addRow(tr("Labour (€/yr)"), self._spin("economics", "labor_cost_per_year", 0.0, 1e7, 10000.0, 0))
-        f.addRow(tr("Maintenance (frac. CAPEX/yr)"), self._spin("economics", "maintenance_frac", 0.0, 0.2, 0.005, 3))
-        f.addRow(tr("Discount rate"), self._spin("economics", "discount_rate", 0.0, 0.25, 0.005, 3))
-        f.addRow(tr("Plant lifetime (yr)"), self._spin("economics", "plant_lifetime", 1.0, 40.0, 1.0, 0))
-        f.addRow(tr("Depreciation period (yr)"), self._spin("economics", "depreciation_years", 1.0, 30.0, 1.0, 0))
-        f.addRow(tr("Tax rate"), self._spin("economics", "tax_rate", 0.0, 0.6, 0.05, 2))
-        v.addWidget(g_eco)
-
-        # --- Profitability -------------------------------------------
-        g_prof = QGroupBox(tr("Profitability"))
-        f = QFormLayout(g_prof)
-        self.spn_price = QDoubleSpinBox()
-        self.spn_price.setRange(0.0, 1e6)
-        self.spn_price.setDecimals(2)
-        self.spn_price.setSingleStep(0.5)
-        self.spn_price.setValue(self.product_price)
-        self.spn_price.setToolTip(tr(
-            "Selling price of the product the cost and GWP are reported per. In a "
-            "multiproduct case this is the main product's price: changing it here "
-            "changes that product's price, its revenue and the NPV."
-        ))
-        self.spn_price.valueChanged.connect(self._on_price)
-        # The row label says which product the price belongs to, because in a
-        # biorefinery "Product price" alone is ambiguous — and a price that looks
-        # like it applies to the biomass while the engine sells oil is how a user
-        # ends up reporting a number nothing in the model produced.
-        self.lbl_price_row = QLabel(tr("Product price (€/kg)"))
-        f.addRow(self.lbl_price_row, self.spn_price)
-        self.spn_coproduct = QDoubleSpinBox()
-        self.spn_coproduct.setRange(0.0, 1e9)
-        self.spn_coproduct.setDecimals(0)
-        self.spn_coproduct.setSingleStep(50_000)
-        self.spn_coproduct.setGroupSeparatorShown(True)
-        self.spn_coproduct.setValue(self.coproduct_revenue)
-        self.spn_coproduct.setToolTip(tr(
-            "Revenue from by-products that are NOT in the product list — sold "
-            "residue, spent media, heat. Products defined in the biorefinery "
-            "section already earn through their own price; this is on top of them."
-        ))
-        self.spn_coproduct.valueChanged.connect(self._on_coproduct)
-        f.addRow(tr("Other co-product revenue (€/yr)"), self.spn_coproduct)
-
-        self.spn_credits = QDoubleSpinBox()
-        self.spn_credits.setRange(0.0, 1e9)
-        self.spn_credits.setDecimals(0)
-        self.spn_credits.setSingleStep(50_000)
-        self.spn_credits.setGroupSeparatorShown(True)
-        self.spn_credits.setValue(self.credits_per_year)
-        self.spn_credits.setToolTip(tr(
-            "Operating credits: energy or heat recovery, biogas, waste valorisation. "
-            "They lower the NET operating cost and the profit, never the gross "
-            "production cost."
-        ))
-        self.spn_credits.valueChanged.connect(self._on_credits)
-        f.addRow(tr("Operating credits (€/yr)"), self.spn_credits)
-
-        self.spn_other_opex = QDoubleSpinBox()
-        self.spn_other_opex.setRange(0.0, 1e9)
-        self.spn_other_opex.setDecimals(0)
-        self.spn_other_opex.setSingleStep(10_000)
-        self.spn_other_opex.setGroupSeparatorShown(True)
-        self.spn_other_opex.setValue(self.other_opex_per_year)
-        self.spn_other_opex.setToolTip(tr(
-            "Annual operating costs that are neither per-kg materials/utilities nor "
-            "labour: consumables, probes and filters, effluent treatment, "
-            "contingencies. Enters the annual operating cost as its own category."
-        ))
-        self.spn_other_opex.valueChanged.connect(self._on_other_opex)
-        f.addRow(tr("Other operating cost (€/yr)"), self.spn_other_opex)
-        v.addWidget(g_prof)
-
-        # --- Extraction & products (biorefinery) ---------------------
-        g_ext = QGroupBox(tr("Downstream extraction & products"))
-        f = QFormLayout(g_ext)
-        self.chk_extraction = QCheckBox("Enable extraction & co-products")
-        self.chk_extraction.toggled.connect(self._on_extraction_toggled)
-        f.addRow(tr(""), self.chk_extraction)
-        self.cmb_ext_tech = QComboBox()
-        self.cmb_ext_tech.addItems(list(self.lib.extraction))
-        self.cmb_ext_tech.setToolTip(tr(
-            "Downstream extraction technology (hexane, ethanol, supercritical CO2, "
-            "bead-milling, ultrafiltration, chromatography). Sets the energy, solvent "
-            "and CAPEX of the extraction step from the literature-anchored catalogue."
-        ))
-        self.cmb_ext_tech.currentTextChanged.connect(self._on_extraction_tech)
-        f.addRow(tr("Extraction technology"), self.cmb_ext_tech)
-        self.cmb_downstream = QComboBox()
-        self.cmb_downstream.addItems([
-            tr("Oil / lipid → main product"),
-            tr("Protein → main product"),
-        ])
-        self.cmb_downstream.currentTextChanged.connect(self._on_target_product)
-        f.addRow(tr("Target product"), self.cmb_downstream)
-
-        def _ext_spin(lo, hi, val, step, dec, slot):
-            sb = QDoubleSpinBox()
-            sb.setRange(lo, hi)
-            sb.setDecimals(dec)
-            sb.setSingleStep(step)
-            sb.setValue(val)
-            sb.valueChanged.connect(slot)
-            return sb
-
-        # The four product fields edit the matching product in place; the solvent
-        # price and the allocation touch nothing else.
-        self.spn_oil_rec = _ext_spin(0.0, 1.0, 0.90, 0.05, 2, self._on_product_fields)
-        self.spn_oil_price = _ext_spin(0.0, 1e6, 2.50, 0.1, 2, self._on_product_fields)
-        self.spn_prot_rec = _ext_spin(0.0, 1.0, 0.80, 0.05, 2, self._on_product_fields)
-        self.spn_prot_price = _ext_spin(0.0, 1e6, 0.60, 0.05, 2, self._on_product_fields)
-        self.spn_solvent_price = _ext_spin(0.0, 100.0, 1.50, 0.1, 2, self._on_solvent_price)
-        f.addRow(tr("Oil (lipid) recovery"), self.spn_oil_rec)
-        f.addRow(tr("Oil price (€/kg)"), self.spn_oil_price)
-        f.addRow(tr("Protein recovery"), self.spn_prot_rec)
-        f.addRow(tr("Protein price (€/kg)"), self.spn_prot_price)
-        f.addRow(tr("Solvent make-up price (€/kg)"), self.spn_solvent_price)
-        self.cmb_alloc = QComboBox()
-        self.cmb_alloc.addItems(["economic", "mass", "none"])
-        self.cmb_alloc.setToolTip(tr(
-            "How the operating cost and the environmental burden are split between "
-            "the products. It changes how the results are attributed, never what "
-            "the products are."
-        ))
-        self.cmb_alloc.currentTextChanged.connect(self._on_allocation)
-        f.addRow(tr("Allocation method"), self.cmb_alloc)
-        self.lbl_products = QLabel("")
-        self.lbl_products.setObjectName("subtle")
-        self.lbl_products.setWordWrap(True)
-        f.addRow(self.lbl_products)
-        v.addWidget(g_ext)
-
-        # --- Waste-derived nutrients ---------------------------------
-        g_waste = QGroupBox(tr("Waste-derived nutrients & carbon"))
-        f = QFormLayout(g_waste)
-        self.chk_waste = QCheckBox("Feed the culture on a waste stream")
-        self.chk_waste.setToolTip(
-            "Cover part of the nitrogen, phosphorus or carbon demand with an "
-            "effluent or a food-industry side-stream instead of buying it. The "
-            "biomass still needs the same nutrients: what changes is the purchase, "
-            "the burden of making fertiliser, and the money the stream brings or costs."
-        )
-        self.chk_waste.toggled.connect(self._on_waste_toggled)
-        f.addRow(tr(""), self.chk_waste)
-
-        self.cmb_waste = QComboBox()
-        self.cmb_waste.addItems(list(self.lib.waste_feeds))
-        self.cmb_waste.setToolTip(
-            "Municipal effluent, anaerobic digestate, or a food-industry side-stream "
-            "(whey permeate, vinasse, potato fruit juice). Concentrations are "
-            "literature central values: replace them with an analysis of your stream."
-        )
-        self.cmb_waste.currentTextChanged.connect(self._on_waste_preset)
-        f.addRow(tr("Stream"), self.cmb_waste)
-
-        self.cmb_waste_dosed = QComboBox()
-        self.cmb_waste_dosed.addItems(["nitrogen", "phosphorus", "substrate"])
-        self.cmb_waste_dosed.setToolTip(
-            "Which demand fixes how much of the stream is dosed. One stream has one "
-            "composition, so what it delivers of the other two follows from this "
-            "choice — and any excess is discharged, not stored."
-        )
-        self.cmb_waste_dosed.currentTextChanged.connect(self._on_waste_change)
-        f.addRow(tr("Dosed on"), self.cmb_waste_dosed)
-
-        self.spn_waste_cov = QDoubleSpinBox()
-        self.spn_waste_cov.setRange(0.0, 100.0)
-        self.spn_waste_cov.setDecimals(0)
-        self.spn_waste_cov.setSuffix(" %")
-        self.spn_waste_cov.setValue(100.0)
-        self.spn_waste_cov.setToolTip(
-            "Share of that demand the stream is dosed to cover. Below 100% for a "
-            "stream that is not available year-round, or whose colour or ammonia "
-            "load caps how much of the culture it may make up."
-        )
-        self.spn_waste_cov.valueChanged.connect(self._on_waste_change)
-        f.addRow(tr("Coverage"), self.spn_waste_cov)
-
-        self.spn_waste_price = QDoubleSpinBox()
-        self.spn_waste_price.setRange(-1000.0, 1000.0)
-        self.spn_waste_price.setDecimals(3)
-        self.spn_waste_price.setSingleStep(0.05)
-        self.spn_waste_price.setToolTip(
-            "Price per m³ or per kg of stream. NEGATIVE means a gate fee: you are "
-            "paid to accept it, which is how a works treating municipal effluent earns."
-        )
-        self.spn_waste_price.valueChanged.connect(self._on_waste_change)
-        f.addRow(tr("Price (€/unit, negative = gate fee)"), self.spn_waste_price)
-
-        self.cmb_waste_conv = QComboBox()
-        self.cmb_waste_conv.addItems(["cut_off", "avoided_treatment"])
-        self.cmb_waste_conv.setToolTip(
-            "cut_off: the waste enters burden-free and you carry only what you do "
-            "yourself. avoided_treatment: system expansion, crediting the treatment "
-            "you displace — both its emissions and its cost, since one boundary has "
-            "to serve both analyses. Either way the credit is reported on its own "
-            "line and kept out of the gross, so it can be taken back off."
-        )
-        self.cmb_waste_conv.currentTextChanged.connect(self._on_waste_change)
-        f.addRow(tr("System boundary"), self.cmb_waste_conv)
-
-        self.spn_waste_avoided = QDoubleSpinBox()
-        self.spn_waste_avoided.setRange(0.0, 1000.0)
-        self.spn_waste_avoided.setDecimals(3)
-        self.spn_waste_avoided.setSingleStep(0.05)
-        self.spn_waste_avoided.setToolTip(
-            "What treating this stream conventionally would have cost somebody, per "
-            "unit. This is NOT money you receive — that is the price above — so it "
-            "never enters the operating cost or the production cost. It lowers the "
-            "net cost and the profit, and only under avoided_treatment."
-        )
-        self.spn_waste_avoided.valueChanged.connect(self._on_waste_change)
-        f.addRow(tr("Treatment displaced (€/unit)"), self.spn_waste_avoided)
-
-        self.lbl_waste = QLabel("")
-        self.lbl_waste.setObjectName("subtle")
-        self.lbl_waste.setWordWrap(True)
-        f.addRow(self.lbl_waste)
-        v.addWidget(g_waste)
-
-        # --- Batch scheduling ----------------------------------------
-        g_batch = QGroupBox(tr("Batch scheduling"))
-        f = QFormLayout(g_batch)
-        self.chk_batch = QCheckBox("Batch mode (else continuous)")
-        self.chk_batch.toggled.connect(self._on_batch_change)
-        f.addRow(tr(""), self.chk_batch)
-        self.spn_batch_size = QDoubleSpinBox()
-        self.spn_batch_size.setRange(1.0, 1e7)
-        self.spn_batch_size.setDecimals(0)
-        self.spn_batch_size.setGroupSeparatorShown(True)
-        self.spn_batch_size.setValue(self.batch_size_kg)
-        self.spn_batch_size.valueChanged.connect(self._on_batch_change)
-        self.spn_batch_cycle = QDoubleSpinBox()
-        self.spn_batch_cycle.setRange(1.0, 2000.0)
-        self.spn_batch_cycle.setDecimals(1)
-        self.spn_batch_cycle.setValue(self.batch_cycle_time_h)
-        self.spn_batch_cycle.valueChanged.connect(self._on_batch_change)
-        f.addRow(tr("Batch size (kg gross/batch)"), self.spn_batch_size)
-        f.addRow(tr("Cycle time (h)"), self.spn_batch_cycle)
-        v.addWidget(g_batch)
-
-        # --- Custom media & products (editors) -----------------------
-        g_custom = QGroupBox(tr("Custom media & products"))
-        cf = QVBoxLayout(g_custom)
-        btn_mat = QPushButton(tr("Edit media / materials…"))
-        btn_mat.clicked.connect(self.edit_materials)
-        btn_prod = QPushButton(tr("Edit products…"))
-        btn_prod.clicked.connect(self.edit_products)
-        self.lbl_custom = QLabel(tr(tr("No custom media or products defined.")))
-        self.lbl_custom.setObjectName("subtle")
-        self.lbl_custom.setWordWrap(True)
-        cf.addWidget(btn_mat)
-        cf.addWidget(btn_prod)
-        cf.addWidget(self.lbl_custom)
-        v.addWidget(g_custom)
-
-        # --- LCA ------------------------------------------------------
-        g_lca = QGroupBox(tr("LCA characterization factors"))
-        f = QFormLayout(g_lca)
-        f.addRow(tr("Electricity GWP (kg CO₂-eq/kWh)"), self._spin("lcia", "elec_gwp", 0.0, 1.5, 0.01, 3))
-        f.addRow(tr("Electricity CED (MJ/kWh)"), self._spin("lcia", "elec_ced", 0.0, 15.0, 0.5, 2))
-        f.addRow(tr("Heat GWP (kg CO₂-eq/MJ)"), self._spin("lcia", "heat_gwp", 0.0, 0.3, 0.005, 3))
-        f.addRow(tr("N fertilizer GWP (kg CO₂-eq/kg)"), self._spin("lcia", "nitrogen_gwp", 0.0, 20.0, 0.5, 2))
-        f.addRow(tr("P fertilizer GWP (kg CO₂-eq/kg)"), self._spin("lcia", "phosphorus_gwp", 0.0, 10.0, 0.5, 2))
-        f.addRow(tr("CO₂ supply GWP (kg CO₂-eq/kg)"), self._spin("lcia", "co2_supply_gwp", 0.0, 1.0, 0.01, 3))
-        f.addRow(tr("Bicarbonate GWP (kg CO₂-eq/kg)"), self._spin("lcia", "bicarbonate_gwp", 0.0, 3.0, 0.05, 2))
-        f.addRow(tr("Substrate GWP (kg CO₂-eq/kg)"), self._spin("lcia", "substrate_gwp", 0.0, 5.0, 0.05, 2))
-        f.addRow(tr(""), self._check("lcia", "count_biogenic_uptake", "Credit biogenic CO₂ uptake at gate"))
-        v.addWidget(g_lca)
-
-        v.addStretch(1)
-
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setWidget(container)
-        scroll.setMinimumWidth(400)
-        return scroll
-
-    def _build_results_panel(self) -> QWidget:
-        panel = QWidget()
-        v = QVBoxLayout(panel)
-
-        title = QLabel(tr("Techno-economic & Life-cycle results"))
-        title.setObjectName("h1")
-        v.addWidget(title)
-        self.subtitle = QLabel("")
-        self.subtitle.setObjectName("subtle")
-        # Wrap instead of forcing the whole panel as wide as this one-line summary,
-        # which would stop the input column from being dragged wider.
-        self.subtitle.setWordWrap(True)
-        v.addWidget(self.subtitle)
-
-        # Inadmissible input is reported here and nowhere else: one banner, above
-        # the numbers it is withholding.
-        self.lbl_issues = QLabel("")
-        self.lbl_issues.setObjectName("issueBanner")
-        self.lbl_issues.setWordWrap(True)
-        self.lbl_issues.setVisible(False)
-        v.addWidget(self.lbl_issues)
-
-        # KPI cards
-        kpi_row = QHBoxLayout()
-        self.kpi = {
-            "cost": KpiCard(tr("Production cost"), "€ / kg"),
-            "npv": KpiCard("NPV", "€ M"),
-            "payback": KpiCard(tr("Payback"), "years"),
-            "roi": KpiCard("ROI", "% / yr"),
-            "gwp": KpiCard("GWP", "kg CO₂-eq / kg"),
-            "output": KpiCard(tr("Annual output"), "t / yr"),
-        }
-        for card in self.kpi.values():
-            kpi_row.addWidget(card)
-        v.addLayout(kpi_row)
-
-        # Tabs with charts
-        tabs = QTabWidget()
-
-        tea_tab = QWidget()
-        tea_l = QGridLayout(tea_tab)
-        self.cv_opex = MplCanvas()
-        self.cv_capex = MplCanvas()
-        tea_l.addWidget(self.cv_opex, 0, 0)
-        tea_l.addWidget(self.cv_capex, 0, 1)
-        # Itemised production-cost table: every operating-cost line (raw materials,
-        # utilities, labour, facility, overhead) with its unit cost, annual cost and
-        # share of the total — the detail behind the € / kg production cost.
-        self.tbl_tea = QTableWidget(0, 4)
-        self.tbl_tea.setHorizontalHeaderLabels(
-            [tr("Cost item"), tr("€ / kg"), tr("€ / yr"), tr("% of total")]
-        )
-        self.tbl_tea.horizontalHeader().setStretchLastSection(True)
-        self.tbl_tea.verticalHeader().setVisible(False)
-        self.tbl_tea.setEditTriggers(QTableWidget.NoEditTriggers)
-        tea_l.addWidget(self.tbl_tea, 1, 0, 1, 2)
-        self.lbl_tea_totals = QLabel("")
-        self.lbl_tea_totals.setObjectName("subtle")
-        self.lbl_tea_totals.setWordWrap(True)
-        tea_l.addWidget(self.lbl_tea_totals, 2, 0, 1, 2)
-        tea_l.setRowStretch(0, 3)
-        tea_l.setRowStretch(1, 2)
-        tabs.addTab(tea_tab, tr("💶  Techno-economic"))
-
-        lca_tab = QWidget()
-        lca_l = QVBoxLayout(lca_tab)
-        lca_top = QHBoxLayout()
-        self.cv_gwp = MplCanvas(width=6)
-        lca_top.addWidget(self.cv_gwp, 2)
-        self.tbl_impacts = QTableWidget(0, 2)
-        self.tbl_impacts.setHorizontalHeaderLabels(
-            [tr("Impact category"), tr("per kg dry biomass processed")]
-        )
-        self.tbl_impacts.horizontalHeader().setStretchLastSection(True)
-        self.tbl_impacts.verticalHeader().setVisible(False)
-        lca_top.addWidget(self.tbl_impacts, 1)
-        lca_l.addLayout(lca_top)
-        self.lbl_lca_totals = QLabel("")
-        self.lbl_lca_totals.setObjectName("subtle")
-        self.lbl_lca_totals.setWordWrap(True)
-        lca_l.addWidget(self.lbl_lca_totals)
-        # An impact number is not interpretable without its method, so the tab
-        # that shows the numbers also says which method produced them and which
-        # flows this scenario leaves uncharacterized.
-        self.lbl_lca_method = QLabel("")
-        self.lbl_lca_method.setObjectName("subtle")
-        self.lbl_lca_method.setWordWrap(True)
-        lca_l.addWidget(self.lbl_lca_method)
-        tabs.addTab(lca_tab, tr("🌍  Life-cycle"))
-
-        inv_tab = QWidget()
-        inv_outer = QVBoxLayout(inv_tab)
-        self.lbl_inv_basis = QLabel(
-            tr("Foreground inventory per 1 kg of dry biomass processed — the flows "
-               "the allocation is applied to, not per kg of main product.")
-        )
-        self.lbl_inv_basis.setObjectName("subtle")
-        self.lbl_inv_basis.setWordWrap(True)
-        inv_outer.addWidget(self.lbl_inv_basis)
-        inv_body = QWidget()
-        inv_l = QHBoxLayout(inv_body)
-        inv_l.setContentsMargins(0, 0, 0, 0)
-        inv_outer.addWidget(inv_body, 1)
-        self.tbl_inv = QTableWidget(0, 3)
-        self.tbl_inv.setHorizontalHeaderLabels([tr("Flow"), tr("Value"), tr("Unit")])
-        self.tbl_inv.horizontalHeader().setStretchLastSection(True)
-        self.tbl_inv.verticalHeader().setVisible(False)
-        inv_l.addWidget(self.tbl_inv, 1)
-        self.cv_elec = MplCanvas()
-        inv_l.addWidget(self.cv_elec, 1)
-        tabs.addTab(inv_tab, tr("📦  Inventory"))
-
-        prod_tab = QWidget()
-        pl = QVBoxLayout(prod_tab)
-        self.lbl_products_hint = QLabel(
-            "Enable “extraction & co-products” in the sidebar to split the biomass into a "
-            "main product (e.g. algal oil) and co-products, with cost & impact allocation."
-        )
-        self.lbl_products_hint.setObjectName("subtle")
-        self.lbl_products_hint.setWordWrap(True)
-        pl.addWidget(self.lbl_products_hint)
-        self.tbl_products = QTableWidget(0, 6)
-        self.tbl_products.setHorizontalHeaderLabels(
-            [tr("Product"), "t/yr", tr("Cost €/kg"), tr("Price €/kg"), tr("Alloc %"), "GWP kgCO₂/kg"]
-        )
-        self.tbl_products.horizontalHeader().setStretchLastSection(True)
-        self.tbl_products.verticalHeader().setVisible(False)
-        pl.addWidget(self.tbl_products)
-        tabs.addTab(prod_tab, tr("🛢  Products"))
-
-        sens_tab = QWidget()
-        sl = QVBoxLayout(sens_tab)
-        ctrl = QHBoxLayout()
-        self.cmb_sens_param = QComboBox()
-        self.cmb_sens_param.addItems([p.name for p in PARAMETERS])
-        self.cmb_sens_output = QComboBox()
-        self.cmb_sens_output.addItems(list(OUTPUTS.keys()))
-        self.cmb_sens_output.setCurrentText("NPV (€)")
-        # Cap how wide these long-labelled combos ask to be, so the Sensitivity /
-        # Uncertainty tabs don't force the whole results panel (and the input
-        # column's max width) to the width of their longest option.
-        for _cb in (self.cmb_sens_param, self.cmb_sens_output):
-            _cb.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
-            _cb.setMinimumContentsLength(14)
-        btn_run = QPushButton(tr("Run sweep"))
-        btn_run.clicked.connect(self.run_sensitivity)
-        ctrl.addWidget(QLabel(tr("Vary:")))
-        ctrl.addWidget(self.cmb_sens_param)
-        ctrl.addWidget(QLabel(tr("Output:")))
-        ctrl.addWidget(self.cmb_sens_output)
-        ctrl.addWidget(btn_run)
-        ctrl.addStretch(1)
-        sl.addLayout(ctrl)
-        self.cv_sens = MplCanvas(width=6)
-        sl.addWidget(self.cv_sens)
-        tabs.addTab(sens_tab, tr("📈  Sensitivity"))
-
-        # --- Uncertainty (Monte Carlo) tab ---------------------------
-        unc_tab = QWidget()
-        ul = QVBoxLayout(unc_tab)
-        ul.addWidget(QLabel(tr("Vary:")))
-        # A wrapping grid of parameter checkboxes rather than one long horizontal row,
-        # so this tab does not force the whole results panel (and the splitter) wide.
-        unc_grid = QGridLayout()
-        unc_grid.setContentsMargins(0, 0, 0, 0)
-        self.unc_checks: dict[str, QCheckBox] = {}
-        default_on = {"Plant scale", "Product price", "Productivity", "Electricity price"}
-        cols = 2
-        for idx, p in enumerate(PARAMETERS):
-            cb = QCheckBox(p.name)
-            cb.setChecked(p.name in default_on)
-            self.unc_checks[p.name] = cb
-            unc_grid.addWidget(cb, idx // cols, idx % cols)
-        ul.addLayout(unc_grid)
-        row2 = QHBoxLayout()
-        self.spn_unc_pct = QSpinBox()
-        self.spn_unc_pct.setRange(1, 80)
-        self.spn_unc_pct.setValue(20)
-        self.spn_unc_pct.setSuffix(" %")
-        self.spn_unc_n = QSpinBox()
-        self.spn_unc_n.setRange(100, 20000)
-        self.spn_unc_n.setSingleStep(100)
-        self.spn_unc_n.setValue(1000)
-        self.cmb_unc_output = QComboBox()
-        self.cmb_unc_output.addItems(list(OUTPUTS.keys()))
-        self.cmb_unc_output.setSizeAdjustPolicy(
-            QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
-        self.cmb_unc_output.setMinimumContentsLength(14)
-        btn_unc = QPushButton(tr("Run Monte Carlo"))
-        btn_unc.clicked.connect(self.run_uncertainty)
-        row2.addWidget(QLabel(tr("Relative width (±):")))
-        row2.addWidget(self.spn_unc_pct)
-        row2.addWidget(QLabel(tr("Samples:")))
-        row2.addWidget(self.spn_unc_n)
-        row2.addStretch(1)
-        ul.addLayout(row2)
-        # Output selector + run on their own row so the controls don't force a very
-        # wide minimum for the whole results panel.
-        row3 = QHBoxLayout()
-        row3.addWidget(QLabel(tr("Output:")))
-        row3.addWidget(self.cmb_unc_output)
-        row3.addWidget(btn_unc)
-        row3.addStretch(1)
-        ul.addLayout(row3)
-        self.cv_unc = MplCanvas(width=6)
-        ul.addWidget(self.cv_unc)
-        self.lbl_unc_stats = QLabel("")
-        self.lbl_unc_stats.setObjectName("subtle")
-        ul.addWidget(self.lbl_unc_stats)
-        tabs.addTab(unc_tab, tr("🎲  Uncertainty"))
-
-        # --- Compare tab ---------------------------------------------
-        cmp_tab = QWidget()
-        cl = QVBoxLayout(cmp_tab)
-        cbtns = QHBoxLayout()
-        btn_snap = QPushButton(tr("Snapshot current scenario"))
-        btn_snap.clicked.connect(self.snapshot_scenario)
-        btn_clear = QPushButton(tr("Clear"))
-        btn_clear.clicked.connect(self.clear_snapshots)
-        cbtns.addWidget(btn_snap)
-        cbtns.addWidget(btn_clear)
-        cbtns.addStretch(1)
-        cl.addLayout(cbtns)
-        self.tbl_compare = QTableWidget(len(KPI_ORDER), 0)
-        self.tbl_compare.setVerticalHeaderLabels(KPI_ORDER)
-        cl.addWidget(self.tbl_compare)
-        tabs.addTab(cmp_tab, tr("⚖  Compare"))
-
-        v.addWidget(tabs, 1)
-        return panel
-
+    # ------------------------------------------------------------------ #
+    # Analyses
+    # ------------------------------------------------------------------ #
     def run_uncertainty(self):
         if not self._require_results():
             return
@@ -913,12 +525,16 @@ class MainWindow(QMainWindow):
             for p in PARAMETERS if self.unc_checks[p.name].isChecked()
         ]
         if not selected:
+            self.cv_unc.show_message(tr("Nothing to vary"),
+                                     tr("Tick at least one input above."))
             return
         out_name = self.cmb_unc_output.currentText()
-        mc = run_montecarlo(
-            self.build_scenario(), selected,
-            outputs={out_name: OUTPUTS[out_name]}, n=self.spn_unc_n.value(),
-        )
+        n = self.spn_unc_n.value()
+        with self._busy(tr("Running {n:,} Monte Carlo draws…").format(n=n), self.btn_unc):
+            mc = run_montecarlo(
+                self.build_scenario(), selected,
+                outputs={out_name: OUTPUTS[out_name]}, n=n,
+            )
         vals = mc.series[out_name]
         s = mc.stats(out_name)
         self._last_uncertainty = {
@@ -926,24 +542,34 @@ class MainWindow(QMainWindow):
             "skipped": mc.skipped,
         }
         ax = self.cv_unc.reset()
-        ax.hist(vals, bins=30, color=ACCENT, alpha=0.85)
-        for q, col in ((s["p10"], "#888888"), (s["p50"], "#c0392b"), (s["p90"], "#888888")):
-            ax.axvline(q, color=col, linestyle="--", linewidth=1)
-        ax.set_title(f"{out_name}   (n = {mc.n})", fontsize=10)
-        ax.set_xlabel(out_name, fontsize=9)
-        ax.tick_params(labelsize=8)
-        self.cv_unc.refresh()
-        # A draw whose recovery or uptake landed past its physical limit is not a
-        # sample of anything, so it is dropped rather than bounded — and said, or
-        # the histogram would quietly be of fewer draws than were asked for.
-        dropped = (f"   ·   {mc.skipped} of {mc.skipped + mc.n} draws dropped as "
-                   f"physically inadmissible: the width crosses a limit"
-                   if mc.skipped else "")
-        self.lbl_unc_stats.setText(
-            f"P10: {s['p10']:,.2f}   ·   P50 (median): {s['p50']:,.2f}   ·   "
-            f"P90: {s['p90']:,.2f}   ·   mean: {s['mean']:,.2f}   ·   std: {s['std']:,.2f}"
-            + dropped
+        hover = charts.histogram(
+            ax, vals, xlabel=out_name,
+            title=tr("{out}: {n:,} draws, ±{w}% on {k} inputs").format(
+                out=out_name, n=mc.n, w=self.spn_unc_pct.value(), k=len(selected)),
+            percentiles={"P10": s["p10"], "P50": s["p50"], "P90": s["p90"]},
         )
+        self.cv_unc.set_hover(hover)
+        self.cv_unc.refresh()
+        self.kv_unc.set_rows([
+            ("P10", sig(s["p10"], 3), "", "10th percentile"),
+            ("P50 (median)", sig(s["p50"], 3), "", "median"),
+            ("P90", sig(s["p90"], 3), "", "90th percentile"),
+            ("Mean", sig(s["mean"], 3), ""),
+            ("Std. dev.", sig(s["std"], 3), ""),
+        ])
+        # A draw whose recovery or uptake landed past its physical limit is not a
+        # sample of anything, so it is dropped rather than bounded - and said, or
+        # the histogram would quietly be of fewer draws than were asked for.
+        note = tr("Each ticked input is drawn uniformly within ±{w}% of its current value; "
+                  "the other inputs stay fixed. Output unit as in its name.").format(
+            w=self.spn_unc_pct.value())
+        if mc.skipped:
+            note += "  " + tr("{k} of {n} draws were dropped as physically inadmissible: "
+                              "the width crosses a limit.").format(k=mc.skipped,
+                                                                   n=mc.skipped + mc.n)
+        self.lbl_unc_stats.setText(note)
+        report_panel.refresh(self)
+        self.statusBar().showMessage(tr("Monte Carlo done: {n:,} draws").format(n=mc.n), 4000)
 
     def snapshot_scenario(self):
         if not self._require_results():
@@ -953,22 +579,29 @@ class MainWindow(QMainWindow):
         label = f"{n}: {self.organism.name.split()[0]}/{self.system.name.split()[0]}"
         self._snapshots.append((label, kpis))
         self._refresh_compare()
+        self.tabs.setCurrentIndex(TAB_COMPARE)
+        self.statusBar().showMessage(tr("Snapshot {n} taken").format(n=n), 3000)
 
     def clear_snapshots(self):
         self._snapshots = []
         self._refresh_compare()
 
     def _refresh_compare(self):
+        has = bool(self._snapshots)
+        self.tbl_compare.setVisible(has)
+        self.empty_cmp.setVisible(not has)
         self.tbl_compare.setColumnCount(len(self._snapshots))
         self.tbl_compare.setHorizontalHeaderLabels([lbl for lbl, _ in self._snapshots])
         self.tbl_compare.setRowCount(len(KPI_ORDER))
         self.tbl_compare.setVerticalHeaderLabels(KPI_ORDER)
         for c, (_, kpis) in enumerate(self._snapshots):
             for r_i, metric in enumerate(KPI_ORDER):
-                item = QTableWidgetItem(f"{kpis.get(metric, float('nan')):,.2f}")
+                item = QTableWidgetItem(sig(kpis.get(metric, float("nan")), 3))
                 item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
                 self.tbl_compare.setItem(r_i, c, item)
         self.tbl_compare.resizeColumnsToContents()
+        fit_rows(self.tbl_compare)
+        report_panel.refresh(self)
 
     def run_sensitivity(self):
         if not self._require_results():
@@ -976,25 +609,51 @@ class MainWindow(QMainWindow):
         base = self.build_scenario()
         param = next(p for p in PARAMETERS if p.name == self.cmb_sens_param.currentText())
         values = param.default_range(base)
-        points = run_sweep(base, param, values)
-        getter = OUTPUTS[self.cmb_sens_output.currentText()]
+        with self._busy(tr("Sweeping {p}…").format(p=param.name), self.btn_sens):
+            points = run_sweep(base, param, values)
+        out_name = self.cmb_sens_output.currentText()
+        getter = OUTPUTS[out_name]
         xs = [pt.value for pt in points]
         ys = [getter(pt.results) for pt in points]
         self._last_sensitivity = {
             "param": param.name, "unit": param.unit,
-            "output": self.cmb_sens_output.currentText(), "xs": xs, "ys": ys,
+            "output": out_name, "xs": xs, "ys": ys,
         }
+        unit = param.unit
+        if param.name == "Plant scale":
+            unit = "m²" if self.system.basis == Basis.AREA else "m³"
+        xlabel = f"{param.name} ({unit})" if unit and unit != "-" else param.name
+        nominal = param.read(base) if param.read is not None else None
         ax = self.cv_sens.reset()
-        ax.plot(xs, ys, marker="o", color=ACCENT)
-        ax.axhline(0, color="#bbbbbb", linewidth=0.8)
-        ax.set_xlabel(f"{param.name} ({param.unit})", fontsize=9)
-        ax.set_ylabel(self.cmb_sens_output.currentText(), fontsize=9)
-        ax.set_title(
-            f"{self.cmb_sens_output.currentText()} vs {param.name}", fontsize=10
-        )
-        ax.tick_params(labelsize=8)
-        ax.grid(True, alpha=0.3)
+        if not points:
+            self.cv_sens.show_message(tr("No admissible point"),
+                                      tr("Every value in the default range makes the case "
+                                         "inadmissible."))
+            self.tbl_sens.setVisible(False)
+            return
+        hover = charts.line(ax, xs, ys, xlabel=xlabel, ylabel=out_name,
+                            title=tr("{out} as {p} varies").format(out=out_name, p=param.name),
+                            nominal=nominal)
+        self.cv_sens.set_hover(hover)
         self.cv_sens.refresh()
+        current = getter(self.results)
+        rows = []
+        for x, y in zip(xs, ys):
+            change = DASH if not current else f"{(y / current - 1) * 100:+.1f}%"
+            rows.append([sig(x, 4), sig(y, 4), change])
+        self.tbl_sens.setHorizontalHeaderLabels([xlabel, out_name, tr("Change vs current")])
+        fill_table(self.tbl_sens, rows, numeric_from=0)
+        self.tbl_sens.setVisible(True)
+        skipped = skipped_values(values, points)
+        note = tr("Eleven values across the default range of {p}; everything else held at "
+                  "the current case.").format(p=param.name)
+        if skipped:
+            note += "  " + tr("{k} value(s) left out because they make the case "
+                              "inadmissible: {vals}.").format(
+                k=len(skipped), vals=", ".join(sig(v, 3) for v in skipped))
+        self.lbl_sens_note.setText(note)
+        report_panel.refresh(self)
+        self.statusBar().showMessage(tr("Sweep done"), 3000)
 
     # ------------------------------------------------------------------ #
     # Signal handlers
@@ -1110,24 +769,28 @@ class MainWindow(QMainWindow):
             self.cmb_downstream.setCurrentIndex(1 if main.fraction == "protein" else 0)
             self.cmb_downstream.blockSignals(False)
         self._update_extraction_enabled()
+        if hasattr(self, "lbl_ext_notes"):
+            self._update_preset_notes()
 
     def _update_extraction_enabled(self):
         """Grey out what does not apply: a control that does nothing must say so."""
         on = self.chk_extraction.isChecked()
         oil = self._product_by_fraction("lipid") if on else None
         protein = self._product_by_fraction("protein") if on else None
+        off = tr("Not used: extraction is switched off for this case. Tick the box above "
+                 "to split the biomass into products.")
         for widget in (self.cmb_ext_tech, self.cmb_downstream, self.spn_solvent_price,
                        self.cmb_alloc):
-            widget.setEnabled(on)
+            self._set_row_enabled(widget, on, off)
         for widget, product, label in ((self.spn_oil_rec, oil, "lipid"),
                                        (self.spn_oil_price, oil, "lipid"),
                                        (self.spn_prot_rec, protein, "protein"),
                                        (self.spn_prot_price, protein, "protein")):
-            widget.setEnabled(on and product is not None)
-            widget.setToolTip("" if (on and product is not None) else tr(
+            reason = off if not on else tr(
                 "Not used by this case: it defines no {f} product. Products are "
                 "edited under Custom media & products."
-            ).format(f=label))
+            ).format(f=label)
+            self._set_row_enabled(widget, on and product is not None, reason)
         self._update_products_label()
 
     def _update_products_label(self):
@@ -1241,6 +904,7 @@ class MainWindow(QMainWindow):
             combo.blockSignals(True)
             combo.setCurrentText(value)
             combo.blockSignals(False)
+        self._update_preset_notes()
 
     def _on_waste_preset(self, name: str):
         self._seed_waste_fields(name)
@@ -1292,8 +956,8 @@ class MainWindow(QMainWindow):
         inv = results.inventory
         wf = self.waste_feed
         if inv.waste_feed_per_kg <= 0:
-            # A stream dosed on a demand this scenario does not have — whey
-            # permeate, dosed on substrate, fed to a phototrophic pond — is a
+            # A stream dosed on a demand this scenario does not have - whey
+            # permeate, dosed on substrate, fed to a phototrophic pond - is a
             # valid setting that does nothing. Saying so beats a row of zeros.
             demand = {"nitrogen": inv.nitrogen_per_kg,
                       "phosphorus": inv.phosphorus_per_kg,
@@ -1397,8 +1061,25 @@ class MainWindow(QMainWindow):
         self._update_basis_labels()
         self._update_custom_label()
         self._update_mode_controls()
+        self._update_preset_notes()
+        self._reset_analyses()
         self._loading = False
         self.recompute()
+
+    def _reset_analyses(self):
+        """The sweep, the Monte Carlo and their tables describe the previous case."""
+        if not hasattr(self, "cv_sens"):
+            return
+        self.cv_sens.show_message(tr("No sweep run yet"),
+                                  tr("Pick an input and an output above, then run the sweep. "
+                                     "Points that make the case inadmissible are left out."))
+        self.tbl_sens.setVisible(False)
+        self.lbl_sens_note.setText("")
+        self.cv_unc.show_message(tr("No Monte Carlo run yet"),
+                                 tr("Tick the inputs to vary, set the width and the number of "
+                                    "draws, then run."))
+        self.kv_unc.set_rows([])
+        self.lbl_unc_stats.setText("")
 
     def _on_batch_change(self, *_):
         if self._loading:
@@ -1489,11 +1170,50 @@ class MainWindow(QMainWindow):
                 cb.blockSignals(False)
         if obj == "system":
             self._update_carbon_labels()
+        self._refresh_tooltips(obj)
+
+    def _refresh_tooltips(self, obj: str | None = None):
+        """Tooltips name the preset a default comes from, so they follow the combos."""
+        for (o, a), sb in self._spins.items():
+            if obj is not None and o != obj:
+                continue
+            tip = self._tooltip_for(fields.spec(o, a))
+            self._base_tooltips[id(sb)] = tip
+            if sb.isEnabled():
+                sb.setToolTip(tip)
+        if obj in (None, "system") and hasattr(self, "spn_scale"):
+            tip = self._tooltip_for(fields.spec("scenario", "scale"))
+            self._base_tooltips[id(self.spn_scale)] = tip
+            self.spn_scale.setToolTip(tip)
+
+    def _update_preset_notes(self):
+        """The notes a preset carries, shown under the combo that picked it."""
+        if not hasattr(self, "lbl_org_notes"):
+            return
+        self.lbl_org_notes.setText(fields.preset_notes(self.lib.organisms.get(self.organism.name)))
+        sys_note = fields.preset_notes(self.lib.systems.get(self.system.name))
+        scaling = fields.scaling_source(self.system.capex_scaling)
+        if scaling:
+            sys_note = f"{sys_note}  Cost scaling: {scaling}".strip()
+        self.lbl_sys_notes.setText(sys_note)
+        self.lbl_harv_notes.setText(
+            fields.preset_notes(self.lib.harvesting.get(self.harvesting.name)))
+        self.lbl_dry_notes.setText(fields.preset_notes(self.lib.drying.get(self.drying.name)))
+        ext = self.lib.extraction.get(self.cmb_ext_tech.currentText())
+        self.lbl_ext_notes.setText(fields.preset_notes(ext) if self.chk_extraction.isChecked()
+                                   else "")
+        feed = self.lib.waste_feeds.get(self.cmb_waste.currentText())
+        self.lbl_waste_notes.setText(fields.preset_notes(feed) if self.chk_waste.isChecked()
+                                     else "")
+        for lbl in (self.lbl_org_notes, self.lbl_sys_notes, self.lbl_harv_notes,
+                    self.lbl_dry_notes, self.lbl_ext_notes, self.lbl_waste_notes):
+            lbl.setVisible(bool(lbl.text()))
 
     def _on_organism(self, name: str):
         if name in self.lib.organisms:
             self.organism = copy.deepcopy(self.lib.organisms[name])
             self._refresh("organism")
+            self._update_preset_notes()
             if not self._loading:
                 self.recompute()
 
@@ -1515,6 +1235,7 @@ class MainWindow(QMainWindow):
             self.spn_price.blockSignals(True)
             self.spn_price.setValue(self.product_price)
             self.spn_price.blockSignals(False)
+        self._update_preset_notes()
         if not self._loading:
             self.recompute()
 
@@ -1522,6 +1243,7 @@ class MainWindow(QMainWindow):
         if name in self.lib.harvesting:
             self.harvesting = copy.deepcopy(self.lib.harvesting[name])
             self._refresh("harvesting")
+            self._update_preset_notes()
             if not self._loading:
                 self.recompute()
 
@@ -1530,18 +1252,25 @@ class MainWindow(QMainWindow):
             self.drying = copy.deepcopy(self.lib.drying[name])
             self._refresh("drying")
             self._update_mode_controls()
+            self._update_preset_notes()
             if not self._loading:
                 self.recompute()
 
     def _update_basis_labels(self):
-        if self.system.basis == Basis.AREA:
-            self.lbl_prod.setText("Productivity (g/m²/d)")
-            self.lbl_capex.setText("Cultivation CAPEX (€/m²)")
-            self.lbl_scale.setText("Plant scale (m²)")
-        else:
-            self.lbl_prod.setText("Productivity (g/L/d)")
-            self.lbl_capex.setText("Cultivation CAPEX (€/m³)")
-            self.lbl_scale.setText("Plant scale (m³)")
+        """Units of the three basis-dependent rows follow the system's sizing basis."""
+        area = self.system.basis == Basis.AREA
+        self.lbl_prod.setText(tr("Productivity"))
+        self.lbl_capex.setText(tr("Cultivation CAPEX"))
+        self.lbl_scale.setText(tr("Plant scale"))
+        basis = self._basis_key()
+        self.sec_cultivation.set_unit(self.spn_productivity,
+                                      fields.spec("system", "productivity").unit_for(basis))
+        self.sec_cultivation.set_unit(self.spn_capex,
+                                      fields.spec("system", "capex_per_unit").unit_for(basis))
+        self.sec_cultivation.set_unit(self.spn_scale,
+                                      fields.spec("scenario", "scale").unit_for(basis))
+        self.spn_scale.setSingleStep(1000.0 if area else 10.0)
+        self._refresh_tooltips("system")
 
     def _on_carbon_source(self, index: int):
         self.system.carbon_source = (
@@ -1560,7 +1289,7 @@ class MainWindow(QMainWindow):
         """Sync the carbon-source & heat-fuel combos and relabel the utilization spin.
 
         ``co2_utilization`` is an *efficiency* (fraction of supplied inorganic
-        carbon that is fixed), not an amount — the label makes that explicit for
+        carbon that is fixed), not an amount - the label makes that explicit for
         each carbon source so lowering it reads as 'less efficient', not 'less fed'.
         """
         is_bicarb = self.system.carbon_source == CarbonSource.BICARBONATE
@@ -1576,17 +1305,19 @@ class MainWindow(QMainWindow):
         self._update_mode_controls()
 
     def _set_row_enabled(self, widget, on: bool, reason: str = ""):
-        """Enable or grey out a form row - the field and the label that names it."""
+        """Enable or grey out a form row - the field, its unit and the label that names it."""
         base = self._base_tooltips.setdefault(id(widget), widget.toolTip())
+        form, holder = form_row_of(widget)
+        if holder is not None and holder is not widget:
+            holder.setEnabled(on)
         widget.setEnabled(on)
         widget.setToolTip(base if on else reason)
-        parent = widget.parentWidget()
-        layout = parent.layout() if parent is not None else None
-        if isinstance(layout, QFormLayout):
-            label = layout.labelForField(widget)
+        if form is not None:
+            label = form.labelForField(holder)
             if label is not None:
+                label_base = self._base_tooltips.setdefault(id(label), label.toolTip())
                 label.setEnabled(on)
-                label.setToolTip("" if on else reason)
+                label.setToolTip(label_base if on else reason)
 
     def _update_mode_controls(self):
         """Grey out the inputs this configuration does not read.
@@ -1645,6 +1376,8 @@ class MainWindow(QMainWindow):
                       "productivity × operating days.")
         for widget in (self.spn_batch_size, self.spn_batch_cycle):
             self._set_row_enabled(widget, batch_on, no_batch)
+        if hasattr(self, "lbl_waste_notes"):
+            self._update_preset_notes()
 
     # ------------------------------------------------------------------ #
     # Compute + render
@@ -1675,9 +1408,11 @@ class MainWindow(QMainWindow):
         )
 
     def recompute(self):
+        started = time.perf_counter()
         scenario = self.build_scenario()
         self.issues = check_inputs(scenario)
         self._show_issues()
+        unit = "m²" if self.system.basis == Basis.AREA else "m³"
         if any(i.is_error for i in self.issues):
             # Arithmetic on an impossible input is not a result. A productivity of
             # zero returns a cost of inf and a substrate yield of zero returns a
@@ -1685,9 +1420,14 @@ class MainWindow(QMainWindow):
             # in the same font as a number somebody could publish.
             self.results = None
             for card in self.kpi.values():
-                card.set_value("—")
+                card.set_value(DASH)
+            self._render_not_computed()
+            self.subtitle.setText(
+                f"{self.organism.name}  ·  {self.system.name}  ·  {self.scale:,.0f} {unit}"
+                f"  ·  " + tr("not computed"))
             self.statusBar().showMessage(
                 tr("Not computed: the scenario is not physically admissible."), 8000)
+            self._after_render()
             return
         self.results = run_scenario(scenario)
         r = self.results
@@ -1695,7 +1435,6 @@ class MainWindow(QMainWindow):
         # the organism, the system or the recovery does - not only when the
         # waste-feed controls are touched.
         self._update_waste_label()
-        unit = "m²" if self.system.basis == Basis.AREA else "m³"
         # One name for what the headline numbers are per, taken from the same
         # helper the export uses, so a figure caption and a JSON file cannot
         # disagree about the functional unit.
@@ -1705,51 +1444,84 @@ class MainWindow(QMainWindow):
             f"{self.organism.name}  ·  {self.system.name}  ·  {self.scale:,.0f} {unit}"
             f"  ·  functional unit: {fu}"
         )
-        if r.main_product:
-            self.subtitle.setText(
-                self.subtitle.text()
-                + f"  ·  allocation: {r.scenario.extraction.allocation}"
-                  f" ({r.main_product.allocation_share * 100:,.0f}% to the main product)"
-                  f"  ·  {r.inventory.annual_biomass_kg / 1000:,.0f} t/yr dry biomass processed"
-            )
-        if not self.drying.enabled:
-            # The product leaves wet, the results are per kg of dry matter, and
-            # a price typed in EUR per kg of paste against a cost per kg of dry
-            # matter is off by the water. Say the solids content here.
-            self.subtitle.setText(
-                self.subtitle.text()
-                + f"  ·  no drying: the product leaves at "
-                  f"{self.harvesting.final_solids:.0%} solids, and every result "
-                  f"below is per kg of DRY matter"
-            )
-        if r.inventory.batches_per_year:
-            self.subtitle.setText(
-                self.subtitle.text()
-                + f"  ·  {r.inventory.batches_per_year:,.0f} batches/yr "
-                  f"× {r.inventory.batch_product_kg:,.0f} kg"
-            )
+        self.lbl_case_title.setText(
+            f"{r.main_product.name} from {self.organism.name}" if r.main_product
+            else f"{self.organism.name} dry biomass")
+        self.chip_fu.setText(fu)
         pb = r.tea.payback_years
         if r.main_product:  # biorefinery mode: report per the main product
             self.kpi["cost"].set_value(f"{r.main_product.production_cost_eur_per_kg:,.2f}")
             self.kpi["gwp"].set_value(f"{r.main_product.gwp_kg_co2eq_per_kg:,.2f}")
             self.kpi["output"].set_value(f"{r.main_product.annual_kg / 1000:,.0f}")
             self.kpi["output"].set_title(tr("Main product output"))
+            share = r.main_product.allocation_share
+            self.kpi["cost"].set_basis(
+                tr("{share:.0%} of the operating cost, {method} allocation, plant gate").format(
+                    share=share, method=r.scenario.extraction.allocation))
+            self.kpi["gwp"].set_basis(
+                tr("cradle-to-gate, {share:.0%} of the burden by {method} allocation").format(
+                    share=share, method=r.scenario.extraction.allocation))
+            self.kpi["output"].set_basis(
+                tr("per year, from {t:,.0f} t/yr of dry biomass processed").format(
+                    t=r.inventory.annual_biomass_kg / 1000))
         else:
             self.kpi["cost"].set_value(f"{r.tea.production_cost_eur_per_kg:,.2f}")
             self.kpi["gwp"].set_value(f"{r.lca.gwp_kg_co2eq_per_kg:,.2f}")
             self.kpi["output"].set_value(f"{r.inventory.annual_biomass_kg / 1000:,.0f}")
             self.kpi["output"].set_title(tr("Dry biomass output"))
+            self.kpi["cost"].set_basis(tr("annual operating cost per kg at the plant gate"))
+            self.kpi["gwp"].set_basis(
+                tr("cradle-to-gate, attributional; {mode}").format(
+                    mode=r.lca.carbon_accounting_mode.replace("_", " ")))
+            self.kpi["output"].set_basis(tr("per year, dry basis, after harvest losses"))
         self.kpi["cost"].set_unit(f"€ / kg {self.reference_product}")
         self.kpi["gwp"].set_unit(f"kg CO₂-eq / kg {self.reference_product}")
         self.kpi["output"].set_unit(f"t {self.reference_product} / yr")
         self.kpi["npv"].set_value(f"{r.tea.npv / 1e6:,.1f}")
+        self.kpi["npv"].set_basis(
+            tr("{yrs:.0f}-year horizon, {rate:.1%} discount rate, after tax").format(
+                yrs=self.economics.plant_lifetime, rate=self.economics.discount_rate))
         self.kpi["payback"].set_value("∞" if pb == float("inf") else f"{pb:,.1f}")
+        self.kpi["payback"].set_basis(tr("total investment ÷ annual after-tax cash flow"))
         self.kpi["roi"].set_value(f"{r.tea.roi * 100:,.0f}")
+        self.kpi["roi"].set_basis(tr("net profit after tax ÷ total investment"))
 
+        self._update_basis(r)
+        self._draw_overview(r)
         self._draw_tea(r)
         self._draw_lca(r)
         self._draw_inventory(r)
         self._draw_products(r)
+        self._after_render()
+        elapsed = (time.perf_counter() - started) * 1000.0
+        self.lbl_status_right.setText(
+            tr("Computed in {ms:.0f} ms  ·  {fu}").format(ms=elapsed, fu=fu))
+        self.statusBar().showMessage(tr("Ready"), 2000)
+
+    def _after_render(self):
+        """What follows every render, computed or refused."""
+        self._mark_issue_fields()
+        validation_panel.refresh_all(self)
+        report_panel.refresh(self)
+
+    def _render_not_computed(self):
+        title = tr("Not computed")
+        hint = tr("Fix the inputs flagged on the Overview page.")
+        for cv in (self.cv_overview_cost, self.cv_overview_gwp, self.cv_opex, self.cv_capex,
+                   self.cv_gwp, self.cv_elec):
+            cv.render_later(lambda c=cv: c.show_message(title, hint))
+        for tbl in (self.tbl_tea, self.tbl_impacts, self.tbl_inv, self.tbl_products):
+            tbl.setRowCount(0)
+        self.kv_tea.set_rows([])
+        self.lbl_tea_totals.setText("")
+        self.lbl_lca_totals.setText("")
+        self._basis_html = ""
+        self.lbl_basis.setText(
+            tr("Nothing is computed, exported or compared while the scenario is not "
+               "physically admissible."))
+        self.chip_fu.setText(tr("not computed"))
+        self.lbl_case_title.setText(tr("Scenario not admissible"))
+        self.lbl_status_right.setText("")
 
     def _show_issues(self):
         """Say what is wrong, in the order it has to be fixed."""
@@ -1766,8 +1538,45 @@ class MainWindow(QMainWindow):
         self.lbl_issues.setProperty("blocking", bool(blocking))
         self.lbl_issues.setText(head + "\n" + "\n".join(lines))
         self.lbl_issues.setVisible(True)
-        self.lbl_issues.style().unpolish(self.lbl_issues)
-        self.lbl_issues.style().polish(self.lbl_issues)
+        theme.repolish(self.lbl_issues)
+
+    def _field_widget(self, field: str):
+        """The input control an issue's dotted field path points at, if any."""
+        if field == "scale":
+            return self.spn_scale
+        parts = field.split(".")
+        if len(parts) == 2 and tuple(parts) in self._spins:
+            return self._spins[tuple(parts)]
+        return None
+
+    def _mark_issue_fields(self):
+        """Flag the offending fields themselves, with the message in their tooltip."""
+        wanted: dict[int, tuple[str, list[str]]] = {}
+        for issue in self.issues:
+            widget = self._field_widget(issue.field)
+            if widget is None:
+                continue
+            sev, msgs = wanted.get(id(widget), ("warning", []))
+            if issue.is_error:
+                sev = "error"
+            msgs.append(issue.message)
+            wanted[id(widget)] = (sev, msgs)
+        widgets = list(self._spins.values()) + [self.spn_scale]
+        for widget in widgets:
+            sev, msgs = wanted.get(id(widget), ("", []))
+            if widget.property("issue") != sev:
+                widget.setProperty("issue", sev)
+                theme.repolish(widget)
+            if not widget.isEnabled():
+                continue
+            base = self._base_tooltips.get(id(widget), widget.toolTip())
+            if msgs:
+                color = theme.DANGER if sev == "error" else theme.WARNING
+                extra = "".join(f"<p style='margin:4px 0; color:{color}'><b>Check:</b> "
+                                f"{m}</p>" for m in msgs)
+                widget.setToolTip(base + extra)
+            else:
+                widget.setToolTip(base)
 
     def _require_results(self) -> bool:
         """Refuse an action that would present a result the scenario cannot have."""
@@ -1781,22 +1590,127 @@ class MainWindow(QMainWindow):
         )
         return False
 
-    def _draw_tea(self, r):
-        items = sorted(r.tea.opex_breakdown.items(), key=lambda kv: kv[1])
-        labels = [k for k, _ in items]
-        vals = [v / 1e6 for _, v in items]
+    # ------------------------------------------------------------------ #
+    # Rendering
+    # ------------------------------------------------------------------ #
+    def _scope(self) -> dict:
+        method = self.lib.lcia_method
+        return method.scope if method else {}
+
+    def _update_basis(self, r):
+        """State what every number on the screen is per, in one place."""
+        scope = self._scope()
+        geography = (scope.get("geography") or {}).get("default", "EU-27")
+        period = (scope.get("reference_period") or {}).get("default", "")
+        rows = [
+            (tr("Functional unit"), f"{functional_unit(r)} at the plant gate"),
+            (tr("System boundary"),
+             f"cradle-to-gate, attributional; {geography} background {period}; "
+             f"infrastructure, transport and packaging outside"),
+        ]
+        if r.main_product:
+            rows.append((tr("Allocation"),
+                         f"{r.scenario.extraction.allocation}: "
+                         f"{r.main_product.allocation_share:.0%} of cost and burden to "
+                         f"{r.main_product.name}; {r.inventory.annual_biomass_kg / 1000:,.0f} "
+                         f"t/yr of dry biomass processed"))
+        else:
+            rows.append((tr("Allocation"), "single product: the whole cost and burden on the "
+                                           "dry biomass"))
+        rows.append((tr("Biogenic carbon"), r.lca.carbon_accounting_mode.replace("_", " ")))
+        rows.append((tr("Price basis"), PRICE_BASIS))
+        if self.drying.enabled:
+            rows.append((tr("Product form"),
+                         f"dried to {self.drying.final_solids:.0%} solids; results per kg of "
+                         f"dry matter"))
+        else:
+            # The product leaves wet, the results are per kg of dry matter, and
+            # a price typed in EUR per kg of paste against a cost per kg of dry
+            # matter is off by the water. Say the solids content here.
+            rows.append((tr("Product form"),
+                         f"no drying: the product leaves at {self.harvesting.final_solids:.0%} "
+                         f"solids, and every result is per kg of DRY matter"))
+        if r.inventory.batches_per_year:
+            rows.append((tr("Operation"),
+                         f"batch: {r.inventory.batches_per_year:,.0f} batches/yr × "
+                         f"{r.inventory.batch_product_kg:,.0f} kg"))
+        else:
+            rows.append((tr("Operation"), "continuous"))
+        self._basis_html = "".join(
+            f"<div style='margin:1px 0'><span style='color:{theme.INK_3}'>{k}:</span> "
+            f"{v}</div>" for k, v in rows)
+        self.lbl_basis.setText(self._basis_html)
+
+    def _per_kg_items(self, r) -> tuple[list, list, float]:
+        """Operating-cost items per kg of the reference product, allocated like the KPI."""
+        mp = r.main_product
+        denom = mp.annual_kg if mp else r.inventory.annual_biomass_kg
+        share = mp.allocation_share if mp else 1.0
+        labels, vals = [], []
+        for name, val in r.tea.opex_breakdown.items():
+            labels.append(name)
+            vals.append(val * share / denom if denom else 0.0)
+        return labels, vals, share
+
+    def _chart_cost_per_kg(self, r):
+        labels, vals, _share = self._per_kg_items(r)
+        ax = self.cv_overview_cost.reset()
+        hover = charts.barh(ax, labels, vals, unit=f"€ / kg {self.reference_product}",
+                            title=tr("Operating cost per kg, by item"),
+                            share_of=sum(vals) or None, value_fmt=lambda v: fixed(v, 2))
+        self.cv_overview_cost.set_hover(hover)
+        self.cv_overview_cost.refresh()
+
+    def _chart_gwp(self, canvas, r, title: str):
+        ax = canvas.reset()
+        items = r.lca.gwp_breakdown
+        hover = charts.diverging_barh(
+            ax, list(items.keys()), list(items.values()),
+            unit="kg CO₂-eq / kg dry biomass processed", title=title,
+            net=r.lca.gwp_kg_co2eq_per_kg, net_label=tr("net"))
+        canvas.set_hover(hover)
+        canvas.refresh()
+
+    def _chart_opex(self, r):
+        items = list(r.tea.opex_breakdown.items())
         ax = self.cv_opex.reset()
-        ax.barh(labels, vals, color=ACCENT)
-        ax.set_title(tr("Annual cost breakdown (€ M/yr)"), fontsize=10)
-        ax.tick_params(labelsize=8)
+        hover = charts.barh(ax, [k for k, _ in items], [v / 1e6 for _, v in items],
+                            unit="M€ / yr (plant total)",
+                            title=tr("Annual operating cost by item"),
+                            share_of=(r.tea.annual_opex / 1e6) or None,
+                            value_fmt=lambda v: fixed(v, 2))
+        self.cv_opex.set_hover(hover)
         self.cv_opex.refresh()
 
-        cap = r.tea.capex_breakdown
+    def _chart_capex(self, r):
+        cap = [(k, v) for k, v in r.tea.capex_breakdown.items()]
         ax = self.cv_capex.reset()
-        ax.pie(list(cap.values()), labels=list(cap.keys()),
-               autopct="%1.0f%%", textprops={"fontsize": 7})
-        ax.set_title(tr("CAPEX breakdown"), fontsize=10)
+        hover = charts.barh(ax, [k for k, _ in cap], [v / 1e6 for _, v in cap],
+                            unit="M€",
+                            title=tr("Capital investment by item"),
+                            share_of=(r.tea.total_investment / 1e6) or None,
+                            value_fmt=lambda v: fixed(v, 2))
+        self.cv_capex.set_hover(hover)
         self.cv_capex.refresh()
+
+    def _chart_electricity(self, r):
+        ax = self.cv_elec.reset()
+        stages = r.inventory.elec_breakdown
+        hover = charts.barh(ax, list(stages.keys()), list(stages.values()),
+                            unit="kWh / kg dry biomass", title=tr("Electricity by stage"),
+                            ranked=False, label_top=len(stages), value_fmt=lambda v: fixed(v, 2))
+        self.cv_elec.set_hover(hover)
+        self.cv_elec.refresh()
+
+    def _draw_overview(self, r):
+        self.cv_overview_cost.render_later(lambda: self._chart_cost_per_kg(r))
+        self.cv_overview_gwp.render_later(
+            lambda: self._chart_gwp(self.cv_overview_gwp, r,
+                                    tr("GWP contributions per kg of dry biomass")))
+
+    def _draw_tea(self, r):
+        self.cv_opex.render_later(lambda: self._chart_opex(r))
+        self.cv_capex.render_later(lambda: self._chart_capex(r))
 
         # Itemised production-cost table. The € / kg column is per kg of the
         # reported product AND carries the same allocation share as the KPI, so
@@ -1818,61 +1732,47 @@ class MainWindow(QMainWindow):
             (tr("Raw materials (subtotal)"), r.tea.raw_materials_cost),
             (tr("Annual operating cost"), aoc),
         ]
-        self.tbl_tea.setRowCount(len(items) + len(summary))
-
-        def _cost_row(row, name, val, bold=False):
+        rows = []
+        for name, val in items + summary:
             per_kg = val * share / denom if denom else 0.0
-            pct = val / aoc * 100.0 if aoc else 0.0
-            cells = [name, f"{per_kg:,.3f}", _money(val), f"{pct:,.1f}%"]
-            for c, text in enumerate(cells):
-                item = QTableWidgetItem(text)
-                if c > 0:
-                    item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-                if bold:
-                    font = item.font()
-                    font.setBold(True)
-                    item.setFont(font)
-                self.tbl_tea.setItem(row, c, item)
+            pc = val / aoc * 100.0 if aoc else 0.0
+            rows.append([name, f"{per_kg:,.3f}", money(val), f"{pc:,.1f}%"])
+        fill_table(self.tbl_tea, rows, numeric_from=1,
+                   bold_rows=range(len(items), len(items) + len(summary)), fit=True)
 
-        for i, (name, val) in enumerate(items):
-            _cost_row(i, name, val)
-        for j, (name, val) in enumerate(summary):
-            _cost_row(len(items) + j, name, val, bold=True)
-        self.tbl_tea.resizeColumnsToContents()
-        self.tbl_tea.horizontalHeader().setStretchLastSection(True)
-
-        irr_txt = "n/a" if r.tea.irr is None else f"{r.tea.irr * 100:,.1f}%"
-        pb = "∞" if r.tea.payback_years == float("inf") else f"{r.tea.payback_years:,.1f} yr"
+        irr_txt = DASH if r.tea.irr is None else f"{r.tea.irr * 100:,.1f}%"
+        pb = "∞" if r.tea.payback_years == float("inf") else f"{r.tea.payback_years:,.1f}"
         mepp = minimum_selling_price(r.scenario)
-        mepp_txt = "n/a" if mepp is None else f"€ {mepp:,.2f}/kg"
+        mepp_txt = DASH if mepp is None else f"{mepp:,.2f}"
+        self.kv_tea.set_rows([
+            (tr("Total investment"), money(r.tea.total_investment), "",
+             "direct fixed capital + working capital + start-up"),
+            (tr("Annual operating cost"), money(r.tea.annual_opex), "/ yr"),
+            (tr("Revenues"), money(r.tea.revenues), "/ yr"),
+            (tr("Net profit"), money(r.tea.net_profit), "/ yr", "after tax"),
+            ("NPV", money(r.tea.npv), "",
+             f"{self.economics.plant_lifetime:.0f} years at "
+             f"{self.economics.discount_rate:.1%}"),
+            ("IRR", irr_txt, ""),
+            ("ROI", f"{r.tea.roi * 100:,.1f}%", "/ yr", "net profit ÷ total investment"),
+            (tr("Payback"), pb, "yr", "total investment ÷ annual after-tax cash flow"),
+            (tr("Net production cost"), f"€ {r.tea.net_production_cost_eur_per_kg:,.2f}",
+             "/ kg dry biomass", "operating cost net of co-product revenue and credits"),
+            (tr("Break-even price (MEPP)"), f"€ {mepp_txt}", f"/ kg {self.reference_product}",
+             "selling price at which the NPV is zero"),
+        ])
         self.lbl_tea_totals.setText(
-            f"Total investment: {_money(r.tea.total_investment)}   ·   "
-            f"AOC: {_money(r.tea.annual_opex)}/yr   ·   "
-            f"Revenues: {_money(r.tea.revenues)}/yr   ·   "
-            f"Net profit: {_money(r.tea.net_profit)}/yr\n"
-            f"NPV: {_money(r.tea.npv)}   ·   IRR: {irr_txt}   ·   "
-            f"ROI: {r.tea.roi * 100:,.1f}%   ·   Payback: {pb}   ·   "
-            f"Net production cost: € {r.tea.net_production_cost_eur_per_kg:,.2f}"
-            f"/kg dry biomass   ·   "
-            f"Break-even price (MEPP): {mepp_txt} of {self.reference_product}\n"
-            + (f"The € / kg column is allocated: {share * 100:,.0f}% of each line goes to "
-               f"{self.reference_product} under {r.scenario.extraction.allocation} allocation. "
-               f"The € / yr column is the plant total."
-               if r.main_product else
-               "Single product: the whole operating cost is carried by the dry biomass.")
+            (f"The € / kg column is allocated: {share * 100:,.0f}% of each line goes to "
+             f"{self.reference_product} under {r.scenario.extraction.allocation} allocation. "
+             f"The € / yr column is the plant total.")
+            if r.main_product else
+            "Single product: the whole operating cost is carried by the dry biomass. "
+            "Amounts in EUR as entered."
         )
 
     def _draw_lca(self, r):
-        items = sorted(r.lca.gwp_breakdown.items(), key=lambda kv: kv[1])
-        labels = [k for k, _ in items]
-        vals = [v for _, v in items]
-        colors = [NEG if v < 0 else POS for v in vals]
-        ax = self.cv_gwp.reset()
-        ax.barh(labels, vals, color=colors)
-        ax.axvline(r.lca.gwp_kg_co2eq_per_kg, color="#333", linestyle="--", linewidth=1)
-        ax.set_title(tr("GWP contribution (kg CO₂-eq / kg biomass)"), fontsize=10)
-        ax.tick_params(labelsize=8)
-        self.cv_gwp.refresh()
+        self.cv_gwp.render_later(
+            lambda: self._chart_gwp(self.cv_gwp, r, tr("GWP contributions")))
 
         # Two bases, each labelled. The chart, the impact table and this first
         # line are the foreground inventory per kg of biomass processed; the
@@ -1880,49 +1780,57 @@ class MainWindow(QMainWindow):
         # cards show. Printing the first alone next to a KPI computed from the
         # second is how the same panel came to hold two different GWPs.
         per_biomass = (
-            f"Per 1 kg dry biomass processed  —  "
-            f"Net GWP: {r.lca.gwp_kg_co2eq_per_kg:,.2f} kg CO₂-eq     ·     "
-            f"CED: {r.lca.ced_mj_per_kg:,.1f} MJ     ·     "
-            f"Water: {r.lca.water_m3_per_kg:,.2f} m³     ·     "
-            f"Land: {r.lca.land_m2a_per_kg:,.2f} m²·a"
+            f"<b>Per 1 kg dry biomass processed</b> — "
+            f"net GWP {r.lca.gwp_kg_co2eq_per_kg:,.2f} kg CO₂-eq  ·  "
+            f"CED {r.lca.ced_mj_per_kg:,.1f} MJ  ·  "
+            f"water {r.lca.water_m3_per_kg:,.2f} m³  ·  "
+            f"land {r.lca.land_m2a_per_kg:,.2f} m²·a"
         )
         if r.main_product:
             mp = r.main_product
             per_biomass += (
-                f"\nPer 1 kg {mp.name} (allocated, {r.scenario.extraction.allocation}, "
-                f"{mp.allocation_share * 100:,.0f}%)  —  "
-                f"GWP: {mp.gwp_kg_co2eq_per_kg:,.2f} kg CO₂-eq     ·     "
-                f"CED: {mp.ced_mj_per_kg:,.1f} MJ"
+                f"<br/><b>Per 1 kg {mp.name}</b> ({r.scenario.extraction.allocation} "
+                f"allocation, {mp.allocation_share * 100:,.0f}%) — "
+                f"GWP {mp.gwp_kg_co2eq_per_kg:,.2f} kg CO₂-eq  ·  "
+                f"CED {mp.ced_mj_per_kg:,.1f} MJ"
             )
         self.lbl_lca_totals.setText(per_biomass)
 
-        impacts = r.lca.impacts
-        self.tbl_impacts.setRowCount(len(impacts))
-        for i, (cat, val) in enumerate(impacts.items()):
-            self.tbl_impacts.setItem(i, 0, QTableWidgetItem(cat))
-            item = QTableWidgetItem(f"{val:,.4g}")
-            item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-            self.tbl_impacts.setItem(i, 1, item)
-        self.tbl_impacts.resizeColumnsToContents()
+        method = self.lib.lcia_method
+        indicators = {i.key: i for i in method.indicators} if method else {}
+        rows, tips = [], {}
+        for i, (cat, val) in enumerate(r.lca.impacts.items()):
+            m = re.match(r"^(.*?)\s*\((.*)\)\s*$", cat)
+            name, unit = (m.group(1), m.group(2)) if m else (cat, "")
+            key = next((k for word, k in _IMPACT_INDICATOR if name.startswith(word)), None)
+            ind = indicators.get(key) if key else None
+            method_txt = ind.method if ind else ""
+            if ind is not None and ind.kind == "inventory":
+                method_txt = "inventory total, not characterized"
+            rows.append([name, sig(val, 3), unit, method_txt])
+            if ind is not None and ind.note:
+                tips[(i, 3)] = " ".join(ind.note.split())
+                tips[(i, 0)] = " ".join(ind.note.split())
+        fill_table(self.tbl_impacts, rows, numeric_from=1, tooltips=tips, max_width=300,
+                   fit=True)
         self.lbl_lca_method.setText(self._lca_method_note(r))
 
     def _lca_method_note(self, r) -> str:
         """One line of scope, plus this scenario's uncharacterized flows."""
-        from algametrix.lciamethod import load_method
-
-        method = load_method()
-        scope = method.scope if method else {}
+        scope = self._scope()
         geography = (scope.get("geography") or {}).get("default", "EU-27")
         period = (scope.get("reference_period") or {}).get("default", "")
-        note = (f"Cradle-to-gate, attributional; {geography} background {period}, "
-                "aggregated indicative factors — no LCI database. Infrastructure, "
-                "transport and packaging are outside the boundary. Method: "
+        note = (f"<b>Method.</b> Cradle-to-gate, attributional; {geography} background "
+                f"{period}, aggregated indicative factors — no LCI database. Infrastructure, "
+                "transport and packaging are outside the boundary. Impact values per kg of dry "
+                "biomass processed, three significant figures. Method statement: "
                 "docs/LCA_METHOD.md.")
         gaps = getattr(r.lca, "not_characterized", {}) or {}
         if gaps:
             names = sorted({name for items in gaps.values() for name in items})
-            note += ("  Not characterized in every category: "
-                     + ", ".join(names) + " — those categories are understated.")
+            note += (f"<br/><span style='color:{theme.DANGER}'>Not characterized in every "
+                     f"category: " + ", ".join(names) + " — those categories are "
+                     "understated.</span>")
         return note
 
     def _draw_inventory(self, r):
@@ -1943,45 +1851,40 @@ class MainWindow(QMainWindow):
         for u in r.scenario.utilities:
             rows.append((f"  {u.name}", u.amount_per_kg, u.unit))
         rows.append(("Land occupation", inv.land_m2a_per_kg, "m²·a"))
-        self.tbl_inv.setRowCount(len(rows))
-        for i, (name, val, unit) in enumerate(rows):
-            self.tbl_inv.setItem(i, 0, QTableWidgetItem(name))
-            item = QTableWidgetItem(f"{val:,.3f}")
-            item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-            self.tbl_inv.setItem(i, 1, item)
-            self.tbl_inv.setItem(i, 2, QTableWidgetItem(unit))
-        self.tbl_inv.resizeColumnsToContents()
-
-        ax = self.cv_elec.reset()
-        stages = inv.elec_breakdown
-        ax.bar(list(stages.keys()), list(stages.values()), color=ACCENT)
-        ax.set_title(tr("Electricity by stage (kWh/kg)"), fontsize=10)
-        ax.tick_params(labelsize=8)
-        self.cv_elec.refresh()
+        fill_table(self.tbl_inv, [[n, sig(v, 4), u] for n, v, u in rows], numeric_from=1,
+                   fit=True)
+        self.tbl_inv.horizontalHeader().setStretchLastSection(True)
+        self.cv_elec.render_later(lambda: self._chart_electricity(r))
 
     def _draw_products(self, r):
         self.lbl_products_hint.setVisible(not r.products)
-        self.tbl_products.setRowCount(len(r.products))
+        self.tbl_products.setVisible(bool(r.products))
+        if r.products:
+            self.lbl_products_basis.setText(
+                tr("{n} products from {t:,.0f} t/yr of dry biomass; {method} allocation of "
+                   "the operating cost and the burden. The main product carries the "
+                   "headline KPIs.").format(n=len(r.products),
+                                            t=r.inventory.annual_biomass_kg / 1000,
+                                            method=r.scenario.extraction.allocation))
+        else:
+            self.lbl_products_basis.setText("")
+        rows, bold = [], []
         for i, p in enumerate(r.products):
-            cells = [
-                p.name,
-                f"{p.annual_kg / 1000:,.0f}",
+            if p.is_main:
+                bold.append(i)
+            rows.append([
+                f"{p.name} (main)" if p.is_main else p.name,
+                # Three significant figures, not whole tonnes: a 10 t/yr plant
+                # listed its products as 2, 4 and 4, and anything under half a
+                # tonne read 0.
+                sig(p.annual_kg / 1000, 3),
                 f"{p.production_cost_eur_per_kg:,.2f}",
                 f"{p.price:,.2f}",
                 f"{p.allocation_share * 100:,.1f}",
                 f"{p.gwp_kg_co2eq_per_kg:,.2f}",
-            ]
-            for c, text in enumerate(cells):
-                item = QTableWidgetItem(text)
-                if c > 0:
-                    item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-                if p.is_main:
-                    from PySide6.QtGui import QFont
-                    font = item.font()
-                    font.setBold(True)
-                    item.setFont(font)
-                self.tbl_products.setItem(i, c, item)
-        self.tbl_products.resizeColumnsToContents()
+                money(p.revenue),
+            ])
+        fill_table(self.tbl_products, rows, numeric_from=1, bold_rows=bold, fit=True)
 
     # ------------------------------------------------------------------ #
     # File actions
@@ -2049,6 +1952,7 @@ class MainWindow(QMainWindow):
         self._products_backup = []
         self._snapshots = []
         self.reference = {}
+        self.reference_name = ""
         self.apply_scenario(self.default_scenario())
         self._refresh_compare()
         self.statusBar().showMessage(tr("New case: every field back to its default."), 4000)
@@ -2133,12 +2037,13 @@ class MainWindow(QMainWindow):
                 extras["uncertainty"] = self._last_uncertainty
             if getattr(self, "_snapshots", None):
                 extras["compare"] = {"order": KPI_ORDER, "snapshots": self._snapshots}
-            build_process_report(
-                path, self.results, self.build_scenario(),
-                flowsheet=ed.scene.flowsheet if ed is not None else None,
-                pfd_png=png if has_diagram else None,
-                title=f"{title} — process report", extras=extras,
-            )
+            with self._busy(tr("Writing the report…")):
+                build_process_report(
+                    path, self.results, self.build_scenario(),
+                    flowsheet=ed.scene.flowsheet if ed is not None else None,
+                    pfd_png=png if has_diagram else None,
+                    title=f"{title} — process report", extras=extras,
+                )
             self.statusBar().showMessage(f"Report saved to {path}", 6000)
         except Exception as exc:
             QMessageBox.warning(self, tr("Export failed"),
@@ -2154,7 +2059,7 @@ class MainWindow(QMainWindow):
 
         The old export reported the biomass-basis cost and GWP under plain
         names, so a multiproduct case exported 6.78 €/kg while the window showed
-        17.55 €/kg — with nothing in the file to say the two were per different
+        17.55 €/kg - with nothing in the file to say the two were per different
         things. The export now declares its functional unit and carries both
         bases plus the scenario that produced them.
         """
@@ -2180,6 +2085,7 @@ class MainWindow(QMainWindow):
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, tr("Load failed"), str(exc))
             return
+        self.reference_name = f"{filename} (bundled)"
         self.show_comparison()
 
     def load_reference_csv(self):
@@ -2191,6 +2097,7 @@ class MainWindow(QMainWindow):
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, tr("Load failed"), str(exc))
             return
+        self.reference_name = path
         self.show_comparison()
 
     def load_superpro_excel(self):
@@ -2211,152 +2118,33 @@ class MainWindow(QMainWindow):
                 "CSV template instead (Validation menu).",
             )
             return
+        self.reference_name = path
         self.show_comparison()
 
+    def _show_validation(self, sub: int):
+        self.tabs.setCurrentIndex(TAB_VALIDATION)
+        self.val_tabs.setCurrentIndex(sub)
+
     def show_comparison(self):
-        if not self._require_results():
-            return
-        if not self.reference:
-            QMessageBox.information(
-                self, tr("No reference loaded"),
-                "Load a SuperPro Excel report or a reference CSV first "
-                "(Validation menu). A CSV template is in data/.",
-            )
-            return
-        rows = compare(self.reference, self.results)
-        dlg = QDialog(self)
-        dlg.setWindowTitle(tr("Validation vs reference (e.g. SuperPro)"))
-        dlg.resize(680, 300)
-        lay = QVBoxLayout(dlg)
-        table = QTableWidget(len(rows), 5)
-        table.setHorizontalHeaderLabels([tr("Metric"), tr("Reference"), tr("This tool"), "Δ %", tr("Fit")])
-        table.horizontalHeader().setStretchLastSection(True)
-        table.verticalHeader().setVisible(False)
-        colors = {"good": "#2e7d32", "fair": "#e08e0b", "poor": "#c0392b", "n/a": "#9aa7b0"}
-        for i, row in enumerate(rows):
-            ref = "—" if row.reference is None else f"{row.reference:,.2f}"
-            pct = "—" if row.pct_diff is None else f"{row.pct_diff:+.1f}%"
-            cells = [f"{row.label} ({row.unit})", ref, f"{row.model:,.2f}", pct, row.status]
-            for c, text in enumerate(cells):
-                item = QTableWidgetItem(text)
-                if c == 4:
-                    item.setForeground(Qt.white if False else item.foreground())
-                if c == 3 and row.pct_diff is not None:
-                    from PySide6.QtGui import QColor
-                    item.setForeground(QColor(colors[row.status]))
-                table.setItem(i, c, item)
-        table.resizeColumnsToContents()
-        lay.addWidget(QLabel(
-            "Green ≤10%, amber ≤25%, red >25% deviation from the reference."
-        ))
-        lay.addWidget(table)
-        dlg.exec()
+        validation_panel.refresh_reference(self)
+        self._show_validation(SUB_REFERENCE)
 
     def show_benchmarks(self):
-        if not self._require_results():
-            return
-        from PySide6.QtGui import QColor
-
-        rows = check_benchmarks(self.results)
-        cat = infer_category(self.system).replace("_", " ")
-        dlg = QDialog(self)
-        dlg.setWindowTitle(tr("Open-literature benchmarks (per kg dry biomass)"))
-        dlg.resize(760, 320)
-        lay = QVBoxLayout(dlg)
-        lay.addWidget(QLabel(
-            f"Category: <b>{cat}</b>. The model value should fall within the published "
-            "range (green). Ranges are wide — read the source. Values ~USD≈EUR."
-        ))
-        table = QTableWidget(len(rows), 5)
-        table.setHorizontalHeaderLabels([tr("Metric"), tr("Model"), tr("Literature range"), tr("Fit"), tr("Source")])
-        table.horizontalHeader().setStretchLastSection(True)
-        table.verticalHeader().setVisible(False)
-        colors = {"within": "#2e7d32", "above": "#c0392b", "below": "#e08e0b"}
-        labels = {"production_cost": "Production cost", "gwp": "GWP",
-                  "ced": "Energy demand", "electricity": "Electricity"}
-        for i, r in enumerate(rows):
-            cells = [
-                f"{labels.get(r.metric, r.metric)} ({r.unit})",
-                f"{r.model:,.2f}",
-                f"{r.low:g} – {r.high:g}",
-                r.status,
-                r.source,
-            ]
-            for c, text in enumerate(cells):
-                item = QTableWidgetItem(text)
-                if c in (1, 2):
-                    item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-                if c == 3:
-                    item.setForeground(QColor(colors.get(r.status, "#333333")))
-                table.setItem(i, c, item)
-        table.resizeColumnsToContents()
-        lay.addWidget(table)
-        n_ok = sum(1 for r in rows if r.in_range)
-        lay.addWidget(QLabel(
-            f"{n_ok}/{len(rows)} metrics within the published range."
-        ))
-        dlg.exec()
+        validation_panel.refresh_benchmarks(self)
+        self._show_validation(SUB_BENCHMARKS)
 
     def show_market_prices(self):
-        prices = load_market_prices()
-        dlg = QDialog(self)
-        dlg.setWindowTitle(tr("Indicative microalgal product prices"))
-        dlg.resize(760, 320)
-        lay = QVBoxLayout(dlg)
-        lay.addWidget(QLabel(
-            "Order-of-magnitude ranges to sanity-check selling prices (USD≈EUR). "
-            "Broad and time-varying — read the source."
-        ))
-        table = QTableWidget(len(prices), 4)
-        table.setHorizontalHeaderLabels([tr("Product"), tr("Range"), tr("Unit"), tr("Source")])
-        table.horizontalHeader().setStretchLastSection(True)
-        table.verticalHeader().setVisible(False)
-        for i, p in enumerate(prices):
-            cells = [p.product, f"{p.low:g} – {p.high:g}", p.unit, p.source]
-            for c, text in enumerate(cells):
-                item = QTableWidgetItem(text)
-                if c == 1:
-                    item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-                table.setItem(i, c, item)
-        table.resizeColumnsToContents()
-        lay.addWidget(table)
-        dlg.exec()
+        self._show_validation(SUB_MARKET)
 
     def show_validation_references(self):
-        refs = load_validation_references()
-        dlg = QDialog(self)
-        dlg.setWindowTitle(tr("Validation library — published TEA/LCA studies"))
-        dlg.resize(900, 360)
-        lay = QVBoxLayout(dlg)
-        lay.addWidget(QLabel(
-            "Published Spirulina/microalgae studies this model has been checked against — "
-            "the paper's reported value next to our model's output. Hover a paper for its system & link."
-        ))
-        headers = [tr("Paper"), tr("Type"), tr("Metric"),
-                   tr("Paper value"), tr("Our model"), tr("Match")]
-        table = QTableWidget(len(refs), len(headers))
-        table.setHorizontalHeaderLabels(headers)
-        table.horizontalHeader().setStretchLastSection(True)
-        table.verticalHeader().setVisible(False)
-        for i, r in enumerate(refs):
-            cells = [r.paper, r.type, r.metric, r.paper_value, r.model_value, r.match]
-            for c, text in enumerate(cells):
-                item = QTableWidgetItem(text)
-                if c == 0 and (r.system or r.url):
-                    item.setToolTip(f"{r.system}\n{r.url}".strip())
-                if c >= 3:
-                    item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-                table.setItem(i, c, item)
-        table.resizeColumnsToContents()
-        lay.addWidget(table)
-        if not refs:
-            lay.addWidget(QLabel(tr("No validation references defined yet.")))
-        dlg.exec()
+        self._show_validation(SUB_LIBRARY)
 
     def show_about(self):
+        from algametrix import __version__
+
         QMessageBox.about(
             self, "About AlgaMetrix",
-            "<b>AlgaMetrix</b><br>Open-source techno-economic &amp; life-cycle "
+            f"<b>AlgaMetrix {__version__}</b><br>Open-source techno-economic &amp; life-cycle "
             "analysis for microalgae, cyanobacteria and thraustochytrid biomass.<br><br>"
             "One mass/energy balance feeds both the TEA and the LCA.<br>"
             "MIT licensed. Default values are literature-typical placeholders.",

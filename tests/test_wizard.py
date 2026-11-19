@@ -144,6 +144,101 @@ def test_continuous_operation_keeps_the_productivity_route(wizard, lib):
 
 
 # --------------------------------------------------------------------------- #
+# Sizing by target shows, and takes, the two numbers that set the area
+# --------------------------------------------------------------------------- #
+def size_by_target(cult, target=10.0, productivity=12.0, days=240.0):
+    cult.cmb_batch.setCurrentIndex(0)              # continuous
+    cult.cmb_mode.setCurrentIndex(0)               # by target production
+    cult.spn_target.setValue(target)
+    cult.spn_productivity.setValue(productivity)
+    cult.spn_days.setValue(days)
+
+
+def test_a_target_is_sized_with_the_productivity_and_days_on_the_page(wizard):
+    cult = from_scratch(wizard)
+    assert wizard.scenario.harvesting.name == "Settling + centrifugation"   # recovery 0.90
+    size_by_target(cult)
+    text = cult.lbl_derived.text()
+    assert "10 t/yr → 3,858 m² at 12 g/m²/d × 240 d = 2.88 kg/m²/yr" in text
+    assert "90% harvest recovery" in text
+    assert cult.validatePage()
+    scn = wizard.scenario
+    assert scn.system.productivity == pytest.approx(12.0)
+    assert scn.system.operating_days == pytest.approx(240.0)
+    assert scn.scale == pytest.approx(10_000 / 0.90 / 2.88, rel=1e-6)      # 3,858 m²
+
+
+def test_the_harvesting_picked_downstream_resizes_the_target(wizard):
+    cult = from_scratch(wizard)
+    size_by_target(cult)
+    assert cult.validatePage()
+    down = page(wizard, DOWNSTREAM)
+    down.initializePage()
+    down.cmb_harv.setCurrentText("Centrifugation only")      # recovery 0.95
+    assert down.validatePage()
+    scn = wizard.scenario
+    assert scn.harvesting.recovery == pytest.approx(0.95)
+    assert scn.scale == pytest.approx(10_000 / 0.95 / 2.88, rel=1e-6)      # about 3,655 m²
+    assert run_scenario(scn).inventory.annual_biomass_kg / 1000 == pytest.approx(10.0, rel=1e-6)
+
+
+def test_sizing_by_area_does_not_resize_downstream(wizard):
+    cult = from_scratch(wizard)
+    cult.cmb_mode.setCurrentIndex(1)               # by cultivation size
+    cult.spn_size.setValue(5_000.0)
+    assert cult.validatePage()
+    down = page(wizard, DOWNSTREAM)
+    down.initializePage()
+    down.cmb_harv.setCurrentText("Centrifugation only")
+    assert down.validatePage()
+    assert wizard.scenario.scale == pytest.approx(5_000.0)
+
+
+def test_changing_the_system_resets_productivity_and_days(wizard, lib):
+    cult = from_scratch(wizard)
+    cult.spn_productivity.setValue(12.0)
+    cult.spn_days.setValue(240.0)
+    cult.cmb_sys.setCurrentText("Flat-panel photobioreactor")
+    flat = lib.systems["Flat-panel photobioreactor"]
+    assert cult.spn_productivity.value() == pytest.approx(flat.productivity)
+    assert cult.spn_days.value() == pytest.approx(flat.operating_days)
+
+
+def test_productivity_is_shown_for_continuous_operation_only(wizard):
+    cult = from_scratch(wizard)
+    holder = cult._holders[id(cult.spn_productivity)]
+    cult.cmb_batch.setCurrentIndex(0)
+    assert cult.form.isRowVisible(holder)
+    cult.cmb_batch.setCurrentIndex(1)
+    assert not cult.form.isRowVisible(holder)
+    assert cult.form.isRowVisible(cult._holders[id(cult.spn_days)])
+
+
+def test_sizing_by_area_states_the_gross_output(wizard):
+    cult = from_scratch(wizard)
+    cult.cmb_batch.setCurrentIndex(0)
+    cult.cmb_mode.setCurrentIndex(1)
+    cult.spn_size.setValue(10_000.0)
+    cult.spn_productivity.setValue(20.0)
+    cult.spn_days.setValue(300.0)
+    # 10,000 m² × 20 g/m²/d × 300 d = 60,000 kg
+    assert "= 60 t/yr of gross dry biomass" in cult.lbl_derived.text()
+
+
+def test_the_review_states_productivity_and_days(wizard):
+    cult = from_scratch(wizard)
+    size_by_target(cult)
+    assert cult.validatePage()
+    for i in (DOWNSTREAM, CONTEXT):
+        p = page(wizard, i)
+        p.initializePage()
+        assert p.validatePage()
+    review = page(wizard, REVIEW)
+    review.initializePage()
+    assert "12 g/m²/d × 240 d" in review.lbl.text()
+
+
+# --------------------------------------------------------------------------- #
 # QA-010 — the wizard must refuse an impossible case
 # --------------------------------------------------------------------------- #
 def test_invalid_composition_cannot_leave_the_organism_page(wizard, monkeypatch):
