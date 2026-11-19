@@ -169,6 +169,37 @@ def test_analyses_start_from_an_empty_state(window):
     assert window.empty_cmp.isHidden()
 
 
+@pytest.mark.parametrize("size", [(1180, 760), (1440, 900)])
+def test_an_empty_state_hint_gets_the_height_its_text_needs(window, qapp, size):
+    """The hint used to be drawn narrower than the height it was given, and lost lines."""
+    from desktop.results_panel import TAB_COMPARE, TAB_PRODUCTS
+
+    window.resize(*size)
+    window.show()
+    # The default case is a single product, and no snapshot has been taken yet.
+    for tab, state in ((TAB_PRODUCTS, window.empty_products), (TAB_COMPARE, window.empty_cmp)):
+        window.tabs.setCurrentIndex(tab)
+        for _ in range(3):
+            qapp.processEvents()
+        assert state.isVisible()
+        hint = state._hint
+        assert hint.isVisible() and hint.text()
+        assert hint.heightForWidth(hint.width()) <= hint.height()
+
+
+def test_product_tonnage_keeps_three_significant_figures(window):
+    """A small plant listed its products in whole tonnes, and under half a tonne read 0."""
+    from algametrix.templates import get_template, set_scale_from_target
+
+    scn = get_template("Algal-oil biorefinery (phototrophic)").build(window.lib)
+    set_scale_from_target(scn, 3.0)
+    window.apply_scenario(scn)
+    table = window.tbl_products
+    shown = [table.item(r, 1).text() for r in range(table.rowCount())]
+    assert shown == [fmt.sig(p.annual_kg / 1000, 3) for p in window.results.products]
+    assert any("." in text for text in shown)
+
+
 def test_the_report_page_says_what_each_analysis_adds(window):
     text = window.lbl_report_pages.text()
     assert "Sensitivity sweep" in text and "needs" in text

@@ -43,6 +43,8 @@ from algametrix.templates import (
 
 from desktop import resources, theme
 from desktop.fields import plain_tooltip
+from desktop.fields import spec as field_spec
+from desktop.fmt import sig
 from desktop.i18n import tr
 from desktop.inputs_panel import number
 
@@ -368,6 +370,27 @@ class CultivationPage(QWizardPage):
         self.cmb_batch.addItems([tr("Continuous"), tr("Batch")])
         f.addRow(tr("Operation"), self.cmb_batch)
 
+        # The two numbers that set the area when sizing by target. They used to
+        # come from the system preset without being shown, so a target turned
+        # into an area with no visible basis. Productivity has no meaning at
+        # zero, hence the floor.
+        fp = field_spec("system", "productivity")
+        self.spn_productivity = number(
+            max(fp.lo, 0.1), fp.hi, 20.0, fp.step, fp.decimals, tooltip=plain_tooltip(
+                tr("Productivity"),
+                tr("Annual mean over the operating days, for the site's climate.")))
+        self.lbl_productivity = QLabel(tr("Productivity (g/m²/d)"))
+        self.lbl_productivity_unit = QLabel("g/m²/d")
+        self._add(f, self.lbl_productivity, self.spn_productivity,
+                  unit_label=self.lbl_productivity_unit)
+        fd = field_spec("system", "operating_days")
+        self.spn_days = number(
+            fd.lo, fd.hi, 330.0, fd.step, fd.decimals, tooltip=plain_tooltip(
+                tr("Operating days"),
+                tr("Days a year the plant produces. In batch operation it also sets the "
+                   "number of batches a year.")))
+        self._add(f, QLabel(tr("Operating days (d/yr)")), self.spn_days, "d/yr")
+
         # The three numbers that make a batch a batch. Without them "batch size"
         # is a free parameter and the reactor volume is decoration.
         self.spn_titer = number(0.1, 500.0, 50.0, 1.0, 1, tooltip=tr(
@@ -394,7 +417,7 @@ class CultivationPage(QWizardPage):
         self.cmb_sys.currentTextChanged.connect(self._sys_changed)
         self.cmb_batch.currentIndexChanged.connect(self._toggle)
         for w in (self.spn_size, self.spn_titer, self.spn_working, self.spn_cycle,
-                  self.spn_target):
+                  self.spn_target, self.spn_productivity, self.spn_days):
             w.valueChanged.connect(self._update_derived)
 
     def _add(self, form, label, field, unit: str = "", unit_label: QLabel | None = None):
@@ -430,6 +453,9 @@ class CultivationPage(QWizardPage):
         for widget in (self.spn_titer, self.spn_working):
             self._row_visible(widget, volume and self._is_batch())
         self._row_visible(self.spn_cycle, self._is_batch())
+        # A batch's output is batch size × batches a year; productivity only
+        # enters continuous operation. Operating days count in both.
+        self._row_visible(self.spn_productivity, not self._is_batch())
         self._update_derived()
 
     def _sys_changed(self, name):
@@ -441,6 +467,11 @@ class CultivationPage(QWizardPage):
         self.cmb_batch.setCurrentIndex(1 if s.mode.value == "heterotrophic" else 0)
         self.spn_titer.setValue(s.biomass_conc)
         self.spn_working.setValue(s.working_volume)
+        for sb, value in ((self.spn_productivity, s.productivity),
+                          (self.spn_days, s.operating_days)):
+            sb.blockSignals(True)
+            sb.setValue(value)
+            sb.blockSignals(False)
         # A basis change makes the old number mean something else: 100,000 m² of
         # pond is not 100,000 m³ of fermenter. Never carry it across.
         if s.basis != getattr(self, "_basis", None):
@@ -453,13 +484,52 @@ class CultivationPage(QWizardPage):
         self.lbl_size.setText(tr("Reactor volume (m³)") if volume else tr("Cultivation size (m²)"))
         self.lbl_size_unit.setText("m³" if volume else "m²")
         self.spn_size.setSingleStep(10 if volume else 1000)
+        self.lbl_productivity.setText(
+            tr("Productivity (g/L/d)") if volume else tr("Productivity (g/m²/d)"))
+        self.lbl_productivity_unit.setText("g/L/d" if volume else "g/m²/d")
+        self.spn_productivity.setSingleStep(0.1 if volume else 1.0)
+
+    def _sized_system(self, sysm):
+        """The selected system with the productivity and operating days typed here."""
+        sized = copy.deepcopy(sysm)
+        sized.productivity = self.spn_productivity.value()
+        sized.operating_days = self.spn_days.value()
+        return sized
+
+    def _continuous_text(self, sized, by_target: bool) -> str:
+        """The area (or volume) a target needs, or the output a size gives, with its basis."""
+        volume = sized.basis == Basis.VOLUME
+        if volume:
+            unit, p_unit, y_unit = "m³", "g/L/d", "kg/m³/yr"
+            per_unit = sized.productivity * sized.operating_days           # g/L/d = kg/m³/d
+        else:
+            unit, p_unit, y_unit = "m²", "g/m²/d", "kg/m²/yr"
+            per_unit = sized.productivity * sized.operating_days / 1000.0
+        recovery = self.wiz.scenario.harvesting.recovery
+        values = dict(u=unit, p=sig(sized.productivity, 3), pu=p_unit,
+                      d=f"{sized.operating_days:.0f}", r=f"{recovery:.0%}")
+        if by_target:
+            # Sized on a copy, the way validatePage will size it, so the yield
+            # of the main product for the chosen goal is in the number.
+            trial = copy.copy(self.wiz.scenario)
+            trial.system = sized
+            trial.batch_mode = False
+            set_scale_from_target(trial, self.spn_target.value())
+            return tr("{t} t/yr → {a} {u} at {p} {pu} × {d} d = {y} {yu}, with {r} harvest "
+                      "recovery.").format(t=sig(self.spn_target.value(), 3),
+                                          a=sig(trial.scale, 3), y=sig(per_unit, 3),
+                                          yu=y_unit, **values)
+        gross_t = self.spn_size.value() * per_unit / 1000.0
+        return tr("{s} {u} × {p} {pu} × {d} d = {g} t/yr of gross dry biomass, before {r} "
+                  "harvest recovery.").format(s=sig(self.spn_size.value(), 3),
+                                              g=sig(gross_t, 3), **values)
 
     def _update_derived(self):
         sysm = self._system()
         if sysm is None:
             return
         by_target = self.cmb_mode.currentIndex() == 0
-        batches = sysm.operating_days * 24.0 / max(self.spn_cycle.value(), 1e-9)
+        batches = self.spn_days.value() * 24.0 / max(self.spn_cycle.value(), 1e-9)
         if self._is_batch() and sysm.basis == Basis.VOLUME:
             if by_target:
                 self.lbl_derived.setText(tr(
@@ -485,9 +555,7 @@ class CultivationPage(QWizardPage):
                 "not enter it."
             ).format(n=batches))
         else:
-            self.lbl_derived.setText(tr(
-                "Continuous: output = scale × productivity × {d:.0f} operating days."
-            ).format(d=sysm.operating_days))
+            self.lbl_derived.setText(self._continuous_text(self._sized_system(sysm), by_target))
 
     def initializePage(self):
         scn = self.wiz.scenario
@@ -501,6 +569,8 @@ class CultivationPage(QWizardPage):
         self.spn_size.setValue(scn.scale)
         self.spn_titer.setValue(scn.system.biomass_conc)
         self.spn_working.setValue(scn.system.working_volume)
+        self.spn_productivity.setValue(scn.system.productivity)
+        self.spn_days.setValue(scn.system.operating_days)
         self.cmb_batch.setCurrentIndex(1 if scn.batch_mode else 0)
         if scn.batch_cycle_time_h > 0:
             self.spn_cycle.setValue(scn.batch_cycle_time_h)
@@ -510,6 +580,8 @@ class CultivationPage(QWizardPage):
     def validatePage(self):
         scn = self.wiz.scenario
         scn.system = copy.deepcopy(self.wiz.lib.systems[self.cmb_sys.currentText()])
+        scn.system.productivity = self.spn_productivity.value()
+        scn.system.operating_days = self.spn_days.value()
         scn.system.biomass_conc = self.spn_titer.value()
         scn.system.working_volume = self.spn_working.value()
         scn.materials = list(scn.system.materials)
@@ -518,8 +590,12 @@ class CultivationPage(QWizardPage):
         if scn.batch_mode:
             scn.batch_cycle_time_h = self.spn_cycle.value()
         if self.cmb_mode.currentIndex() == 0:
-            set_scale_from_target(scn, self.spn_target.value())
+            # Kept on the wizard: the downstream page sizes again once the
+            # harvesting, and so the recovery, is known.
+            self.wiz.target_t_yr = self.spn_target.value()
+            set_scale_from_target(scn, self.wiz.target_t_yr)
         else:
+            self.wiz.target_t_yr = None
             scn.scale = self.spn_size.value()
             if scn.batch_mode and scn.system.basis == Basis.VOLUME:
                 # One batch is what the vessel holds. Sizing by volume therefore
@@ -606,6 +682,11 @@ class DownstreamPage(QWizardPage):
             new_ext.enabled = True
             new_ext.allocation = ext.allocation
             self.wiz.scenario.extraction = new_ext
+        # The cultivation page sized a target with the harvesting the scenario
+        # had then. Recoveries differ between methods, so size again with the
+        # one chosen here, or the plant misses its target by the difference.
+        if self.wiz.target_t_yr is not None:
+            set_scale_from_target(self.wiz.scenario, self.wiz.target_t_yr)
         return True
 
 
@@ -749,6 +830,11 @@ class ReviewPage(QWizardPage):
                        + tr("Validated against: {v}").format(v=f"{t.name} — {t.validation}")
                        + "</p>")
         per = mp.name if mp else "dry biomass"
+        system = f"{scn.system.name}  ·  {scn.scale:,.0f} {unit}  ·  {op}"
+        if not scn.batch_mode:
+            p_unit = "g/m²/d" if scn.system.basis == Basis.AREA else "g/L/d"
+            system += (f"  ·  {sig(scn.system.productivity, 3)} {p_unit} × "
+                       f"{scn.system.operating_days:.0f} d")
 
         def row(k, v):
             return (f"<tr><td style='color:{theme.INK_3}; padding:2px 14px 2px 0'>{k}</td>"
@@ -757,7 +843,7 @@ class ReviewPage(QWizardPage):
         self.lbl.setText(
             "<table cellspacing='0'>"
             + row(tr("Organism"), scn.organism.name)
-            + row(tr("System"), f"{scn.system.name}  ·  {scn.scale:,.0f} {unit}  ·  {op}")
+            + row(tr("System"), system)
             + row(tr("Product goal"), prod)
             + "</table><table cellspacing='0' style='margin-top:10px'>"
             + row(tr("Production cost"), f"<b>€ {cost:,.2f}</b> / kg {per}")
@@ -776,6 +862,9 @@ class SetupWizard(QWizard):
         self.scenario = _default_scenario(lib)
         self.from_example: str | None = None
         self.goal = "biomass"
+        #: Set when the cultivation page sizes by target, so the downstream page
+        #: can size again with the harvesting it picks.
+        self.target_t_yr: float | None = None
         self.setWindowTitle("AlgaMetrix")
         self.setWizardStyle(QWizard.ModernStyle)
         self.setOption(QWizard.NoBackButtonOnStartPage, True)
